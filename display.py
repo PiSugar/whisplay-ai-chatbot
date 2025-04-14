@@ -38,7 +38,7 @@ def main():
     # 如果你有专门支持 emoji 的字体文件，则应加载该字体文件。
     try:
         # 注意修改 font_path 为你系统中存在的字体文件路径
-        font_path = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
+        font_path = "/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf"
         font = ImageFont.truetype(font_path, 28)
     except IOError:
         print("加载字体失败，请检查字体路径或安装对应字体。")
