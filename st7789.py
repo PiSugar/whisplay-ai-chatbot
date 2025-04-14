@@ -14,7 +14,7 @@ def main():
     args = parser.parse_args()
 
     # 初始化 ST7789 屏幕。注意：以下参数依据具体平台和接线配置需要修改。
-    disp = st7789.st7789(
+    disp = st7789.ST7789(
         # SPI 相关参数（根据实际情况设置）
         port=0, 
         cs=0, 
