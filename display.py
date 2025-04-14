@@ -20,7 +20,7 @@ def main():
         cs=0, 
         dc=9,            # 数据/命令选择引脚
         backlight=19,    # 背光控制引脚
-        rotation=90,     # 旋转角度（根据屏幕安装方向设置）
+        rotation=0,     # 旋转角度（根据屏幕安装方向设置）
         width=240, 
         height=280, 
         spi_speed_hz=40000000  # SPI 总线时钟
