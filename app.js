@@ -2,6 +2,7 @@ const { exec, spawn } = require("child_process");
 const { recognizeAudio } = require("./tencent-cloud");
 const chatWithDoubao = require("./doubao-llm");
 const volcengineTTS = require("./volcengine-tts");
+const { main: display } = require("./display");
 
 const recordAudio = (outputPath, duration = 10) => {
   return new Promise((resolve, reject) => {
@@ -57,6 +58,8 @@ const playAudioData = (resAudioData, audioDuration) => {
 (async () => {
   // const audioData = await ttsByteDance('欢迎使用豆包语音合成服务');
   // playAudioData(audioData);
+
+  display();
 
   const filePath = "record.mp3";
 
