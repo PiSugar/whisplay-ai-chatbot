@@ -21,7 +21,7 @@ const volcengineTTS = async (text) => {
       voice_type: "zh_female_wanwanxiaohe_moon_bigtts",
       encoding: "mp3",
       speed_ratio: 1,
-      volume_ratio: 1.0,
+      volume_ratio: 2.0,
     },
     request: {
       reqid: `req_${Date.now()}`,
