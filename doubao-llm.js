@@ -1,4 +1,5 @@
 const axios = require("axios");
+require("dotenv").config();
 
 // Doubao LLM
 const doubaoAccessToken = process.env.DOUBAO_ACCESS_TOKEN;

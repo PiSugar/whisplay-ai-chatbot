@@ -2,7 +2,6 @@ const { exec, spawn } = require("child_process");
 const { recognizeAudio } = require("./tencent-cloud");
 const chatWithDoubao = require("./doubao-llm");
 const volcengineTTS = require("./volcengine-tts");
-require("dotenv").config();
 
 const recordAudio = (outputPath, duration = 10) => {
   return new Promise((resolve, reject) => {

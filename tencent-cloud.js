@@ -1,6 +1,7 @@
 const fs = require("fs");
 const crypto = require("crypto");
 const axios = require("axios");
+require("dotenv").config();
 
 // Tencent Cloud ASR
 const SECRET_ID = process.env.SECRET_ID;

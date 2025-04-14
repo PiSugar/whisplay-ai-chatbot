@@ -1,4 +1,5 @@
 const axios = require("axios");
+require("dotenv").config();
 
 // ByteDance TTS
 const byteDanceAppId = process.env.BYTE_DANCE_APP_ID;
