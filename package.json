@@ -9,8 +9,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@lynniemagoo/adafruit-gfx-library": "^1.1.0",
-    "@lynniemagoo/adafruit-st7735-library": "^1.0.2",
     "axios": "^1.8.4",
     "crypto": "^1.0.1",
     "dotenv": "^16.5.0",
