@@ -47,7 +47,9 @@ def main():
     # 合并 emoji 和文字
     display_text = f"{args.emoji} {args.text}"
     # 计算文本尺寸，使得能够在屏幕上居中显示
-    text_width, text_height = draw.textsize(display_text, font=font)
+    bbox = draw.textbbox((0, 0), display_text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
     x = (disp.width - text_width) // 2
     y = (disp.height - text_height) // 2
 
