@@ -10,7 +10,7 @@ const recordAudio = (outputPath, duration = 10) => {
     // const cmd = `arecord -D hw:0,0 -f S16_LE -r 16000 -c 1 -t raw | opusenc --bitrate 16 --raw --raw-rate 16000 --raw-chan 1 - ${outputPath}`;
     // const cmd = `arecord -D hw:0,0 -f S16_LE -r 16000 -c 2 -t raw | lame -r -s 16 - ${outputPath}`;
     // const cmd == `sox -d -t wavpcm -c 2 -b 16 -r 16000 -e signed-integer --endian little output.wav silence 1 0.1 25% 1 3.0 30%`
-    const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 15% 1 1.0 15%`;
+    const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 15% 1 1.0 20%`;
     console.log(`开始录音, 最长${duration}秒钟...`);
     const process = exec(cmd, (err, stdout, stderr) => {
       if (err) reject(stderr);
