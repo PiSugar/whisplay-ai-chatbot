@@ -47,4 +47,4 @@ const chatWithDoubao = async (userMessage) => {
   return answer;
 };
 
-modele.exports = chatWithDoubao;
+module.exports = chatWithDoubao;
