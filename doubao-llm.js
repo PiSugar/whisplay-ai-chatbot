@@ -13,6 +13,7 @@ const messages = [
 ];
 
 const chatWithDoubao = async (userMessage) => {
+  console.time("llm");
   messages.push({
     role: "user",
     content: userMessage,
@@ -45,6 +46,7 @@ const chatWithDoubao = async (userMessage) => {
     role: "assistant",
     content: answer,
   });
+  console.timeEnd("llm");
   return answer;
 };
 

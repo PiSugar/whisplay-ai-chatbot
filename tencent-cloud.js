@@ -83,7 +83,7 @@ const recognizeAudio = async (audioPath) => {
   try {
     const res = await axios.post(`https://${ENDPOINT}`, payload, { headers });
     console.timeEnd("识别音频");
-    console.log("识别结果：", res.data);
+    console.log("识别结果：", res.data.Response.Result);
     return res.data.Response.Result;
   } catch (err) {
     console.error("识别失败：", err.response?.data || err.message);
