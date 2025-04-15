@@ -255,9 +255,14 @@ const client = new VolcengineAsrClient({
 
 let recognizeResolve = () => "";
 
+client.onOpen = () => {
+  console.log("ASR WebSocket 连接成功");
+}
+
 client.onMessage = (data) => {
   const astText = data?.result?.[0]?.text || "";
   console.timeEnd("识别音频");
+  console.log("识别结果：", astText);
   recognizeResolve(astText);
 };
 
