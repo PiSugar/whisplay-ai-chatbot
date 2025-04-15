@@ -257,10 +257,12 @@ let recognizeResolve = () => "";
 
 client.onMessage = (data) => {
   const astText = data?.result?.[0]?.text || "";
+  console.timeEnd("识别音频");
   recognizeResolve(astText);
 };
 
 const recognizeAudio = (audioPath) => {
+  console.time("识别音频");
   return new Promise((resolve, reject) => {
     const audioData = fs.readFileSync(audioPath);
     client.send(audioData);

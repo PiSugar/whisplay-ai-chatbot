@@ -33,7 +33,6 @@ const chatWithDoubao = async (userMessage) => {
       }
     )
     .then((response) => {
-      console.log("ChatGPT response:", response.data);
       return response.data;
     })
     .catch((error) => {
