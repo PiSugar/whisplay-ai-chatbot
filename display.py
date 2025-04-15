@@ -161,6 +161,10 @@ class LCD:
 
     def draw_image(self, x, y, width, height, pixel_data):
         if (x + width > self.WIDTH) or (y + height > self.HEIGHT):
+            # 打印宽度
+            print(f"Image width: {width}, height: {height}")
+            # 打印屏幕宽度
+            print(f"Screen width: {self.WIDTH}, height: {self.HEIGHT}")
             raise ValueError("图像尺寸超出屏幕范围")
         self.set_window(x, y, x + width - 1, y + height - 1)
         self._send_data(pixel_data)
