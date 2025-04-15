@@ -1,5 +1,8 @@
 require("dotenv").config();
 
+const byteDanceAppId = process.env.BYTE_DANCE_APP_ID;
+const byteDanceAccessToken = process.env.BYTE_DANCE_ACCESS_TOKEN;
+
 /*
  * MIT License
  *
@@ -244,9 +247,9 @@ class VolcengineAsrClient {
 }
 
 const client = new VolcengineAsrClient({
-  appid: process.env.BYTE_DANCE_APP_ID,
-  token: process.env.BYTE_DANCE_ACCESS_TOKEN,
-  cluster: "volcano_asr",
+  appid: byteDanceAppId,
+  token: byteDanceAccessToken,
+  cluster: "volcengine_input_common",
   uid: "01",
 });
 
