@@ -207,6 +207,6 @@ if __name__ == "__main__":
     # lcd_test.test_refresh_rate(100)  # 测试 100 次刷新
     # 测试绘制文字
     lcd_test.fill(0x0000)  # 清屏
-    lcd_test.draw_text(10, 10, "Hello World", font, 0xFFFF)  # 白色文字
-    lcd_test.draw_text(10, 50, "😊", font, 0xFFFF)  # 白色 emoji
+    lcd_test.draw_text(0, 0, "Hello World", font, 0xFFFF)  # 白色文字
+    lcd_test.draw_text(0, 0, "😊", font, 0xFFFF)  # 白色 emoji
     lcd_test.cleanup()
