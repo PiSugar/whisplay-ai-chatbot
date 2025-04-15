@@ -1,7 +1,8 @@
 const { exec, spawn } = require("child_process");
-const { recognizeAudio } = require("./tencent-cloud");
+// const { recognizeAudio } = require("./tencent-cloud");
 const chatWithDoubao = require("./doubao-llm");
 const volcengineTTS = require("./volcengine-tts");
+const volcengineASR = require("./volcengine-asr");
 const { main: display } = require("./display");
 
 const recordAudio = (outputPath, duration = 10) => {
@@ -67,7 +68,8 @@ const playAudioData = (resAudioData, audioDuration) => {
     console.log("聆听中...");
     await recordAudio(filePath, 60);
     console.log("识别中...");
-    const text = await recognizeAudio(filePath);
+    // const text = await recognizeAudio(filePath);
+    const text = await volcengineASR(filePath);
 
     // 调用腾讯云语音合成，播报识别结果
     // const audioData = await synthesizeSpeech(res);
