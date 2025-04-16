@@ -17,7 +17,7 @@ const recordAudio = (outputPath, duration = 10) => {
   });
 };
 
-const player = spawn("mpg123", ["-", "--scale", "1.2"]); // 设置音量为50%
+const player = spawn("mpg123", ["-", "--scale", "2"]); // 设置音量为50%
 
 const playAudioData = (resAudioData, audioDuration) => {
   // const audioData = Buffer.from(resAudioData).toString('base64');
