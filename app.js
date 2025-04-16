@@ -1,6 +1,7 @@
 const chatWithDoubao = require("./cloud-api/doubao-llm");
 const volcengineTTS = require("./cloud-api/volcengine-tts");
 const volcengineASR = require("./cloud-api/volcengine-asr");
+const { recognizeAudio } = require("./cloud-api/tencent-cloud");
 const { main: display } = require("./display");
 const { recordAudio, playAudioData } = require("./device/audio");
 
@@ -14,8 +15,8 @@ const { recordAudio, playAudioData } = require("./device/audio");
     console.log("聆听中...");
     await recordAudio(filePath, 60);
     console.log("识别中...");
-    // const text = await recognizeAudio(filePath);
-    const text = await volcengineASR(filePath);
+    const text = await recognizeAudio(filePath);
+    // const text = await volcengineASR(filePath);
 
     // 调用腾讯云语音合成，播报识别结果
     // const audioData = await synthesizeSpeech(res);
