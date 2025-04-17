@@ -4,7 +4,7 @@ const { createSteamResponser } = require("./device/audio");
 
 const { partial, endPartial, getPlayEndPromise } =
   createSteamResponser(volcengineTTS, (text) => {
-    console.log("完整回复:", text);
+    console.log("完整回复 outside:", text);
   });
 
 // main

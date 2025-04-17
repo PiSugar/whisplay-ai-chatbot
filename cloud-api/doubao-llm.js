@@ -50,6 +50,8 @@ const chatWithDoubao = async (userMessage) => {
   return answer;
 };
 
+let partialAnswer = "";
+
 const chatWithDoubaoStream = async (userMessage, cb, endCallBack) => {
   console.time("llm");
   messages.push({
@@ -60,6 +62,7 @@ const chatWithDoubaoStream = async (userMessage, cb, endCallBack) => {
   let promise = new Promise((resolve, reject) => {
     endResolve = resolve;
   });
+  partialAnswer = "";
   axios
     .post(
       "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
@@ -102,8 +105,8 @@ const chatWithDoubaoStream = async (userMessage, cb, endCallBack) => {
           const answer = parsedData
             .map((item) => get(item, "choices[0].delta.content", ""))
             .join("");
-          console.log("response:", answer);
           cb(answer);
+          partialAnswer += answer;
         } catch (error) {
           // 处理解析错误
           console.error("Error parsing data:", error, data);
@@ -114,6 +117,11 @@ const chatWithDoubaoStream = async (userMessage, cb, endCallBack) => {
       response.data.on("end", () => {
         console.log("Stream ended");
         endResolve(true); // 调用结束回调函数
+        messages.push({
+          role: "assistant",
+          content: partialAnswer,
+        });
+        endCallBack();
       });
     })
     .catch((error) => {
