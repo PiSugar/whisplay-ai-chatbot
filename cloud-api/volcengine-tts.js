@@ -1,4 +1,5 @@
 const axios = require("axios");
+const uuidv4 = require("uuid").v4;
 require("dotenv").config();
 
 // ByteDance TTS
@@ -6,7 +7,8 @@ const byteDanceAppId = process.env.BYTE_DANCE_APP_ID;
 const byteDanceAccessToken = process.env.BYTE_DANCE_ACCESS_TOKEN;
 
 const volcengineTTS = async (text) => {
-  console.time("合成语音");
+  const uuid = uuidv4();
+  console.time(`合成语音${uuid}`);
   // https://openspeech.bytedance.com/api/v1/tts
   const payload = {
     app: {
@@ -42,10 +44,10 @@ const volcengineTTS = async (text) => {
       { headers }
     );
     // console.log('res.data', res.data)
-    console.timeEnd("合成语音");
+    console.timeEnd(`合成语音${uuid}`);
     return { data: res.data.data, duration: res.data.addition.duration };
   } catch (err) {
-    console.error("合成语音失败：", err.response?.data || err.message);
+    console.error(`合成语音${uuid}失败：`, err.response?.data || err.message);
   }
 };
 

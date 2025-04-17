@@ -1,212 +1,252 @@
-import RPi.GPIO as GPIO
-import spidev
-import time
+import unicodedata
 from PIL import Image, ImageDraw, ImageFont
+import cairosvg
+from io import BytesIO
+import os
+import numpy as np
 
-font_path = "/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf"
-font = ImageFont.truetype(font_path, 28)
+def image_to_rgb565(image: Image.Image, width: int, height: int) -> list:
+    """
+    将 PIL.Image 图像转换为 LCD 显示用的 RGB565 格式数据
+    包括缩放、居中填充和 RGB565 转换
+    """
+    # 确保为 RGB 模式
+    image = image.convert("RGB")
 
+    # 缩放图像并保持比例，长边等于 LCD 尺寸的一边
+    image.thumbnail((width, height), Image.LANCZOS)
 
-class LCD:
-    def __init__(self):
-        self.WIDTH = 240
-        self.HEIGHT = 280
+    # 创建黑底图像，居中放置缩放后的图像
+    bg = Image.new("RGB", (width, height), (0, 0, 0))
+    x = (width - image.width) // 2
+    y = (height - image.height) // 2
+    bg.paste(image, (x, y))
 
-        self.DC_PIN = 13
-        self.RST_PIN = 7
-        self.LED_PIN = 15
+    # 转换为 numpy 数组
+    np_img = np.array(bg)
 
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setwarnings(False)
-        GPIO.setup([self.DC_PIN, self.RST_PIN, self.LED_PIN], GPIO.OUT)
+    # 分量提取并转换为 RGB565
+    r = (np_img[:, :, 0] >> 3).astype(np.uint16)
+    g = (np_img[:, :, 1] >> 2).astype(np.uint16)
+    b = (np_img[:, :, 2] >> 3).astype(np.uint16)
 
+    rgb565 = (r << 11) | (g << 5) | b
 
+    # 拆分高低字节（按大端或小端方式）
+    high_byte = (rgb565 >> 8).astype(np.uint8)
+    low_byte = (rgb565 & 0xFF).astype(np.uint8)
 
-        self.spi = spidev.SpiDev()
-        self.spi.open(0, 0)
-        self.spi.max_speed_hz = 200_000_000
-        self.spi.mode = 0b00
+    # 交错拼接（高低字节顺序依 LCD 要求调整）
+    interleaved = np.dstack((high_byte, low_byte)).flatten().tolist()
 
-        self.reset()
-        self._init_display()
-        self.fill(0)
-        GPIO.output(self.LED_PIN, GPIO.LOW)
-        self.previous_frame = None  # 用于存储上一帧图像
+    return interleaved
 
-    def reset(self):
-        GPIO.output(self.RST_PIN, GPIO.HIGH)
-        time.sleep(0.1)
-        GPIO.output(self.RST_PIN, GPIO.LOW)
-        time.sleep(0.1)
-        GPIO.output(self.RST_PIN, GPIO.HIGH)
-        time.sleep(0.12)
+def emoji_to_filename(char):
+    return '-'.join(f"{ord(c):x}" for c in char) + ".svg"
 
-    def _init_display(self):
-        self._send_command(0x11)  # Sleep out
-        time.sleep(0.12)
+def get_local_emoji_svg_image(char, size):
+    """从本地 SVG 渲染 Emoji 图像"""
+    filename = emoji_to_filename(char)
+    path = os.path.join("emoji_svg", filename)
+    if not os.path.exists(path):
+        print(f"[警告] 找不到 SVG 图标: {path}")
+        return None
+    try:
+        png_bytes = cairosvg.svg2png(url=path, output_width=size, output_height=size)
+        img = Image.open(BytesIO(png_bytes)).convert("RGBA")
+        return img
+    except Exception as e:
+        print(f"[错误] 渲染 SVG 出错: {e}")
+        return None
 
-        # 设置方向，替换这里的 USE_HORIZONTAL 逻辑
-        USE_HORIZONTAL = 0
-        direction = {0: 0x00, 1: 0xC0, 2: 0x70, 3: 0xA0}.get(USE_HORIZONTAL, 0x00)
-        self._send_command(0x36, direction)
+def is_emoji(char):
+    """判断是否为 Emoji"""
+    return unicodedata.category(char) in ('So', 'Sk') or ord(char) > 0x1F000
 
-        self._send_command(0x3A, 0x05)
+def render_mixed_text(text, font_path, font_size, image_size, start_xy=(0, 0)):
+    """
+    将混合文字 + SVG Emoji 渲染为 PIL.Image
+    emoji 将与文字底部对齐（基线对齐）
+    """
+    image = Image.new("RGBA", image_size, (0, 0, 0, 255))  # 黑底
+    draw = ImageDraw.Draw(image)
 
-        self._send_command(0xB2, 0x0C, 0x0C, 0x00, 0x33, 0x33)
-        self._send_command(0xB7, 0x35)
-        self._send_command(0xBB, 0x32)
-        self._send_command(0xC2, 0x01)
-        self._send_command(0xC3, 0x15)
-        self._send_command(0xC4, 0x20)
-        self._send_command(0xC6, 0x0F)
-        self._send_command(0xD0, 0xA4, 0xA1)
+    font = ImageFont.truetype(font_path, font_size)
+    x, y = start_xy
 
-        self._send_command(
-            0xE0,
-            0xD0,
-            0x08,
-            0x0E,
-            0x09,
-            0x09,
-            0x05,
-            0x31,
-            0x33,
-            0x48,
-            0x17,
-            0x14,
-            0x15,
-            0x31,
-            0x34,
-        )
+    ascent, descent = font.getmetrics()
+    baseline = y + ascent  # 字体基线的 y 坐标
 
-        self._send_command(
-            0xE1,
-            0xD0,
-            0x08,
-            0x0E,
-            0x09,
-            0x09,
-            0x15,
-            0x31,
-            0x33,
-            0x48,
-            0x17,
-            0x14,
-            0x15,
-            0x31,
-            0x34,
-        )
+    for char in text:
+        if is_emoji(char):
+            emoji_img = get_local_emoji_svg_image(char, size=font_size)
+            if emoji_img:
+                emoji_y = baseline - emoji_img.height  # 让 emoji 底部对齐文字基线
+                image.paste(emoji_img, (x, emoji_y), emoji_img)
+                x += emoji_img.width
+        else:
+            draw.text((x, y), char, font=font, fill=(255, 255, 255))
+            char_width, _ = draw.textsize(char, font=font)
+            x += char_width
 
-        self._send_command(0x21)  # Display inversion on
-        self._send_command(0x29)  # Display ON
+    return image
+def render_multi_text(entries, font_path, image_size):
+    """
+    支持多个 (x, y, text, font_size) 输入，逐段绘制文字（可含 emoji）
+    每段可以有不同字号
+    """
+    image = Image.new("RGBA", image_size, (0, 0, 0, 255))  # 黑底
+    draw = ImageDraw.Draw(image)
 
-    def _send_command(self, cmd, *args):
-        GPIO.output(self.DC_PIN, GPIO.LOW)
-        self.spi.xfer2([cmd])
-        if args:
-            GPIO.output(self.DC_PIN, GPIO.HIGH)
-            self._send_data(list(args))
+    for x0, y0, text, font_size in entries:
+        font = ImageFont.truetype(font_path, font_size)
+        ascent, descent = font.getmetrics()
 
-    def _send_data(self, data):
-        GPIO.output(self.DC_PIN, GPIO.HIGH)
-        max_chunk = 4096
-        for i in range(0, len(data), max_chunk):
-            self.spi.writebytes(data[i : i + max_chunk])
-
-
-    def set_window(self, x0, y0, x1, y1, use_horizontal=0):
-        if use_horizontal in (0, 1):
-            # 行加偏移（+20）
-            self._send_command(0x2A, x0 >> 8, x0 & 0xFF, x1 >> 8, x1 & 0xFF)  # 列地址设置
-            self._send_command(0x2B, (y0 + 20) >> 8, (y0 + 20) & 0xFF, (y1 + 20) >> 8, (y1 + 20) & 0xFF)  # 行地址设置
-        elif use_horizontal in (2, 3):
-            # 列加偏移（+20）
-            self._send_command(0x2A, (x0 + 20) >> 8, (x0 + 20) & 0xFF, (x1 + 20) >> 8, (x1 + 20) & 0xFF)  # 列地址设置
-            self._send_command(0x2B, y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF)  # 行地址设置
-        self._send_command(0x2C)  # 储存器写
-
-    def draw_pixel(self, x, y, color):
-        if x >= self.WIDTH or y >= self.HEIGHT:
-            return
-        self.set_window(x, y, x, y)
-        self._send_data([(color >> 8) & 0xFF, color & 0xFF])
-
-    def draw_line(self, x0, y0, x1, y1, color):
-        dx = abs(x1 - x0)
-        dy = abs(y1 - y0)
-        sx = 1 if x0 < x1 else -1
-        sy = 1 if y0 < y1 else -1
-        err = dx - dy
-
-        while True:
-            self.draw_pixel(x0, y0, color)
-            if x0 == x1 and y0 == y1:
-                break
-            e2 = 2 * err
-            if e2 > -dy:
-                err -= dy
-                x0 += sx
-            if e2 < dx:
-                err += dx
-                y0 += sy
-
-    def fill(self, color):
-        self.set_window(0, 0, self.WIDTH - 1, self.HEIGHT - 1)
-        buffer = []
-        high = (color >> 8) & 0xFF
-        low = color & 0xFF
-        for _ in range(self.WIDTH * self.HEIGHT):
-            buffer.extend([high, low])
-        self._send_data(buffer)
-
-    def draw_image(self, x, y, width, height, pixel_data):
-        if (x + width > self.WIDTH) or (y + height > self.HEIGHT):
-            # 打印宽度
-            print(f"Image width: {width}, height: {height}")
-            # 打印屏幕宽度
-            print(f"Screen width: {self.WIDTH}, height: {self.HEIGHT}")
-            raise ValueError("图像尺寸超出屏幕范围")
-        self.set_window(x, y, x + width - 1, y + height - 1)
-        self._send_data(pixel_data)
-
-    def draw_text(self, x, y, text, font, color):
-        image = Image.new("RGB", (self.WIDTH, self.HEIGHT), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        draw.text((x, y), text, font=font, fill=color)
-        pixel_data = list(image.getdata())
-        pixel_data = [((r << 16) | (g << 8) | b) for r, g, b in pixel_data]
-        self.draw_image(x, y, self.WIDTH, self.HEIGHT, pixel_data)
-        # 将 RGB 转换为 16 位颜色格式
-
-    def cleanup(self):
-        self.spi.close()
-        GPIO.cleanup()
-
-
-
-class LCDTest(LCD):
-    def __init__(self):
-        super().__init__()
-
-    def test_refresh_rate(self, num_iterations=100):
-        start_time = time.time()  # 记录开始时间
-        for i in range(num_iterations):
-            # 使用 fill 函数填充不同颜色来模拟屏幕刷新
-            if i % 2 == 0:
-                self.fill(0x3ED1)  # 白色
+        x = x0
+        baseline = y0 + ascent
+        for char in text:
+            if is_emoji(char):
+                emoji_img = get_local_emoji_svg_image(char, size=font_size)
+                if emoji_img:
+                    emoji_y = baseline - emoji_img.height
+                    image.paste(emoji_img, (x, emoji_y), emoji_img)
+                    x += emoji_img.width
             else:
-                self.fill(0x0000)  # 黑色
-        end_time = time.time()  # 记录结束时间
+                draw.text((x, y0), char, font=font, fill=(255, 255, 255))
+                char_width, _ = draw.textsize(char, font=font)
+                x += char_width
 
-        elapsed_time = end_time - start_time
-        refresh_rate = num_iterations / elapsed_time  # 刷新率 = 刷新次数 / 花费时间
-        print(f"刷新率: {refresh_rate:.2f} 次/秒")
-if __name__ == "__main__":
-    # 测试刷新率
-    lcd_test = LCDTest()
-    # lcd_test.test_refresh_rate(100)  # 测试 100 次刷新
-    # 测试绘制文字
-    lcd_test.fill(0x0000)  # 清屏
-    lcd_test.draw_text(0, 0, "Hello World", font, 0xFFFF)  # 白色文字
-    lcd_test.draw_text(0, 0, "😊", font, 0xFFFF)  # 白色 emoji
-    lcd_test.cleanup()
+    return image
+
+
+def render_status_page(status_text, emoji_text, info_text, font_path, image_size):
+    """
+    渲染状态页面，包括状态、emoji 和信息三段内容
+    :param status_text: 状态文字（居中，32号字体）
+    :param emoji_text: Emoji 表情（居中，40号字体）
+    :param info_text: 信息段文字（自动换行、自动缩放）
+    :param font_path: 字体路径
+    :param image_size: 图像尺寸 (width, height)
+    :return: PIL.Image 对象
+    """
+    width, height = image_size
+    image = Image.new("RGBA", image_size, (0, 0, 0, 255))
+    draw = ImageDraw.Draw(image)
+
+    # --- 渲染状态 ---
+    status_font_size = 32
+    status_font = ImageFont.truetype(font_path, status_font_size)
+    status_w, status_h = draw.textsize(status_text, font=status_font)
+    status_x = (width - status_w) // 2
+    draw.text((status_x, 0), status_text, font=status_font, fill=(255, 255, 255))
+
+    # --- 渲染 Emoji ---
+    emoji_font_size = 40
+    emoji_y = status_h + 5
+    ascent, _ = status_font.getmetrics()
+    baseline = emoji_y + ascent
+    x = 0
+    emoji_width_total = 0
+
+    # 计算 emoji 总宽度
+    for char in emoji_text:
+        if is_emoji(char):
+            emoji_img = get_local_emoji_svg_image(char, size=emoji_font_size)
+            if emoji_img:
+                emoji_width_total += emoji_img.width
+        else:
+            emoji_font = ImageFont.truetype(font_path, emoji_font_size)
+            w, _ = draw.textsize(char, font=emoji_font)
+            emoji_width_total += w
+
+    emoji_x = (width - emoji_width_total) // 2
+    x = emoji_x
+    for char in emoji_text:
+        if is_emoji(char):
+            emoji_img = get_local_emoji_svg_image(char, size=emoji_font_size)
+            if emoji_img:
+                y = baseline - emoji_img.height
+                image.paste(emoji_img, (x, y), emoji_img)
+                x += emoji_img.width
+        else:
+            emoji_font = ImageFont.truetype(font_path, emoji_font_size)
+            draw.text((x, emoji_y), char, font=emoji_font, fill=(255, 255, 255))
+            w, _ = draw.textsize(char, font=emoji_font)
+            x += w
+
+    # --- 渲染信息文本（中文自动换行 + 字号缩放） ---
+    info_top = emoji_y + emoji_font_size + 5
+    available_height = height - info_top
+
+    max_font_size = 28
+    min_font_size = 12
+    lines = []
+    final_font_size = min_font_size
+    for font_size in range(max_font_size, min_font_size - 1, -1):
+        font = ImageFont.truetype(font_path, font_size)
+        temp_lines = []
+        line = ""
+        for char in info_text:
+            test_line = line + char
+            w, _ = draw.textsize(test_line, font=font)
+            if w <= width:
+                line = test_line
+            else:
+                temp_lines.append(line)
+                line = char
+        if line:
+            temp_lines.append(line)
+
+        total_height = len(temp_lines) * (font_size + 4)
+        if total_height <= available_height:
+            lines = temp_lines
+            final_font_size = font_size
+            break
+
+    # 开始绘制信息段
+    font = ImageFont.truetype(font_path, final_font_size)
+    y = info_top
+    for line in lines:
+        draw.text((0, y), line, font=font, fill=(255, 255, 255))
+        y += final_font_size + 4
+
+    return image
+
+
+
+
+from lcd import LCD
+
+lcd = LCD()
+
+# 字体路径（需要支持中文）
+font_path = "NotoSansSC-Bold.ttf"
+font_size = 32
+
+# entries = [
+#     (50, 0, "😊🌹", 48),
+#     (0, 40, "PiSugar", 32),
+#     (0, 80, "EchoView", 28),
+# ]
+# img = render_multi_text(
+#     entries,
+#     font_path=font_path,
+#     image_size=(lcd.WIDTH, lcd.HEIGHT)
+# )
+
+
+status = "当前状态：正常"
+emoji = "🚀😎"
+info = "这是一个测试信息。信息可能会比较长，需要自动换行并适应屏幕大小和空间，不然就显示不全了。"
+
+img = render_status_page(
+    status_text=status,
+    emoji_text=emoji,
+    info_text=info,
+    font_path=font_path,
+    image_size=(lcd.WIDTH, lcd.HEIGHT)
+)
+
+rgb565_data = image_to_rgb565(img, lcd.WIDTH, lcd.HEIGHT)
+lcd.draw_image(0, 0, lcd.WIDTH, lcd.HEIGHT, rgb565_data)
+

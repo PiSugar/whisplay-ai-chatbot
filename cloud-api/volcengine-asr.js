@@ -254,20 +254,25 @@ const client = new VolcengineAsrClient({
 });
 
 let recognizeResolve = () => "";
+let timingStart = false;
 
 client.onOpen = () => {
   console.log("ASR WebSocket 连接成功");
-}
+};
 
 client.onMessage = (data) => {
   const astText = data?.result?.[0]?.text || "";
-  console.timeEnd("识别音频");
+  if (timingStart) {
+    console.timeEnd("识别音频");
+    timingStart = false;
+  }
   console.log("识别结果：", astText);
   recognizeResolve(astText);
 };
 
 const recognizeAudio = (audioPath) => {
   console.time("识别音频");
+  timingStart = true;
   return new Promise((resolve, reject) => {
     const audioData = fs.readFileSync(audioPath);
     client.send(audioData);

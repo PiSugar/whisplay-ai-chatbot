@@ -55,8 +55,93 @@ process.on("SIGINT", () => {
   process.exit();
 });
 
+function splitSentences(text) {
+  const regex = /.*?([。！？!?]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\.)(?=\s|$)/gs;
+
+  const sentences = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    sentences.push(match[0].trim());
+    lastIndex = regex.lastIndex;
+  }
+
+  const remaining = text.slice(lastIndex).trim();
+
+  return { sentences, remaining };
+}
+
+const createSteamResponser = (ttsFunc, textCallback) => {
+  // 流式播放
+  let partialContent = "";
+  let isStartSpeak = false;
+  let playEndResolve = () => {};
+
+  const speakArray = [];
+  const parsedSentences = [];
+  const partial = (text) => {
+    partialContent += text;
+    // 如果有句号，emoji，问号，叹号等标点符号，就认为是完整的一句话，截取这个符号之前的内容存入数组
+    const { sentences, remaining } = splitSentences(partialContent);
+    if (sentences.length > 0) {
+      parsedSentences.push(...sentences);
+      speakArray.push(
+        ...sentences.map((item) =>
+          ttsFunc(item).finally(() => {
+            if (!isStartSpeak) {
+              playAudioInOrder();
+              isStartSpeak = true;
+            }
+          })
+        )
+      );
+    }
+    partialContent = remaining;
+  };
+  const endPartial = () => {
+    if (partialContent) {
+      parsedSentences.push(partialContent);
+      speakArray.push(ttsFunc(partialContent));
+      partialContent = "";
+    }
+    textCallback & textCallback(parsedSentences.join(""));
+    parsedSentences.length = 0;
+  };
+
+  // 触发顺序播放
+  const playAudioInOrder = async () => {
+    let currentIndex = 0;
+    const playNext = async () => {
+      if (currentIndex < speakArray.length) {
+        const { data: audio, duration } = await speakArray[currentIndex];
+        console.log(`播放音频 ${currentIndex + 1}/${speakArray.length}`);
+        await playAudioData(audio, duration);
+        currentIndex++;
+        playNext();
+      } else {
+        playEndResolve();
+        isStartSpeak = false;
+        speakArray.length = 0;
+      }
+    };
+    playNext();
+  };
+
+  const getPlayEndPromise = () =>
+    new Promise((resolve) => {
+      playEndResolve = resolve;
+    });
+
+  return {
+    partial,
+    endPartial,
+    getPlayEndPromise,
+  };
+};
 
 module.exports = {
   recordAudio,
   playAudioData,
-}
+  createSteamResponser,
+};
