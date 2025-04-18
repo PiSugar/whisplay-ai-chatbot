@@ -1,13 +1,9 @@
-import { exec } from "child_process";
-
-let statusText = "聆听中";
-let emoji = "😊";
-let text = "";
+const { exec } = require("child_process");
 
 const currentStatus = {
-  statusText,
-  emoji,
-  text,
+  statusText: "聆听中",
+  emoji: "😊",
+  text: "",
 };
 
 let endProcess = () => {};
@@ -15,6 +11,9 @@ let endProcess = () => {};
 async function display(newStatus) {
   endProcess();
   const { statusText, emoji, text } = { ...currentStatus, ...newStatus };
+  currentStatus.statusText = statusText;
+  currentStatus.emoji = emoji;
+  currentStatus.text = text;
   //  python scroll.py --status "聆听中" --emoji "🌟" --text "你好，世界！欢迎使用语音助手。"
   const command = `python3 scroll.py --status "${statusText}" --emoji "${emoji}" --text "${text}"`;
   const process = exec(command);
