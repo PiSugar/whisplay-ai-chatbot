@@ -1,13 +1,14 @@
 const { chatWithDoubaoStream } = require("./cloud-api/doubao-llm");
 const volcengineTTS = require("./cloud-api/volcengine-tts");
 const { recognizeAudio } = require("./cloud-api/tencent-cloud");
-const { main: display } = require("./display");
+const display = require("./display");
 const { recordAudio, createSteamResponser } = require("./device/audio");
 
 const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   volcengineTTS,
   (text) => {
-    console.log("完整回复:", text);
+    console.log("完整回答:", text);
+    display({ text });
   }
 );
 
@@ -17,11 +18,13 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
 
   while (true) {
     console.log("聆听中...");
+    display({ displayText: "聆听中", emoji: "😐", text: "" });
     await recordAudio(filePath, 60);
-    console.log("识别中...");
+    display({ displayText: "识别中", emoji: "🤔", text: "" });
     const text = await recognizeAudio(filePath);
     // const text = await volcengineASR(filePath);
     // 调用字节跳动语音合成，播报识别结果
+    display({ text, emoji: extractEmojis(text) });
     if (text) {
       await Promise.all([
         chatWithDoubaoStream(text, partial, endPartial),

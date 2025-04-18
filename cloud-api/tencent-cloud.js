@@ -6,7 +6,7 @@ require("dotenv").config();
 // Tencent Cloud ASR
 const SECRET_ID = process.env.SECRET_ID;
 const SECRET_KEY = process.env.SECRET_KEY;
-const REGION = process.env.REGION;
+// const REGION = process.env.REGION;
 const ENDPOINT = process.env.ENDPOINT;
 const TTS_ENDPOINT = process.env.TTS_ENDPOINT;
 
@@ -77,7 +77,7 @@ const recognizeAudio = async (audioPath) => {
     "X-TC-Action": "SentenceRecognition",
     "X-TC-Timestamp": timestamp,
     "X-TC-Version": "2019-06-14",
-    "X-TC-Region": REGION,
+    // "X-TC-Region": REGION,
   };
 
   try {
@@ -112,7 +112,7 @@ const synthesizeSpeech = async (text) => {
     "X-TC-Action": "TextToVoice",
     "X-TC-Timestamp": timestamp,
     "X-TC-Version": "2019-08-23",
-    "X-TC-Region": REGION,
+    // "X-TC-Region": REGION,
     EmotionCategory: "happy",
   };
 
