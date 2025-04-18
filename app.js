@@ -1,7 +1,7 @@
 const { chatWithDoubaoStream } = require("./cloud-api/doubao-llm");
 const volcengineTTS = require("./cloud-api/volcengine-tts");
 const { recognizeAudio } = require("./cloud-api/tencent-cloud");
-const display = require("./display");
+const { display, extractEmojis } = require("./display");
 const { recordAudio, createSteamResponser } = require("./device/audio");
 
 const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
