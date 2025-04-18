@@ -5,6 +5,8 @@ from io import BytesIO
 import os
 import numpy as np
 
+
+
 def image_to_rgb565(image: Image.Image, width: int, height: int) -> list:
     """
     将 PIL.Image 图像转换为 LCD 显示用的 RGB565 格式数据
@@ -90,18 +92,22 @@ def render_mixed_text(text, font_path, font_size, image_size, start_xy=(0, 0)):
             x += char_width
 
     return image
-def render_multi_text(entries, font_path, image_size):
+
+def render_multi_text(entries, font_path, font_size, image_size):
     """
-    支持多个 (x, y, text, font_size) 输入，逐段绘制文字（可含 emoji）
-    每段可以有不同字号
+    支持多个 (x, y, text) 输入，逐段绘制文字（可含 emoji）
+    :param entries: 列表，每个元素是 (x, y, text) 三元组
+    :param font_path: 字体路径
+    :param font_size: 字号
+    :param image_size: 整体图像大小 (width, height)
+    :return: PIL.Image 对象
     """
     image = Image.new("RGBA", image_size, (0, 0, 0, 255))  # 黑底
     draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype(font_path, font_size)
+    ascent, descent = font.getmetrics()
 
-    for x0, y0, text, font_size in entries:
-        font = ImageFont.truetype(font_path, font_size)
-        ascent, descent = font.getmetrics()
-
+    for x0, y0, text in entries:
         x = x0
         baseline = y0 + ascent
         for char in text:
@@ -119,101 +125,6 @@ def render_multi_text(entries, font_path, image_size):
     return image
 
 
-def render_status_page(status_text, emoji_text, info_text, font_path, image_size):
-    """
-    渲染状态页面，包括状态、emoji 和信息三段内容
-    :param status_text: 状态文字（居中，32号字体）
-    :param emoji_text: Emoji 表情（居中，40号字体）
-    :param info_text: 信息段文字（自动换行、自动缩放）
-    :param font_path: 字体路径
-    :param image_size: 图像尺寸 (width, height)
-    :return: PIL.Image 对象
-    """
-    width, height = image_size
-    image = Image.new("RGBA", image_size, (0, 0, 0, 255))
-    draw = ImageDraw.Draw(image)
-
-    # --- 渲染状态 ---
-    status_font_size = 32
-    status_font = ImageFont.truetype(font_path, status_font_size)
-    status_w, status_h = draw.textsize(status_text, font=status_font)
-    status_x = (width - status_w) // 2
-    draw.text((status_x, 0), status_text, font=status_font, fill=(255, 255, 255))
-
-    # --- 渲染 Emoji ---
-    emoji_font_size = 40
-    emoji_y = status_h + 5
-    ascent, _ = status_font.getmetrics()
-    baseline = emoji_y + ascent
-    x = 0
-    emoji_width_total = 0
-
-    # 计算 emoji 总宽度
-    for char in emoji_text:
-        if is_emoji(char):
-            emoji_img = get_local_emoji_svg_image(char, size=emoji_font_size)
-            if emoji_img:
-                emoji_width_total += emoji_img.width
-        else:
-            emoji_font = ImageFont.truetype(font_path, emoji_font_size)
-            w, _ = draw.textsize(char, font=emoji_font)
-            emoji_width_total += w
-
-    emoji_x = (width - emoji_width_total) // 2
-    x = emoji_x
-    for char in emoji_text:
-        if is_emoji(char):
-            emoji_img = get_local_emoji_svg_image(char, size=emoji_font_size)
-            if emoji_img:
-                y = baseline - emoji_img.height
-                image.paste(emoji_img, (x, y), emoji_img)
-                x += emoji_img.width
-        else:
-            emoji_font = ImageFont.truetype(font_path, emoji_font_size)
-            draw.text((x, emoji_y), char, font=emoji_font, fill=(255, 255, 255))
-            w, _ = draw.textsize(char, font=emoji_font)
-            x += w
-
-    # --- 渲染信息文本（中文自动换行 + 字号缩放） ---
-    info_top = emoji_y + emoji_font_size + 5
-    available_height = height - info_top
-
-    max_font_size = 28
-    min_font_size = 12
-    lines = []
-    final_font_size = min_font_size
-    for font_size in range(max_font_size, min_font_size - 1, -1):
-        font = ImageFont.truetype(font_path, font_size)
-        temp_lines = []
-        line = ""
-        for char in info_text:
-            test_line = line + char
-            w, _ = draw.textsize(test_line, font=font)
-            if w <= width:
-                line = test_line
-            else:
-                temp_lines.append(line)
-                line = char
-        if line:
-            temp_lines.append(line)
-
-        total_height = len(temp_lines) * (font_size + 4)
-        if total_height <= available_height:
-            lines = temp_lines
-            final_font_size = font_size
-            break
-
-    # 开始绘制信息段
-    font = ImageFont.truetype(font_path, final_font_size)
-    y = info_top
-    for line in lines:
-        draw.text((0, y), line, font=font, fill=(255, 255, 255))
-        y += final_font_size + 4
-
-    return image
-
-
-
 
 from lcd import LCD
 
@@ -223,30 +134,18 @@ lcd = LCD()
 font_path = "NotoSansSC-Bold.ttf"
 font_size = 32
 
-# entries = [
-#     (50, 0, "😊🌹", 48),
-#     (0, 40, "PiSugar", 32),
-#     (0, 80, "EchoView", 28),
-# ]
-# img = render_multi_text(
-#     entries,
-#     font_path=font_path,
-#     image_size=(lcd.WIDTH, lcd.HEIGHT)
-# )
+entries = [
+    (125, 0, "😊"),
+    (0, 40, "PiSugar"),
+    (0, 80, "EchoView"),
+]
 
-
-status = "当前状态：正常"
-emoji = "🚀😎"
-info = "这是一个测试信息。信息可能会比较长，需要自动换行并适应屏幕大小和空间，不然就显示不全了。"
-
-img = render_status_page(
-    status_text=status,
-    emoji_text=emoji,
-    info_text=info,
+img = render_multi_text(
+    entries,
     font_path=font_path,
+    font_size=32,
     image_size=(lcd.WIDTH, lcd.HEIGHT)
 )
 
 rgb565_data = image_to_rgb565(img, lcd.WIDTH, lcd.HEIGHT)
 lcd.draw_image(0, 0, lcd.WIDTH, lcd.HEIGHT, rgb565_data)
-
