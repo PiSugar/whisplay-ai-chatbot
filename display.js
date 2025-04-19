@@ -40,7 +40,7 @@ const waitSocketConnected = new Promise((resolve) => {
 
 const throtthleSend = throttle((data) => {
   console.log("发送数据到本地显示器...", data);
-  localSocket.write(data, "utf8", () => {
+  localSocket.write(`${data}\n`, "utf8", () => {
     console.log("已发送", data);
   });
 }, 2000);
