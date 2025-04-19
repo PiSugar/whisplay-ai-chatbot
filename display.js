@@ -16,6 +16,7 @@ const currentStatus = {
 };
 
 let localSocket = null;
+let messageCount = 0;
 
 const waitSocketConnected = new Promise((resolve) => {
   setTimeout(() => {
@@ -28,10 +29,16 @@ const waitSocketConnected = new Promise((resolve) => {
 });
 
 async function display(newStatus) {
+  const oldStatus = JSON.stringify(currentStatus);
   const { status, emoji, text } = { ...currentStatus, ...newStatus };
   currentStatus.status = status;
   currentStatus.emoji = emoji;
   currentStatus.text = text;
+  if (messageCount > 0 && oldStatus === JSON.stringify(currentStatus)) {
+    console.log("数据未变化, 不发送");
+    return;
+  }
+  messageCount++;
   await waitSocketConnected;
   // 发送scoket到0.0.0.0:12345
   const data = JSON.stringify(currentStatus);
