@@ -8,7 +8,7 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   volcengineTTS,
   (text) => {
     console.log("完整回答:", text);
-    display({ status: "回答中...", text, emoji: extractEmojis(text) });
+    display({ status: "回答中", text, emoji: extractEmojis(text) });
   }
 );
 
@@ -32,6 +32,7 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
       ]);
     } else {
       console.log("识别结果为空, 请继续说");
+      display({ status: "请继续说" });
     }
   }
 })();
