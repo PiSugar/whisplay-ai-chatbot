@@ -26,6 +26,10 @@ const waitSocketConnected = new Promise((resolve) => {
       console.log("Connected to local display socket");
       resolve();
     });
+    localSocket.on("data", (data) => {
+      console.log("Received data from local display:", data.toString());
+      // 处理接收到的数据
+    });
     localSocket.on("error", (err) => {
       console.error("Socket error:", err);
       localSocket.destroy();
