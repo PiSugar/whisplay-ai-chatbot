@@ -15,9 +15,6 @@ const currentStatus = {
   scroll_speed: 3,
 };
 
-const command = `python3 scroll.py`;
-const process = exec(command);
-
 let localSocket = null;
 
 const waitSocketConnected = new Promise((resolve) => {
