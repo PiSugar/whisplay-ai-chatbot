@@ -16,45 +16,34 @@ const currentStatus = {
   scroll_speed: 3,
 };
 
-let localSocket = null;
-let messageCount = 0;
-
-const waitSocketConnected = new Promise((resolve) => {
-  setTimeout(() => {
-    localSocket = new Socket();
-    localSocket.connect(12345, "0.0.0.0", () => {
-      console.log("Connected to local display socket");
-      resolve();
+const sendToDisplay = (data) => {
+  const client = new Socket();
+  client.connect(12345, "0.0.0.0", () => {
+    console.log("Connected to local display socket");
+    client.write(`${data}\n`, "utf8", () => {
+      console.log("已发送", data);
+      client.destroy();
     });
-    localSocket.on("data", (data) => {
+    client.on("data", (data) => {
       console.log("Received data from local display:", data.toString());
       // 处理接收到的数据
     });
-    localSocket.on("error", (err) => {
+    client.on("error", (err) => {
       console.error("Socket error:", err);
-      localSocket.destroy();
-      localSocket = null;
+      client.destroy();
     });
-  }, 2000);
-});
-
-const throtthleSend = throttle((data) => {
-  console.log("发送数据到本地显示器...", data);
-  localSocket.write(`${data}\n`, "utf8", () => {
-    console.log("已发送", data);
   });
-}, 2000);
+};
 
 async function display(newStatus) {
   const { status, emoji, text } = { ...currentStatus, ...newStatus };
   currentStatus.status = status;
   currentStatus.emoji = emoji;
   currentStatus.text = text;
-  messageCount++;
-  await waitSocketConnected;
+
   // 发送scoket到0.0.0.0:12345
   const data = JSON.stringify(currentStatus);
-  throtthleSend(data);
+  sendToDisplay(data);
 }
 
 function extractEmojis(str) {
