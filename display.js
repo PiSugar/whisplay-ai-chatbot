@@ -42,15 +42,10 @@ const throtthleSend = throttle((data) => {
 }, 2000);
 
 async function display(newStatus) {
-  const oldStatus = JSON.stringify(currentStatus);
   const { status, emoji, text } = { ...currentStatus, ...newStatus };
   currentStatus.status = status;
   currentStatus.emoji = emoji;
   currentStatus.text = text;
-  if (messageCount > 0 && oldStatus === JSON.stringify(currentStatus)) {
-    console.log("数据未变化, 不发送");
-    return;
-  }
   messageCount++;
   await waitSocketConnected;
   // 发送scoket到0.0.0.0:12345
