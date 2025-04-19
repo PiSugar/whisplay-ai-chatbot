@@ -20,7 +20,7 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
     console.log("聆听中...");
     display({ displayText: "聆听中", emoji: "😐", text: "" });
     await recordAudio(filePath, 60);
-    display({ displayText: "识别中", emoji: "🤔", text: "" });
+    display({ displayText: "识别中", emoji: "🤖", text: "" });
     const text = await recognizeAudio(filePath);
     // const text = await volcengineASR(filePath);
     // 调用字节跳动语音合成，播报识别结果
