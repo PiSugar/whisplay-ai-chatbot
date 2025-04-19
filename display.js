@@ -1,4 +1,5 @@
 const { exec } = require("child_process");
+const { throttle } = require("lodash");
 const { Socket } = require("net");
 
 // {
@@ -16,7 +17,6 @@ const currentStatus = {
 };
 
 let localSocket = null;
-let lastSend = Promise.resolve();
 let messageCount = 0;
 
 const waitSocketConnected = new Promise((resolve) => {
@@ -28,6 +28,12 @@ const waitSocketConnected = new Promise((resolve) => {
     });
   }, 2000);
 });
+
+const throtthleSend = throttle((data) => {
+  localSocket.write(data, "utf8", () => {
+    console.log("发送数据到本地显示器:", data);
+  });
+}, 2000);
 
 async function display(newStatus) {
   const oldStatus = JSON.stringify(currentStatus);
@@ -41,17 +47,9 @@ async function display(newStatus) {
   }
   messageCount++;
   await waitSocketConnected;
-  await lastSend;
   // 发送scoket到0.0.0.0:12345
   const data = JSON.stringify(currentStatus);
-  localSocket.write(data, "utf8", () => {
-    console.log("发送数据到本地显示器:", data);
-  });
-  lastSend = new Promise((resolve) => {
-    setTimeout(() => {
-      resolve();
-    }, 3000);
-  });
+  throtthleSend(data);
 }
 
 function extractEmojis(str) {
