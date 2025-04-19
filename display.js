@@ -36,7 +36,7 @@ async function display(newStatus) {
   // 发送scoket到0.0.0.0:12345
   const data = JSON.stringify(currentStatus);
   localSocket.write(data, "utf8", () => {
-    console.log("发送数据到本地显示器:", payload);
+    console.log("发送数据到本地显示器:", data);
   });
 }
 
