@@ -35,10 +35,9 @@ async function display(newStatus) {
   await waitSocketConnected;
   // 发送scoket到0.0.0.0:12345
   const data = JSON.stringify(currentStatus);
-  localSocket.write(data);
-  localSocket.write("\n");
-  console.log("发送数据到本地显示器:", data);
-}
+  localSocket.write(data, "utf8", () => {
+    console.log("发送数据到本地显示器:", payload);
+  });
 
 function extractEmojis(str) {
   // 使用 Unicode emoji 匹配范围的正则表达式
