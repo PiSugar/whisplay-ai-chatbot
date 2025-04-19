@@ -26,6 +26,11 @@ const waitSocketConnected = new Promise((resolve) => {
       console.log("Connected to local display socket");
       resolve();
     });
+    localSocket.on("error", (err) => {
+      console.error("Socket error:", err);
+      localSocket.destroy();
+      localSocket = null;
+    });
   }, 2000);
 });
 
