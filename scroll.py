@@ -6,6 +6,14 @@ from io import BytesIO
 import os
 import numpy as np
 import time
+import socket
+import json
+from lcd import LCD  
+import threading
+
+scroll_thread = None
+scroll_stop_event = threading.Event()
+
 
 def image_to_rgb565(image: Image.Image, width: int, height: int) -> list:
     image = image.convert("RGB")
@@ -120,14 +128,16 @@ def render_scroll_status_page(status_text, emoji_text, info_text, font_path, ima
         return image, None, False, scroll_top
 
 def scroll_info_area(base_image: Image.Image, info_scroll_img: Image.Image, lcd,
-                     scroll_top: int, delay=0.1, step=2):
+                     scroll_top: int, scroll_speed=2, delay=0.05, stop_event=None):
     screen_width = lcd.WIDTH
     screen_height = lcd.HEIGHT
     scroll_height = screen_height - scroll_top
     scroll_img_height = info_scroll_img.height
 
-    while True:
-        for y_offset in range(0, max(0, scroll_img_height - scroll_height + 1), step):
+    while not stop_event.is_set():
+        for y_offset in range(0, max(0, scroll_img_height - scroll_height + 1), scroll_speed):
+            if stop_event.is_set():
+                return
             frame = base_image.copy()
             crop = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
             frame.paste(crop, (0, scroll_top))
@@ -137,7 +147,9 @@ def scroll_info_area(base_image: Image.Image, info_scroll_img: Image.Image, lcd,
 
         time.sleep(1.0)
 
-        for y_offset in range(max(0, scroll_img_height - scroll_height), -1, -step):
+        for y_offset in range(max(0, scroll_img_height - scroll_height), -1, -scroll_speed):
+            if stop_event.is_set():
+                return
             frame = base_image.copy()
             crop = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
             frame.paste(crop, (0, scroll_top))
@@ -147,32 +159,68 @@ def scroll_info_area(base_image: Image.Image, info_scroll_img: Image.Image, lcd,
 
         time.sleep(1.0)
 
-# 封装为主函数
-def main():
-    parser = argparse.ArgumentParser(description="显示滚动状态页面")
-    parser.add_argument("--status", type=str, default="状态：待机", help="状态文字")
-    parser.add_argument("--emoji", type=str, default="🤖", help="Emoji 图标")
-    parser.add_argument("--text", type=str, default="你好，世界\n这是一段比ABSDFE较长的测试文本，用来看看文字换行和显示是否正常。\n最后一行文字。", help="信息内容")
-    parser.add_argument("--font", type=str, default="NotoSansSC-Bold.ttf", help="字体路径")
 
-    args = parser.parse_args()
 
-    from lcd import LCD  # 假设你有一个名为 lcd.py 的文件，其中包含 LCD 类
+def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.ttf"):
     lcd = LCD()
-    font_path = args.font
-    img, scroll_img, need_scroll, scroll_top = render_scroll_status_page(
-        status_text=args.status, emoji_text=args.emoji,
-        info_text=args.text,
-        font_path=font_path, image_size=(lcd.WIDTH, lcd.HEIGHT))
-    if need_scroll:
-        scroll_info_area(img, scroll_img, lcd, scroll_top)
-    else:
-        rgb565_data = image_to_rgb565(img, lcd.WIDTH, lcd.HEIGHT)
-        lcd.draw_image(0, 0, lcd.WIDTH, lcd.HEIGHT, rgb565_data)
+    print(f"[LCD] 初始化完成，大小: {lcd.WIDTH}x{lcd.HEIGHT}")
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((host, port))
+    server_socket.listen(1)
+    print(f"[Socket] 正在监听 {host}:{port} ...")
+
+    global scroll_thread, scroll_stop_event
+
+    while True:
+        client_socket, addr = server_socket.accept()
+        print(f"[Socket] 接收到连接来自: {addr}")
+
+        try:
+            data = client_socket.recv(4096).decode("utf-8")
+            print(f"[Socket] 接收到数据: {data}")
+            try:
+                content = json.loads(data)
+                status = content.get("status", "状态：待机")
+                emoji = content.get("emoji", "🤖")
+                text = content.get("text", "你好，世界")
+                scroll_speed = content.get("scroll_speed", 2)
+
+                # 停止之前的滚动线程
+                if scroll_thread and scroll_thread.is_alive():
+                    scroll_stop_event.set()
+                    scroll_thread.join()
+
+                scroll_stop_event = threading.Event()
+
+                img, scroll_img, need_scroll, scroll_top = render_scroll_status_page(
+                    status_text=status, emoji_text=emoji,
+                    info_text=text, font_path=font_path,
+                    image_size=(lcd.WIDTH, lcd.HEIGHT)
+                )
+
+                if need_scroll:
+                    scroll_thread = threading.Thread(
+                        target=scroll_info_area,
+                        args=(img, scroll_img, lcd, scroll_top),
+                        kwargs={'scroll_speed': scroll_speed, 'delay': 0.05, 'stop_event': scroll_stop_event}
+                    )
+                    scroll_thread.start()
+                else:
+                    rgb565_data = image_to_rgb565(img, lcd.WIDTH, lcd.HEIGHT)
+                    lcd.draw_image(0, 0, lcd.WIDTH, lcd.HEIGHT, rgb565_data)
+
+                client_socket.send(b"OK\n")
+            except json.JSONDecodeError:
+                client_socket.send(b"ERROR: invalid JSON\n")
+        except Exception as e:
+            print(f"[Socket] 错误: {e}")
+        finally:
+            client_socket.close()
+
 
 if __name__ == "__main__":
-    main()
-
+    start_socket_server()
 
 #使用示例：
 # python scroll.py --status "聆听中" --emoji "🤩🤩" --text "你好，世界！🤪欢迎使用语音助手。

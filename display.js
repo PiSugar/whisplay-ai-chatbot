@@ -1,25 +1,46 @@
 const { exec } = require("child_process");
+const { Socket } = require("net");
+
+// {
+//   "status": random.choice(status_options),
+//   "emoji": random.choice(emoji_options),
+//   "text": f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {random_text}",
+//   "scroll_speed": random.choice(scroll_speed_options)
+// }
 
 const currentStatus = {
-  statusText: "聆听中",
+  status: "聆听中",
   emoji: "😊",
   text: "",
+  scroll_speed: 3,
 };
 
-let endProcess = () => {};
+const command = `python3 scroll.py`;
+const process = exec(command);
+
+let localSocket = null;
+
+const waitSocketConnected = new Promise((resolve) => {
+  setTimeout(() => {
+    localSocket = new Socket();
+    localSocket.connect(12345, "0.0.0.0", () => {
+      console.log("Connected to local display socket");
+      resolve();
+    });
+  }, 2000);
+});
 
 async function display(newStatus) {
-  endProcess();
-  const { statusText, emoji, text } = { ...currentStatus, ...newStatus };
-  currentStatus.statusText = statusText;
+  const { status, emoji, text } = { ...currentStatus, ...newStatus };
+  currentStatus.status = status;
   currentStatus.emoji = emoji;
   currentStatus.text = text;
-  //  python scroll.py --status "聆听中" --emoji "🌟" --text "你好，世界！欢迎使用语音助手。"
-  const command = `python3 scroll.py --status "${statusText}" --emoji "${emoji}" --text "${text}"`;
-  const process = exec(command);
-  endProcess = () => {
-    process.kill();
-  };
+  await waitSocketConnected;
+  // 发送scoket到0.0.0.0:12345
+  const data = JSON.stringify(currentStatus);
+  localSocket.write(data);
+  localSocket.write("\n");
+  console.log("发送数据到本地显示器:", data);
 }
 
 function extractEmojis(str) {
