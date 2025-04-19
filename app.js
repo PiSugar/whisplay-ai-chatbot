@@ -8,7 +8,7 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   volcengineTTS,
   (text) => {
     console.log("完整回答:", text);
-    display({ text });
+    display({ text, emoji: extractEmojis(text) });
   }
 );
 
@@ -20,11 +20,11 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
     console.log("聆听中...");
     display({ status: "聆听中", emoji: "😐", text: "" });
     await recordAudio(filePath, 60);
-    display({ status: "识别中", emoji: "😐", text: "" });
+    display({ status: "识别中", emoji: "🤔", text: "" });
     const text = await recognizeAudio(filePath);
     // const text = await volcengineASR(filePath);
     // 调用字节跳动语音合成，播报识别结果
-    display({ text, emoji: extractEmojis(text) });
+    display({ text });
     if (text) {
       await Promise.all([
         chatWithDoubaoStream(text, partial, endPartial),
