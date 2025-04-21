@@ -8,7 +8,7 @@ const openai = new OpenAI({
   apiKey: openAIAPIKey,
 });
 
-const recognizeAudio = async (audioPath) => {
+const recognizeAudio = async (audioFilePath) => {
   const transcription = await openai.audio.transcriptions.create({
     file: fs.createReadStream(audioFilePath),
     model: "whisper-1",
