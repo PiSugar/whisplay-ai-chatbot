@@ -35,6 +35,35 @@ const chatWithOpenAI = async (userMessage) => {
   return answer;
 };
 
+const chatWithOpenAISteam = async (userMessage, partialCallback, endCallback) => {
+  console.time("llm");
+  messages.push({
+    role: "user",
+    content: userMessage,
+  });
+  const chatCompletion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages,
+    stream: true,
+  });
+  let partialAnswer = "";
+  for await (const chunk of chatCompletion) {
+    if (chunk.choices[0].delta.content) {
+      partialCallback(chunk.choices[0].delta.content);
+      partialAnswer += chunk.choices[0].delta.content;
+    }
+  }
+  const answer = partialAnswer;
+  messages.push({
+    role: "assistant",
+    content: answer,
+  });
+  endCallback(answer);
+  console.timeEnd("llm");
+};
+
+
 module.exports = {
   chatWithOpenAI,
+  chatWithOpenAISteam,
 };

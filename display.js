@@ -18,21 +18,25 @@ const currentStatus = {
 
 const sendToDisplay = (data) => {
   const client = new Socket();
-  client.connect(12345, "0.0.0.0", () => {
-    console.log("Connected to local display socket");
-    client.write(`${data}\n`, "utf8", () => {
-      console.log("已发送", data);
-      client.destroy();
+  try {
+    client.connect(12345, "0.0.0.0", () => {
+      console.log("Connected to local display socket");
+      client.write(`${data}\n`, "utf8", () => {
+        console.log("已发送", data);
+        client.destroy();
+      });
+      client.on("data", (data) => {
+        console.log("Received data from local display:", data.toString());
+        // 处理接收到的数据
+      });
+      client.on("error", (err) => {
+        console.error("Socket error:", err);
+        client.destroy();
+      });
     });
-    client.on("data", (data) => {
-      console.log("Received data from local display:", data.toString());
-      // 处理接收到的数据
-    });
-    client.on("error", (err) => {
-      console.error("Socket error:", err);
-      client.destroy();
-    });
-  });
+  } catch (error) {
+    console.error("Failed to update display.");
+  }
 };
 
 async function display(newStatus) {

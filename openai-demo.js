@@ -1,12 +1,19 @@
 const { chatWithDoubaoStream } = require("./cloud-api/doubao-llm");
 const volcengineTTS = require("./cloud-api/volcengine-tts");
 const openaiTTS = require("./cloud-api/openai-tts");
-const { chatWithOpenAI } = require("./cloud-api/openai-llm");
+const { chatWithOpenAI, chatWithOpenAISteam } = require("./cloud-api/openai-llm");
 const { recognizeAudio } = require("./cloud-api/openai-asr");
-const { recordAudio, playAudioData } = require("./device/audio");
+const { recordAudio, playAudioData, createSteamResponser } = require("./device/audio");
 
 const { display, extractEmojis } = require("./display");
 
+const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
+  openaiTTS,
+  (text) => {
+    console.log("完整回答:", text);
+    display({ status: "回答中", text, emoji: extractEmojis(text) });
+  }
+);
 
 
 // main
@@ -24,13 +31,10 @@ const { display, extractEmojis } = require("./display");
     // 调用字节跳动语音合成，播报识别结果
     display({ text });
     if (text) {
-      const response = await chatWithOpenAI(text);
-      display({ status: "正在回答", emoji: "😊", text: response });
-      if (response) {
-        const result = await openaiTTS(response);
-        console.log("合成结果:", result);
-        await playAudioData(result.data, result.duration);
-      }
+      await Promise.all([
+        chatWithOpenAISteam(text, partial, endPartial),
+        getPlayEndPromise(),
+      ]);
     } else {
       console.log("识别结果为空, 请继续说");
       display({ status: "请继续说" });

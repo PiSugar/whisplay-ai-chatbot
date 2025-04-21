@@ -114,9 +114,13 @@ const createSteamResponser = (ttsFunc, textCallback) => {
     let currentIndex = 0;
     const playNext = async () => {
       if (currentIndex < speakArray.length) {
-        const { data: audio, duration } = await speakArray[currentIndex];
-        console.log(`播放音频 ${currentIndex + 1}/${speakArray.length}`);
-        await playAudioData(audio, duration);
+        try {
+          const { data: audio, duration } = await speakArray[currentIndex];
+          console.log(`播放音频 ${currentIndex + 1}/${speakArray.length}`);
+          await playAudioData(audio, duration);
+        } catch (error) {
+          console.error("播放音频错误:", error);
+        }
         currentIndex++;
         playNext();
       } else {
