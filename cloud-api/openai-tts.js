@@ -23,7 +23,7 @@ const openaiTTS = async (text) => {
   fs.writeFileSync(filepath, buffer);
   const duration = await mp3Duration(filepath);
   //
-  return { data: buffer, duration };
+  return { data: buffer, duration: duration * 1000 };
 };
 
 module.exports = openaiTTS;
