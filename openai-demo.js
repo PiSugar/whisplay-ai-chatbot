@@ -4,13 +4,9 @@ const openaiTTS = require("./cloud-api/openai-tts");
 const { chatWithOpenAI } = require("./cloud-api/openai-llm");
 const { recognizeAudio } = require("./cloud-api/openai-asr");
 const { createSteamResponser, playAudioData } = require("./device/audio");
+const { display, extractEmojis } = require("./display");
 
-const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
-  volcengineTTS,
-  (text) => {
-    console.log("完整回复 outside:", text);
-  }
-);
+
 
 // main
 (async () => {
