@@ -17,7 +17,7 @@ const openaiTTS = async (text) => {
     input: text,
   });
   const buffer = Buffer.from(await mp3.arrayBuffer());
-  const duration = await mp3Duration(filepath);
+  const duration = await mp3Duration(buffer);
   //
   return { data: buffer, duration: duration * 1000 };
 };
