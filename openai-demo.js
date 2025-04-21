@@ -23,9 +23,10 @@ const { display, extractEmojis } = require("./display");
     // 调用字节跳动语音合成，播报识别结果
     display({ text });
     if (text) {
-      const resonse = await chatWithOpenAI(text);
-      if (resonse) {
-        const result = await openaiTTS(resonse);
+      const response = await chatWithOpenAI(text);
+      display({ status: "正在回答", emoji: "😊", text: response });
+      if (response) {
+        const result = await openaiTTS(response);
         console.log("合成结果:", result);
         await playAudioData(result.data, result.duration);
       }
