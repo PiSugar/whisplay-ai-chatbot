@@ -17,10 +17,6 @@ const openaiTTS = async (text) => {
     input: text,
   });
   const buffer = Buffer.from(await mp3.arrayBuffer());
-
-  const filename = `speech.mp3`;
-  const filepath = path.join(__dirname, filename);
-  fs.writeFileSync(filepath, buffer);
   const duration = await mp3Duration(filepath);
   //
   return { data: buffer, duration: duration * 1000 };
