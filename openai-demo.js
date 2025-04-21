@@ -8,7 +8,7 @@ const { recordAudio, playAudioData, createSteamResponser } = require("./device/a
 const { display, extractEmojis } = require("./display");
 
 const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
-  openaiTTS,
+  volcengineTTS,
   (sentences) => {
     const fullText = sentences.join("");
     display({ status: "回答中", text: fullText, emoji: extractEmojis(fullText) });
