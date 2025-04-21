@@ -72,7 +72,7 @@ function splitSentences(text) {
   return { sentences, remaining };
 }
 
-const createSteamResponser = (ttsFunc, textCallback) => {
+const createSteamResponser = (ttsFunc, sentencesCallback, textCallback) => {
   // 流式播放
   let partialContent = "";
   let isStartSpeak = false;
@@ -86,6 +86,7 @@ const createSteamResponser = (ttsFunc, textCallback) => {
     const { sentences, remaining } = splitSentences(partialContent);
     if (sentences.length > 0) {
       parsedSentences.push(...sentences);
+      sentencesCallback && sentencesCallback(parsedSentences);
       speakArray.push(
         ...sentences.map((item) =>
           ttsFunc(item).finally(() => {
@@ -102,6 +103,7 @@ const createSteamResponser = (ttsFunc, textCallback) => {
   const endPartial = () => {
     if (partialContent) {
       parsedSentences.push(partialContent);
+      sentencesCallback && sentencesCallback(parsedSentences);
       speakArray.push(ttsFunc(partialContent));
       partialContent = "";
     }

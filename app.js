@@ -6,9 +6,12 @@ const { recordAudio, createSteamResponser } = require("./device/audio");
 
 const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   volcengineTTS,
+  (sentences) => {
+    const fullText = sentences.join("");
+    display({ status: "回答中", text: fullText, emoji: extractEmojis(fullText) });
+  },
   (text) => {
     console.log("完整回答:", text);
-    display({ status: "回答中", text, emoji: extractEmojis(text) });
   }
 );
 
