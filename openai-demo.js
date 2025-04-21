@@ -3,7 +3,8 @@ const volcengineTTS = require("./cloud-api/volcengine-tts");
 const openaiTTS = require("./cloud-api/openai-tts");
 const { chatWithOpenAI } = require("./cloud-api/openai-llm");
 const { recognizeAudio } = require("./cloud-api/openai-asr");
-const { createSteamResponser, playAudioData } = require("./device/audio");
+const { recordAudio, playAudioData } = require("./device/audio");
+
 const { display, extractEmojis } = require("./display");
 
 
