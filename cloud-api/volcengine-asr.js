@@ -1,7 +1,7 @@
 require("dotenv").config();
 
-const byteDanceAppId = process.env.BYTE_DANCE_APP_ID;
-const byteDanceAccessToken = process.env.BYTE_DANCE_ACCESS_TOKEN;
+const byteDanceAppId = process.env.VOLCENGINE_APP_ID;
+const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN;
 
 /*
  * MIT License
@@ -280,4 +280,4 @@ const recognizeAudio = (audioPath) => {
   });
 };
 
-module.exports = recognizeAudio;
+module.exports = { recognizeAudio };

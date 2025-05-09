@@ -1,23 +1,47 @@
 const { exec, spawn } = require("child_process");
+const { noop } = require("lodash");
+
+let recordingProcess = null;
+let currentRecordingReject = noop;
 
 const recordAudio = (outputPath, duration = 10) => {
   return new Promise((resolve, reject) => {
     const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 15% 1 1.0 20%`;
     console.log(`开始录音, 最长${duration}秒钟...`);
-    const process = exec(cmd, (err, stdout, stderr) => {
+    recordingProcess = exec(cmd, (err, stdout, stderr) => {
+      currentRecordingReject = reject;
       if (err) reject(stderr);
       else resolve(outputPath);
     });
 
     // Set a timeout to kill the recording process after the specified duration
     setTimeout(() => {
-      process.kill();
-      resolve(outputPath);
+      if (recordingProcess) {
+        recordingProcess.kill();
+        recordingProcess = null;
+        resolve(outputPath);
+      }
     }, duration * 1000);
   });
 };
 
-const player = spawn("mpg123", ["-", "--scale", "2"]); // 设置音量为50%
+const stopRecording = () => {
+  if (recordingProcess) {
+    recordingProcess.kill();
+    recordingProcess = null;
+    try {
+      currentRecordingReject();
+    } catch (e) {}
+    console.log("录音已停止");
+  } else {
+    console.log("没有正在录音的进程");
+  }
+};
+
+const player = {
+  isPlaying: false,
+  process: spawn("mpg123", ["-", "--scale", "2"]),
+};
 
 const playAudioData = (resAudioData, audioDuration) => {
   // const audioData = Buffer.from(resAudioData).toString('base64');
@@ -27,15 +51,22 @@ const playAudioData = (resAudioData, audioDuration) => {
   // console.timeEnd('存储mp3');
   return new Promise((resolve, reject) => {
     console.log("播放时长:", audioDuration);
+    player.isPlaying = true;
     setTimeout(() => {
       resolve();
+      player.isPlaying = false;
       console.log("音频播放完成");
     }, audioDuration); // 加1秒缓冲
 
-    player.stdin.write(audioBuffer);
-    player.stdout.on("data", (data) => console.log(data.toString()));
-    player.stderr.on("data", (data) => console.error(data.toString()));
-    player.on("exit", (code) => {
+    const process = player.process;
+
+    try {
+      process.stdin.write(audioBuffer);
+    } catch (e) {}
+    process.stdout.on("data", (data) => console.log(data.toString()));
+    process.stderr.on("data", (data) => console.error(data.toString()));
+    process.on("exit", (code) => {
+      player.isPlaying = false;
       if (code !== 0) {
         console.error(`播放音频错误: ${code}`);
         reject(code);
@@ -47,6 +78,24 @@ const playAudioData = (resAudioData, audioDuration) => {
   });
 };
 
+const stopPlaying = () => {
+  if (player.isPlaying) {
+    try {
+      console.log("中止播放音频");
+      const process = player.process;
+      process.stdin.end();
+      process.kill();
+    } catch {}
+    player.isPlaying = false;
+    // 重新创建进程
+    setTimeout(() => {
+      player.process = spawn("mpg123", ["-", "--scale", "2"]);
+    }, 500);
+  } else {
+    console.log("没有正在播放的音频");
+  }
+};
+
 // 退出程序时关闭音频播放器
 process.on("SIGINT", () => {
   console.log("退出程序");
@@ -56,7 +105,7 @@ process.on("SIGINT", () => {
 });
 
 function splitSentences(text) {
-  const regex = /.*?([。！？!?]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\.)(?=\s|$)/gs;
+  const regex = /.*?([。！？!?，,]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\.)(?=\s|$)/gs;
 
   const sentences = [];
   let lastIndex = 0;
@@ -72,53 +121,25 @@ function splitSentences(text) {
   return { sentences, remaining };
 }
 
-const createSteamResponser = (ttsFunc, sentencesCallback, textCallback) => {
-  // 流式播放
-  let partialContent = "";
-  let isStartSpeak = false;
-  let playEndResolve = () => {};
+class StreamResponser {
+  constructor(ttsFunc, sentencesCallback, textCallback) {
+    this.ttsFunc = ttsFunc;
+    this.sentencesCallback = sentencesCallback;
+    this.textCallback = textCallback;
+    this.partialContent = "";
+    this.isStartSpeak = false;
+    this.playEndResolve = () => {};
+    this.speakArray = [];
+    this.parsedSentences = [];
+  }
 
-  const speakArray = [];
-  const parsedSentences = [];
-  const partial = (text) => {
-    partialContent += text;
-    // 如果有句号，emoji，问号，叹号等标点符号，就认为是完整的一句话，截取这个符号之前的内容存入数组
-    const { sentences, remaining } = splitSentences(partialContent);
-    if (sentences.length > 0) {
-      parsedSentences.push(...sentences);
-      sentencesCallback && sentencesCallback(parsedSentences);
-      speakArray.push(
-        ...sentences.map((item) =>
-          ttsFunc(item).finally(() => {
-            if (!isStartSpeak) {
-              playAudioInOrder();
-              isStartSpeak = true;
-            }
-          })
-        )
-      );
-    }
-    partialContent = remaining;
-  };
-  const endPartial = () => {
-    if (partialContent) {
-      parsedSentences.push(partialContent);
-      sentencesCallback && sentencesCallback(parsedSentences);
-      speakArray.push(ttsFunc(partialContent));
-      partialContent = "";
-    }
-    textCallback & textCallback(parsedSentences.join(""));
-    parsedSentences.length = 0;
-  };
-
-  // 触发顺序播放
-  const playAudioInOrder = async () => {
+  playAudioInOrder = async () => {
     let currentIndex = 0;
     const playNext = async () => {
-      if (currentIndex < speakArray.length) {
+      if (currentIndex < this.speakArray.length) {
         try {
-          const { data: audio, duration } = await speakArray[currentIndex];
-          console.log(`播放音频 ${currentIndex + 1}/${speakArray.length}`);
+          const { data: audio, duration } = await this.speakArray[currentIndex];
+          console.log(`播放音频 ${currentIndex + 1}/${this.speakArray.length}`);
           await playAudioData(audio, duration);
         } catch (error) {
           console.error("播放音频错误:", error);
@@ -126,28 +147,65 @@ const createSteamResponser = (ttsFunc, sentencesCallback, textCallback) => {
         currentIndex++;
         playNext();
       } else {
-        playEndResolve();
-        isStartSpeak = false;
-        speakArray.length = 0;
+        this.playEndResolve();
+        this.isStartSpeak = false;
+        this.speakArray.length = 0;
       }
     };
     playNext();
   };
 
-  const getPlayEndPromise = () =>
-    new Promise((resolve) => {
-      playEndResolve = resolve;
-    });
-
-  return {
-    partial,
-    endPartial,
-    getPlayEndPromise,
+  partial = (text) => {
+    this.partialContent += text;
+    const { sentences, remaining } = splitSentences(this.partialContent);
+    if (sentences.length > 0) {
+      this.parsedSentences.push(...sentences);
+      this.sentencesCallback && this.sentencesCallback(this.parsedSentences);
+      this.speakArray.push(
+        ...sentences.map((item) =>
+          this.ttsFunc(item).finally(() => {
+            if (!this.isStartSpeak) {
+              this.playAudioInOrder();
+              this.isStartSpeak = true;
+            }
+          })
+        )
+      );
+    }
+    this.partialContent = remaining;
   };
-};
+
+  endPartial = () => {
+    if (this.partialContent) {
+      this.parsedSentences.push(this.partialContent);
+      this.sentencesCallback && this.sentencesCallback(this.parsedSentences);
+      this.speakArray.push(this.ttsFunc(this.partialContent));
+      this.partialContent = "";
+    }
+    this.textCallback && this.textCallback(this.parsedSentences.join(""));
+    this.parsedSentences.length = 0;
+  };
+
+  getPlayEndPromise = () => {
+    return new Promise((resolve) => {
+      this.playEndResolve = resolve;
+    });
+  };
+
+  stop = () => {
+    this.speakArray.length = 0;
+    this.isStartSpeak = false;
+    this.partialContent = "";
+    this.parsedSentences.length = 0;
+    this.playEndResolve();
+    stopPlaying();
+  };
+}
 
 module.exports = {
   recordAudio,
+  stopRecording,
   playAudioData,
-  createSteamResponser,
+  // createStreamResponser,
+  StreamResponser,
 };

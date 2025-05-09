@@ -3,7 +3,7 @@ const { get } = require("lodash");
 require("dotenv").config();
 
 // Doubao LLM
-const doubaoAccessToken = process.env.DOUBAO_ACCESS_TOKEN;
+const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN;
 
 const messages = [
   {
@@ -13,7 +13,7 @@ const messages = [
   },
 ];
 
-const chatWithDoubao = async (userMessage) => {
+const chatWithLLM = async (userMessage) => {
   console.time("llm");
   messages.push({
     role: "user",
@@ -52,7 +52,7 @@ const chatWithDoubao = async (userMessage) => {
 
 let partialAnswer = "";
 
-const chatWithDoubaoStream = async (userMessage, cb, endCallBack) => {
+const chatWithLLMStream = async (userMessage, cb, endCallBack) => {
   console.time("llm");
   messages.push({
     role: "user",
@@ -130,4 +130,4 @@ const chatWithDoubaoStream = async (userMessage, cb, endCallBack) => {
   return promise;
 };
 
-module.exports = { chatWithDoubao, chatWithDoubaoStream };
+module.exports = { chatWithLLM, chatWithLLMStream };

@@ -8,12 +8,81 @@ import numpy as np
 import time
 import socket
 import json
-from lcd import LCD  
+import sys
+sys.path.append(os.path.abspath("../Driver"))
+
+from echoview import EchoViewBoard
 import threading
 
 scroll_thread = None
 scroll_stop_event = threading.Event()
+def rgb565_to_rgb255(color_565):
+    """将 RGB565 颜色值转换为 (R, G, B) 元组，每个分量范围为 0-255。
 
+    Args:
+        color_565: 一个整数，表示 16 位的 RGB565 颜色值。
+
+    Returns:
+        一个包含三个整数的元组 (R, G, B)，分别代表红色、绿色和蓝色分量，范围为 0-255。
+    """
+    red_5bit = (color_565 >> 11) & 0x1F
+    green_6bit = (color_565 >> 5) & 0x3F
+    blue_5bit = color_565 & 0x1F
+    red_8bit = (red_5bit * 255) // 31
+    green_8bit = (green_6bit * 255) // 63
+    blue_8bit = (blue_5bit * 255) // 31
+    return (red_8bit, green_8bit, blue_8bit)
+
+def hex_to_rgb255(hex_color):
+    """将十六进制颜色代码转换为 (R, G, B) 元组，每个分量范围为 0-255。
+
+    Args:
+        hex_color: 一个字符串，表示 6 位或 8 位的十六进制颜色代码 (例如 "#FF0000" 或 "#FF0000FF")。
+
+    Returns:
+        一个包含三个整数的元组 (R, G, B)，分别代表红色、绿色和蓝色分量，范围为 0-255。
+        如果输入的十六进制颜色代码格式不正确，则返回 None。
+    """
+    hex_color = hex_color.lstrip("#")
+    if not all(c in "0123456789abcdefABCDEF" for c in hex_color):
+        return None
+    if len(hex_color) == 6:
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        return (r, g, b)
+    elif len(hex_color) == 8:
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        # Alpha 通道在这里被忽略，但你可以根据需要使用它
+        return (r, g, b)
+    else:
+        return None
+
+def get_rgb255_from_any(rgbled):
+    """自动检测输入格式并转换为 RGB (0-255) 元组。
+
+    Args:
+        rgbled: 可以是 RGB565 格式的整数或十六进制颜色字符串。
+
+    Returns:
+        一个包含三个整数的元组 (R, G, B)，范围为 0-255。
+        如果无法识别或转换格式，则返回 None。
+    """
+    if isinstance(rgbled, int):
+        if 0 <= rgbled <= 0xFFFF:
+            return rgb565_to_rgb255(rgbled)
+        else:
+            return None
+    elif isinstance(rgbled, str):
+        hex_color = rgbled.lstrip("#")
+        if all(c in "0123456789abcdefABCDEF" for c in hex_color) and len(hex_color) in [6, 8]:
+            return hex_to_rgb255(rgbled)
+        else:
+            return None
+    else:
+        return None
 
 def image_to_rgb565(image: Image.Image, width: int, height: int) -> list:
     image = image.convert("RGB")
@@ -85,6 +154,31 @@ def wrap_text(draw, text, font, max_width):
         lines.append(current_line)
     return lines
 
+def render_top_area(status_text, emoji_text, font_path, image_width,
+                    status_font_size=32, emoji_font_size=40):
+    status_font = ImageFont.truetype(font_path, status_font_size)
+    emoji_font = ImageFont.truetype(font_path, emoji_font_size)
+
+    ascent_status, _ = status_font.getmetrics()
+    ascent_emoji, _ = emoji_font.getmetrics()
+
+    top_height = status_font_size + emoji_font_size + 20
+    image = Image.new("RGBA", (image_width, top_height), (0, 0, 0, 255))
+    draw = ImageDraw.Draw(image)
+
+    # Draw status centered
+    status_bbox = status_font.getbbox(status_text)
+    status_w = status_bbox[2] - status_bbox[0]
+    draw_mixed_text(draw, image, status_text, status_font, ((image_width - status_w) // 2, 0))
+
+    # Draw emoji centered
+    emoji_bbox = emoji_font.getbbox(emoji_text)
+    emoji_w = emoji_bbox[2] - emoji_bbox[0]
+    draw_mixed_text(draw, image, emoji_text, emoji_font, ((image_width - emoji_w) // 2, status_font_size + 8))
+
+    return image,top_height
+
+
 def render_scroll_status_page(status_text, emoji_text, info_text, font_path, image_size,
                              status_font_size=32, emoji_font_size=40, info_font_size=28,
                              scroll_font_threshold=10):
@@ -106,7 +200,6 @@ def render_scroll_status_page(status_text, emoji_text, info_text, font_path, ima
     draw_mixed_text(draw, image, emoji_text, emoji_font, ((width - emoji_w) // 2, status_font_size + 8))
 
     # Define scroll area
-    scroll_top = status_font_size + emoji_font_size + 20
     scroll_height = height - scroll_top
 
     # Create info scroll image
@@ -114,7 +207,7 @@ def render_scroll_status_page(status_text, emoji_text, info_text, font_path, ima
     lines = wrap_text(dummy_draw, info_text, info_font, width)
     ascent, descent = info_font.getmetrics()
     line_height = ascent + descent # 这里 +4 是行距 padding
-    total_height = len(lines) * line_height
+    total_height = (len(lines)+1) * line_height
 
     scroll_img = Image.new("RGBA", (width, total_height), (0, 0, 0, 255))
     scroll_draw = ImageDraw.Draw(scroll_img)
@@ -122,15 +215,15 @@ def render_scroll_status_page(status_text, emoji_text, info_text, font_path, ima
         draw_mixed_text(scroll_draw, scroll_img, line, info_font, (0, i * line_height))
 
     if total_height > scroll_height or info_font_size < scroll_font_threshold:
-        return image, scroll_img, True, scroll_top
+        return image, scroll_img, True
     else:
         image.paste(scroll_img, (0, scroll_top))
-        return image, None, False, scroll_top
+        return image, None, False
 
-def scroll_info_area(base_image: Image.Image, info_scroll_img: Image.Image, lcd,
-                     scroll_top: int, scroll_speed=2, delay=0.05, stop_event=None):
-    screen_width = lcd.WIDTH
-    screen_height = lcd.HEIGHT
+def scroll_info_area(top_image: Image.Image, info_scroll_img: Image.Image, echoview,
+                     scroll_speed=2, delay=0.05, stop_event=None):
+    screen_width = echoview.LCD_WIDTH
+    screen_height = echoview.LCD_HEIGHT
     scroll_height = screen_height - scroll_top
     scroll_img_height = info_scroll_img.height
 
@@ -138,89 +231,199 @@ def scroll_info_area(base_image: Image.Image, info_scroll_img: Image.Image, lcd,
         for y_offset in range(0, max(0, scroll_img_height - scroll_height + 1), scroll_speed):
             if stop_event.is_set():
                 return
-            frame = base_image.copy()
-            crop = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
-            frame.paste(crop, (0, scroll_top))
-            rgb565_data = image_to_rgb565(frame, screen_width, screen_height)
-            lcd.draw_image(0, 0, screen_width, screen_height, rgb565_data)
+            frame = Image.new("RGBA", (screen_width, scroll_height), (0, 0, 0, 255))
+            frame = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
+            # frame.paste(crop, (0, scroll_top))
+            rgb565_data = image_to_rgb565(frame, screen_width,  scroll_height)
+            echoview.draw_image(0, scroll_top, screen_width, scroll_height, rgb565_data)
             time.sleep(delay)
 
-        time.sleep(1.0)
-
-        for y_offset in range(max(0, scroll_img_height - scroll_height), -1, -scroll_speed):
-            if stop_event.is_set():
-                return
-            frame = base_image.copy()
-            crop = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
-            frame.paste(crop, (0, scroll_top))
-            rgb565_data = image_to_rgb565(frame, screen_width, screen_height)
-            lcd.draw_image(0, 0, screen_width, screen_height, rgb565_data)
+        while not stop_event.is_set():
             time.sleep(delay)
+        return
+        # 滚动到底后仍需刷新显示以反映 top_image 的变化
+        # while not stop_event.is_set():
+        #     frame = Image.new("RGBA", (screen_width, screen_height), (0, 0, 0, 255))
+        #     frame.paste(top_image, (0, 0))
+        #     crop = info_scroll_img.crop((0, scroll_img_height - scroll_height, screen_width, scroll_img_height))
+        #     frame.paste(crop, (0, scroll_top))
+        #     rgb565_data = image_to_rgb565(frame, screen_width, screen_height)
+        #     echoview.draw_image(0, 0, screen_width, screen_height, rgb565_data)
+        #     time.sleep(1)
+        #     print("重绘页面")
 
-        time.sleep(1.0)
 
 
+        # time.sleep(20)
 
-def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.ttf"):
-    lcd = LCD()
-    print(f"[LCD] 初始化完成，大小: {lcd.WIDTH}x{lcd.HEIGHT}")
+        # for y_offset in range(max(0, scroll_img_height - scroll_height), -1, -scroll_speed):
+        #     if stop_event.is_set():
+        #         return
+        #     frame = base_image.copy()
+        #     crop = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
+        #     frame.paste(crop, (0, scroll_top))
+        #     rgb565_data = image_to_rgb565(frame, screen_width, screen_height)
+        #     echoview.draw_image(0, 0, screen_width, screen_height, rgb565_data)
+        #     time.sleep(delay)
 
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((host, port))
-    server_socket.listen(1)
-    print(f"[Socket] 正在监听 {host}:{port} ...")
+        # time.sleep(5)
 
-    global scroll_thread, scroll_stop_event
+# 全局变量分别保存当前状态、emoji、滚动文本以及滚动线程和控制事件
+current_status = ""
+current_emoji = ""
+current_text = ""
+scroll_thread = None
+scroll_stop_event = threading.Event()
+top_image = None
+clients = {} # 用于存储客户端连接
+def update_display(echoview, font_path, status=None, emoji=None, text=None, scroll_speed=2):
+    global current_status, current_emoji, current_text
+    global scroll_thread, scroll_stop_event, top_image,scroll_top
 
-    while True:
-        client_socket, addr = server_socket.accept()
-        print(f"[Socket] 接收到连接来自: {addr}")
+    top_changed = False
 
+    if status is not None and status != current_status:
+        current_status = status
+        top_changed = True
+    if emoji is not None and emoji != current_emoji:
+        current_emoji = emoji
+        top_changed = True
+    if top_changed:
+        print("重绘顶部")
+        top_image ,scroll_top= render_top_area(current_status, current_emoji, font_path, echoview.LCD_WIDTH)
+        rgb565_data=image_to_rgb565(top_image,echoview.LCD_WIDTH,scroll_top)
+        echoview.draw_image(0, 0, echoview.LCD_WIDTH, scroll_top, rgb565_data)
+
+    if text is not None and text != current_text:
+        current_text = text
+
+        # 停止原有滚动线程
+        if scroll_thread and scroll_thread.is_alive():
+            scroll_stop_event.set()
+            scroll_thread.join()
+        scroll_stop_event = threading.Event()
+
+        _, scroll_img, need_scroll  = render_scroll_status_page(
+            status_text="", emoji_text="", info_text=current_text, font_path=font_path,
+            image_size=(echoview.LCD_WIDTH, echoview.LCD_HEIGHT)
+        )
+
+        if need_scroll:
+            scroll_thread = threading.Thread(
+                target=scroll_info_area,
+                args=(top_image, scroll_img, echoview),
+                kwargs={'scroll_speed': scroll_speed, 'delay': 0.05, 'stop_event': scroll_stop_event}
+            )
+            scroll_thread.start()
+        else:
+            # 无需滚动，直接渲染整图
+            full_image = Image.new("RGBA", (echoview.LCD_WIDTH, echoview.LCD_HEIGHT), (0, 0, 0, 255))
+            full_image.paste(top_image, (0, 0))
+            full_image.paste(scroll_img, (0, scroll_top))
+            rgb565_data = image_to_rgb565(full_image, echoview.LCD_WIDTH, echoview.LCD_HEIGHT)
+            echoview.draw_image(0, 0, echoview.LCD_WIDTH, echoview.LCD_HEIGHT, rgb565_data)
+
+    elif top_changed and scroll_thread is None:
+        # 没有滚动线程，也没新文本，只需要更新 top 部分
+        frame = Image.new("RGBA", (echoview.LCD_WIDTH, echoview.LCD_HEIGHT), (0, 0, 0, 255))
+        frame.paste(top_image, (0, 0))
+        rgb565_data = image_to_rgb565(frame, echoview.LCD_WIDTH, echoview.LCD_HEIGHT)
+        echoview.draw_image(0, 0, echoview.LCD_WIDTH, echoview.LCD_HEIGHT, rgb565_data)
+
+
+def send_to_all_clients(message):
+    """向所有连接的客户端发送消息"""
+    message_json = json.dumps(message).encode("utf-8") + b"\n"
+    for addr, client_socket in clients.items():
         try:
+            client_socket.sendall(message_json)
+            print(f"[Server] 向客户端 {addr} 发送通知: {message}")
+        except Exception as e:
+            print(f"[Server] 向客户端 {addr} 发送通知失败: {e}")
+            # 可以选择在这里处理断开的客户端
+
+def on_button_pressed():
+    """按钮按下时执行的函数"""
+    print("[Server] 按钮被按下")
+    notification = {"event": "button_pressed"}
+    send_to_all_clients(notification)
+
+def handle_client(client_socket, addr, echoview, font_path):
+    print(f"[Socket] 客户端 {addr} 已连接")
+    clients[addr] = client_socket
+    try:
+        while True:
             data = client_socket.recv(4096).decode("utf-8")
-            print(f"[Socket] 接收到数据: {data}")
+            if not data:
+                break
+            print(f"[Socket - {addr}] 接收到数据: {data}")
             try:
                 content = json.loads(data)
-                status = content.get("status", "状态：待机")
-                emoji = content.get("emoji", "🤖")
-                text = content.get("text", "你好，世界")
+                status = content.get("status", None)
+                emoji = content.get("emoji", None)
+                text = content.get("text", None)
+                rgbled = content.get("RGB", None)
+                brightness = content.get("brightness", None)
                 scroll_speed = content.get("scroll_speed", 2)
 
-                # 停止之前的滚动线程
-                if scroll_thread and scroll_thread.is_alive():
-                    scroll_stop_event.set()
-                    scroll_thread.join()
+                response_to_client = content.get("response", None)
 
-                scroll_stop_event = threading.Event()
-
-                img, scroll_img, need_scroll, scroll_top = render_scroll_status_page(
-                    status_text=status, emoji_text=emoji,
-                    info_text=text, font_path=font_path,
-                    image_size=(lcd.WIDTH, lcd.HEIGHT)
-                )
-
-                if need_scroll:
-                    scroll_thread = threading.Thread(
-                        target=scroll_info_area,
-                        args=(img, scroll_img, lcd, scroll_top),
-                        kwargs={'scroll_speed': scroll_speed, 'delay': 0.05, 'stop_event': scroll_stop_event}
-                    )
-                    scroll_thread.start()
-                else:
-                    rgb565_data = image_to_rgb565(img, lcd.WIDTH, lcd.HEIGHT)
-                    lcd.draw_image(0, 0, lcd.WIDTH, lcd.HEIGHT, rgb565_data)
+                if rgbled:
+                    rgb255_tuple = get_rgb255_from_any(rgbled)
+                    echoview.set_rgb(*rgb255_tuple)
+                if brightness:
+                    echoview.set_backlight(brightness)
+                if (text is not None )|(status is not None )|(emoji is not None ):
+                    update_display(echoview, font_path, status=status, emoji=emoji, text=text, scroll_speed=scroll_speed)
 
                 client_socket.send(b"OK\n")
+                if response_to_client:
+                    try:
+                        response_bytes = json.dumps({"response": response_to_client}).encode("utf-8") + b"\n"
+                        client_socket.send(response_bytes)
+                        print(f"[Socket - {addr}] 发送响应: {response_to_client}")
+                    except Exception as e:
+                        print(f"[Socket - {addr}] 发送响应错误: {e}")
+
             except json.JSONDecodeError:
                 client_socket.send(b"ERROR: invalid JSON\n")
-        except Exception as e:
-            print(f"[Socket] 错误: {e}")
-        finally:
-            client_socket.close()
+            except Exception as e:
+                print(f"[Socket - {addr}] 处理数据错误: {e}")
+                client_socket.send(f"ERROR: {e}\n".encode("utf-8"))
+
+    except Exception as e:
+        print(f"[Socket - {addr}] 连接错误: {e}")
+    finally:
+        print(f"[Socket] 客户端 {addr} 断开连接")
+        del clients[addr]
+        client_socket.close()
+
+def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.ttf"):
+    echoview = EchoViewBoard()
+    print(f"[LCD] 初始化完成，大小: {echoview.LCD_WIDTH}x{echoview.LCD_HEIGHT}")
+
+    # 注册按钮按下事件
+
+    echoview.on_button_press(on_button_pressed) # 使用模拟的注册
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # 添加这一行
+    server_socket.bind((host, port))
+    server_socket.listen(1) # 允许更多连接
+    print(f"[Socket] 正在监听 {host}:{port} ...")
+
+    try:
+        while True:
+            client_socket, addr = server_socket.accept()
+            client_thread = threading.Thread(target=handle_client, args=(client_socket, addr, echoview, font_path))
+            client_thread.daemon = True # 设置为守护线程，主线程退出时子线程也会退出
+            client_thread.start()
+    except KeyboardInterrupt:
+        print("[Socket] 服务器停止")
+    finally:
+        server_socket.close()
+        # 可以选择在这里等待所有客户端线程结束，如果需要更优雅的关闭
 
 
 if __name__ == "__main__":
     start_socket_server()
-
-#使用示例：
-# python scroll.py --status "聆听中" --emoji "🤩🤩" --text "你好，世界！🤪欢迎使用语音助手。
