@@ -14,11 +14,6 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
 (async () => {
   const text = "你好，可以给我介绍一下广州有哪些好吃的吗？";
 
-  // await Promise.all([
-  //   chatWithLLMStream(text, partial, endPartial),
-  //   getPlayEndPromise(),
-  // ]);
-
   const result = await openaiTTS(text);
   console.log("合成结果:", result);
   await playAudioData(result.data, result.duration);

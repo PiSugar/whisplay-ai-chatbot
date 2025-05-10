@@ -1,17 +1,17 @@
 const { OpenAI } = require("openai");
+const { systemPrompt } = require("../config/llm-config");
 require("dotenv").config();
 
-const openAIAPIKey = process.env.OPENAI_API_KEY;
+const apiKey = process.env.OPENAI_API_KEY;
 
 const openai = new OpenAI({
-  apiKey: openAIAPIKey,
+  apiKey,
 });
 
 const messages = [
   {
     role: "system",
-    content:
-      "你叫小何，是一个爱笑的台湾女孩，讲话温柔可爱，你会说流利的中文和英文，喜欢分享生活中的小故事和趣事。你也很喜欢音乐和电影，常常会推荐一些好听的歌曲和好看的电影给朋友们。你是一个乐观开朗的人，总是带着微笑面对生活中的每一天。你很善于引导对话，喜欢和朋友们分享自己的想法和感受。",
+    content: systemPrompt,
   },
 ];
 
@@ -35,12 +35,9 @@ const chatWithLLM = async (userMessage) => {
   return answer;
 };
 
-const chatWithLLMStream = async (userMessage, partialCallback, endCallback) => {
+const chatWithLLMStream = async (inputMessages = [], partialCallback, endCallback) => {
   console.time("llm");
-  messages.push({
-    role: "user",
-    content: userMessage,
-  });
+  messages.push(...inputMessages);
   const chatCompletion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages,

@@ -42,7 +42,10 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
     display({ text });
     if (text) {
       await Promise.all([
-        chatWithLLMStream(text, partial, endPartial),
+        chatWithLLMStream([{
+          role: "user",
+          content: text,
+        }], partial, endPartial),
         getPlayEndPromise(),
       ]);
     } else {

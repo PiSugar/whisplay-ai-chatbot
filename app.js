@@ -10,7 +10,7 @@ const {
   chatWithLLMStream,
   recognizeAudio,
   ttsProcessor,
-} = require("./cloud-api/config");
+} = require("./cloud-api/server");
 const { noop } = require("lodash");
 
 const {
@@ -114,7 +114,10 @@ const executeFlow = async (flowStatus) => {
       console.log("回答中...");
       let userStopAnser = noop;
       const answerPromise = Promise.all([
-        chatWithLLMStream(asrText, partial, endPartial),
+        chatWithLLMStream([{
+          role: 'user',
+          content: asrText,
+        }], partial, endPartial),
         getPlayEndPromise(),
       ]);
       Promise.race([

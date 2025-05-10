@@ -31,7 +31,7 @@ const stopRecording = () => {
     recordingProcess = null;
     try {
       currentRecordingReject();
-    } catch (e) {}
+    } catch (e) { }
     console.log("录音已停止");
   } else {
     console.log("没有正在录音的进程");
@@ -62,7 +62,7 @@ const playAudioData = (resAudioData, audioDuration) => {
 
     try {
       process.stdin.write(audioBuffer);
-    } catch (e) {}
+    } catch (e) { }
     process.stdout.on("data", (data) => console.log(data.toString()));
     process.stderr.on("data", (data) => console.error(data.toString()));
     process.on("exit", (code) => {
@@ -85,7 +85,7 @@ const stopPlaying = () => {
       const process = player.process;
       process.stdin.end();
       process.kill();
-    } catch {}
+    } catch { }
     player.isPlaying = false;
     // 重新创建进程
     setTimeout(() => {
@@ -98,9 +98,10 @@ const stopPlaying = () => {
 
 // 退出程序时关闭音频播放器
 process.on("SIGINT", () => {
-  console.log("退出程序");
-  player.stdin.end();
-  player.kill();
+  try {
+    player.stdin.end();
+    player.kill();
+  } catch { }
   process.exit();
 });
 
@@ -128,7 +129,7 @@ class StreamResponser {
     this.textCallback = textCallback;
     this.partialContent = "";
     this.isStartSpeak = false;
-    this.playEndResolve = () => {};
+    this.playEndResolve = () => { };
     this.speakArray = [];
     this.parsedSentences = [];
   }

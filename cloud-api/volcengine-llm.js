@@ -1,5 +1,8 @@
 const axios = require("axios");
-const { get } = require("lodash");
+const { get, isEmpty, isArray } = require("lodash");
+const { systemPrompt } = require("../config/llm-config");
+const { combineFunction } = require("../utils");
+const { llmTools, llmFuncMap } = require("../config/llm-config");
 require("dotenv").config();
 
 // Doubao LLM
@@ -8,8 +11,7 @@ const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN;
 const messages = [
   {
     role: "system",
-    content:
-      "你叫小何，是一个爱笑的台湾女孩，讲话温柔可爱，你会说流利的中文和英文，喜欢分享生活中的小故事和趣事。你也很喜欢音乐和电影，常常会推荐一些好听的歌曲和好看的电影给朋友们。你是一个乐观开朗的人，总是带着微笑面对生活中的每一天。你很善于引导对话，喜欢和朋友们分享自己的想法和感受。",
+    content: systemPrompt,
   },
 ];
 
@@ -46,23 +48,19 @@ const chatWithLLM = async (userMessage) => {
     role: "assistant",
     content: answer,
   });
-  console.timeEnd("llm");
   return answer;
 };
 
-let partialAnswer = "";
 
-const chatWithLLMStream = async (userMessage, cb, endCallBack) => {
-  console.time("llm");
-  messages.push({
-    role: "user",
-    content: userMessage,
-  });
-  let endResolve = () => {};
+
+const chatWithLLMStream = async (inputMessages = [], partialCallback, endCallBack) => {
+  messages.push(...inputMessages);
+  let endResolve = () => { };
   let promise = new Promise((resolve, reject) => {
     endResolve = resolve;
   });
-  partialAnswer = "";
+  let partialAnswer = "";
+  let functionCallsPackages = [];
   axios
     .post(
       "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
@@ -70,6 +68,7 @@ const chatWithLLMStream = async (userMessage, cb, endCallBack) => {
         model: "doubao-1-5-lite-32k-250115",
         messages,
         stream: true,
+        tools: llmTools,
       },
       {
         headers: {
@@ -101,12 +100,22 @@ const chatWithLLMStream = async (userMessage, cb, endCallBack) => {
               return {}; // 返回 null 或其他默认值
             }
           });
+
           // 处理解析后的数据
           const answer = parsedData
             .map((item) => get(item, "choices[0].delta.content", ""))
             .join("");
-          cb(answer);
-          partialAnswer += answer;
+          const toolCalls = parsedData
+            .map((item) => get(item, "choices[0].delta.tool_calls", []))
+            .filter(arr => !isEmpty(arr));
+
+          if (toolCalls.length) {
+            functionCallsPackages.push(...toolCalls);
+          }
+          if (answer) {
+            partialCallback(answer);
+            partialAnswer += answer;
+          }
         } catch (error) {
           // 处理解析错误
           console.error("Error parsing data:", error, data);
@@ -116,16 +125,61 @@ const chatWithLLMStream = async (userMessage, cb, endCallBack) => {
 
       response.data.on("end", () => {
         console.log("Stream ended");
-        endResolve(true); // 调用结束回调函数
+        const functionCalls = combineFunction(functionCallsPackages)
+        console.log('functionCalls: ', JSON.stringify(functionCalls));
         messages.push({
           role: "assistant",
           content: partialAnswer,
+          tool_calls: functionCalls,
         });
-        endCallBack();
+
+        if (!isEmpty(functionCalls)) {
+          Promise.all(functionCalls.map(call => {
+            const { function: { arguments: argString, name }, id } = call;
+            let arguments = {};
+            try {
+              arguments = JSON.parse(argString || {});
+            } catch {
+              console.error(`Error parsing arguments for function ${name}:`, argString);
+            }
+            const func = llmFuncMap[name];
+            if (func) {
+              return Promise.all([Promise.resolve(id), func(arguments)]);
+            } else {
+              console.error(`Function ${name} not found`);
+              return Promise.all([Promise.resolve(id), Promise.resolve(`Function ${name} not found`)]);
+            }
+          })).then((results) => {
+            console.log("call results: ", results);
+            const newMessage = []
+            results.forEach(([id, result]) => {
+              newMessage.push({
+                role: "tool",
+                content: result,
+                tool_call_id: id,
+              });
+            })
+            chatWithLLMStream(
+              newMessage,
+              partialCallback,
+              () => {
+                endResolve(true); // 调用结束回调函数
+                endCallBack();
+              },
+            );
+          })
+          // 在函数调用完成之前先不回答
+          return;
+        }
+
+        if (partialAnswer) {
+          endResolve(true); // 调用结束回调函数
+          endCallBack();
+        }
       });
     })
     .catch((error) => {
-      console.error("Error:", error.response?.data || error.message);
+      console.error("Error:", error.message);
     });
   return promise;
 };
