@@ -1,7 +1,7 @@
-const { chatWithDoubaoStream } = require("./cloud-api/doubao-llm");
-const volcengineTTS = require("./cloud-api/volcengine-tts");
-const openaiTTS = require("./cloud-api/openai-tts");
-const { createSteamResponser, playAudioData } = require("./device/audio");
+const { chatWithLLMStream } = require("../cloud-api/volcengine-llm");
+const volcengineTTS = require("../cloud-api/volcengine-tts");
+const openaiTTS = require("../cloud-api/openai-tts");
+const { createSteamResponser, playAudioData } = require("../device/audio");
 
 const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   volcengineTTS,
@@ -15,7 +15,7 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   const text = "你好，可以给我介绍一下广州有哪些好吃的吗？";
 
   // await Promise.all([
-  //   chatWithDoubaoStream(text, partial, endPartial),
+  //   chatWithLLMStream(text, partial, endPartial),
   //   getPlayEndPromise(),
   // ]);
 

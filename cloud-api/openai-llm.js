@@ -15,7 +15,7 @@ const messages = [
   },
 ];
 
-const chatWithOpenAI = async (userMessage) => {
+const chatWithLLM = async (userMessage) => {
   console.time("llm");
   messages.push({
     role: "user",
@@ -35,7 +35,7 @@ const chatWithOpenAI = async (userMessage) => {
   return answer;
 };
 
-const chatWithOpenAISteam = async (userMessage, partialCallback, endCallback) => {
+const chatWithLLMStream = async (userMessage, partialCallback, endCallback) => {
   console.time("llm");
   messages.push({
     role: "user",
@@ -62,8 +62,7 @@ const chatWithOpenAISteam = async (userMessage, partialCallback, endCallback) =>
   console.timeEnd("llm");
 };
 
-
 module.exports = {
-  chatWithOpenAI,
-  chatWithOpenAISteam,
+  chatWithLLM,
+  chatWithLLMStream,
 };

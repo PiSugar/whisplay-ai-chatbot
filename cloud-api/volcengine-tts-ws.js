@@ -5,8 +5,8 @@ const { v4: uuidv4 } = require("uuid");
 require("dotenv").config();
 
 // ByteDance TTS
-const byteDanceAppId = process.env.BYTE_DANCE_APP_ID;
-const byteDanceAccessToken = process.env.BYTE_DANCE_ACCESS_TOKEN;
+const byteDanceAppId = process.env.VOLCENGINE_APP_ID;
+const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN;
 
 const host = "openspeech.bytedance.com";
 const api_url = `wss://${host}/api/v1/tts/ws_binary`;

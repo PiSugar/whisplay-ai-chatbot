@@ -4,11 +4,11 @@ const axios = require("axios");
 require("dotenv").config();
 
 // Tencent Cloud ASR
-const SECRET_ID = process.env.SECRET_ID;
-const SECRET_KEY = process.env.SECRET_KEY;
+const SECRET_ID = process.env.TENCENT_SECRET_ID;
+const SECRET_KEY = process.env.TENCENT_SECRET_KEY;
 // const REGION = process.env.REGION;
-const ENDPOINT = process.env.ENDPOINT;
-const TTS_ENDPOINT = process.env.TTS_ENDPOINT;
+const ENDPOINT = process.env.TENCENT_ENDPOINT;
+const TTS_ENDPOINT = process.env.TENCENT_TTS_ENDPOINT;
 
 
 const getAuthorization = (payload, service) => {

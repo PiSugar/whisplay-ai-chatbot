@@ -1,23 +1,30 @@
-const { chatWithDoubaoStream } = require("./cloud-api/doubao-llm");
-const volcengineTTS = require("./cloud-api/volcengine-tts");
-const openaiTTS = require("./cloud-api/openai-tts");
-const { chatWithOpenAI, chatWithOpenAISteam } = require("./cloud-api/openai-llm");
-const { recognizeAudio } = require("./cloud-api/openai-asr");
-const { recordAudio, playAudioData, createSteamResponser } = require("./device/audio");
+const { chatWithLLMStream } = require("../cloud-api/volcengine-llm");
+const volcengineTTS = require("../cloud-api/volcengine-tts");
+const openaiTTS = require("../cloud-api/openai-tts");
+const { chatWithLLM, chatWithLLMStream } = require("../cloud-api/openai-llm");
+const { recognizeAudio } = require("../cloud-api/openai-asr");
+const {
+  recordAudio,
+  playAudioData,
+  createSteamResponser,
+} = require("../device/audio");
 
-const { display, extractEmojis } = require("./display");
+const { display, extractEmojis } = require("../device/display");
 
 const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   volcengineTTS,
   (sentences) => {
     const fullText = sentences.join("");
-    display({ status: "回答中", text: fullText, emoji: extractEmojis(fullText) });
+    display({
+      status: "回答中",
+      text: fullText,
+      emoji: extractEmojis(fullText),
+    });
   },
   (text) => {
     console.log("完整回答:", text);
   }
 );
-
 
 // main
 (async () => {
@@ -35,7 +42,7 @@ const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
     display({ text });
     if (text) {
       await Promise.all([
-        chatWithOpenAISteam(text, partial, endPartial),
+        chatWithLLMStream(text, partial, endPartial),
         getPlayEndPromise(),
       ]);
     } else {
