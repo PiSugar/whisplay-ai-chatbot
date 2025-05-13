@@ -1,7 +1,7 @@
 const { Socket } = require("net");
 
 const currentStatus = {
-  status: "正在启动",
+  status: "starting",
   emoji: "😊",
   text: "",
   scroll_speed: 3,

@@ -50,7 +50,7 @@ if (!fs.existsSync(dataDir)) {
   console.log("数据文件夹已存在:", dataDir);
 }
 
-let currentStatus = "sleep";
+let currentStatus = "start";
 
 const executeFlow = async (flowStatus, isButtonClick) => {
   if (flowStatus === currentStatus && !isButtonClick) return
