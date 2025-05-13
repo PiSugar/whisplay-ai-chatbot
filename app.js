@@ -23,7 +23,7 @@ const {
   (sentences) => {
     const fullText = sentences.join("");
     display({
-      status: "回答中",
+      status: "answering",
       emoji: extractEmojis(fullText) || "😊",
       text: fullText,
       RGB: "#0000ff",
@@ -37,7 +37,7 @@ const {
   }
 );
 
-// flowStatus "sleep", "listen", "asr", "anwser"
+// flowStatus "sleep", "listen", "asr", "answer"
 let recordFilePath = "";
 let asrText = "";
 
@@ -50,23 +50,28 @@ if (!fs.existsSync(dataDir)) {
   console.log("数据文件夹已存在:", dataDir);
 }
 
-const executeFlow = async (flowStatus) => {
+let currentStatus = "sleep";
+
+const executeFlow = async (flowStatus, isButtonClick) => {
+  if (flowStatus === currentStatus && !isButtonClick) return
   switch (flowStatus) {
     case "sleep":
+      currentStatus = "sleep";
       console.log("待机");
       display({
-        status: "待机",
+        status: "idle",
         emoji: "😴",
         RGB: "#000055",
-        text: "单击按钮开始讲话",
+        text: "Press the button to start",
       });
       onButtonPressed(() => {
-        executeFlow("listen");
+        executeFlow("listen", true);
       });
       break;
     case "listen":
+      currentStatus = "listen";
       console.log("聆听中...");
-      display({ status: "正在聆听", emoji: "😐", RGB: "#00ff00" });
+      display({ status: "listening", emoji: "😐", RGB: "#00ff00" });
       recordFilePath = `${dataDir}/user-${Date.now()}.mp3`;
       recordAudio(recordFilePath, 60)
         .then(() => {
@@ -78,23 +83,23 @@ const executeFlow = async (flowStatus) => {
         });
       onButtonPressed(() => {
         stopRecording();
-        executeFlow("sleep");
+        executeFlow("sleep", true);
       });
       break;
     case "asr":
+      currentStatus = "asr";
       console.log("识别中...");
       asrText = "";
-      display({ status: "识别中", emoji: "🤔", text: "" });
+      display({ status: "recognizing", emoji: "🤔", text: "" });
       let userStop = noop;
       Promise.race([
         recognizeAudio(recordFilePath).then((text) => {
           asrText = text;
           display({ text });
           if (text) {
-            executeFlow("anwser");
+            executeFlow("answer");
           } else {
             console.log("识别结果为空, 请继续说");
-            display({ status: "请继续说" });
             executeFlow("listen");
           }
         }),
@@ -103,14 +108,15 @@ const executeFlow = async (flowStatus) => {
         }),
       ]).then((result) => {
         if (result === "[UserStop]") {
-          executeFlow("listen");
+          executeFlow("listen", true);
         }
       });
       onButtonPressed(() => {
         userStop("[UserStop]");
       });
       break;
-    case "anwser":
+    case "answer":
+      currentStatus = "answer";
       console.log("回答中...");
       let userStopAnser = noop;
       const answerPromise = Promise.all([
@@ -125,8 +131,8 @@ const executeFlow = async (flowStatus) => {
         new Promise((resolve) => {
           userStopAnser = resolve;
         }),
-      ]).then(() => {
-        executeFlow("listen");
+      ]).then((res) => {
+        executeFlow("listen", res === "[UserStop]");
       });
       onButtonPressed(() => {
         userStopAnser("[UserStop]");
