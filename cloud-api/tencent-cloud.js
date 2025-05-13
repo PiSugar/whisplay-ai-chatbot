@@ -58,6 +58,11 @@ const getAuthorization = (payload, service) => {
 
 const recognizeAudio = async (audioPath) => {
   console.time("识别音频");
+  // 先判断音频文件是否存在
+  if (!fs.existsSync(audioPath)) {
+    console.error("音频文件不存在");
+    return '';
+  }
   const audioData = fs.readFileSync(audioPath).toString("base64");
 
   const payload = JSON.stringify({

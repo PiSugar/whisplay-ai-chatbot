@@ -274,6 +274,12 @@ const recognizeAudio = (audioPath) => {
   console.time("识别音频");
   timingStart = true;
   return new Promise((resolve, reject) => {
+    // 先判断音频文件是否存在
+    if (!fs.existsSync(audioPath)) {
+      console.error("音频文件不存在");
+      resolve("");
+      return;
+    }
     const audioData = fs.readFileSync(audioPath);
     client.send(audioData);
     recognizeResolve = resolve;

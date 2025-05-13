@@ -10,7 +10,7 @@ PORT = 12345
 def generate_random_data():
     status_options = ["系统运行中", "维护中", "警告", "正常"]
     emoji_options = ["🚀", "🛠️", "⚠️", "✅", "💡", "✨"]
-    random_text_length = random.randint(50, 200)
+    random_text_length = random.randint(10, 100)
     random_text = "".join(random.choice("这是一段随机生成的内容，包含一些中文和英文的混合。abcdefghijklmnopqrstuvwxyz ") for _ in range(random_text_length))
     test_colors = [
         0xF800,
@@ -42,7 +42,7 @@ def generate_random_data():
         "#A52A2A",# 棕色
     ]
     scroll_speed_options = [3, 5, 7, 10]
-    brightness_options = [ 25, 50, 75, 100]
+    brightness_options = [  50, 75, 100]
 
     data = {
         "RGB": random.choice(test_colors),
@@ -54,8 +54,9 @@ def generate_random_data():
     }
     if random.random() < 0.3:
         data["text"] =f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {random_text}"
+        # data["text"] =f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
         print("本次包含text部分")
-
+    data["text"] =f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {random_text}"
     return data
 
 def main():
@@ -79,7 +80,7 @@ def main():
                                         if "event" in response and response["event"] == "button_pressed":
                                             print("[Client] 收到按钮按下通知，正在更新显示内容...")
                                             new_payload = generate_random_data()
-                                            json_payload = json.dumps(new_payload).encode("utf-8")
+                                            json_payload = (json.dumps(new_payload) + "\n").encode("utf-8")
                                             sock.sendall(json_payload)
                                             print(f"[Client] 发送新的数据: {new_payload}")
                                             last_sent_payload = new_payload

@@ -9,6 +9,10 @@ const openai = new OpenAI({
 });
 
 const recognizeAudio = async (audioFilePath) => {
+  if (!fs.existsSync(audioFilePath)) {
+    console.error("音频文件不存在:", audioFilePath);
+    return '';
+  }
   const transcription = await openai.audio.transcriptions.create({
     file: fs.createReadStream(audioFilePath),
     model: "whisper-1",

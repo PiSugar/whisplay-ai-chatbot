@@ -4,49 +4,53 @@ import time
 
 
 class EchoViewBoard:
-    # LCD 参数
+    # LCD parameters
     LCD_WIDTH = 240
     LCD_HEIGHT = 280
+    CornerHeight = 20  # Corner radius pixels
     DC_PIN = 13
     RST_PIN = 7
     LED_PIN = 15
 
-    # RGB LED 引脚
+    # RGB LED pins
     RED_PIN = 22
     GREEN_PIN = 18
     BLUE_PIN = 16
 
-    # 按键引脚
+    # Button pin
     BUTTON_PIN = 11
 
     def __init__(self):
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(False)
 
-         # 初始化 LCD 引脚
+        # Initialize LCD pins
         GPIO.setup([self.DC_PIN, self.RST_PIN, self.LED_PIN], GPIO.OUT)
         
-        GPIO.output(self.LED_PIN, GPIO.LOW) # 使能背光
+        GPIO.output(self.LED_PIN, GPIO.LOW)  # Enable backlight
 
-        # 初始化背光 PWM
-        self.backlight_pwm = GPIO.PWM(self.LED_PIN, 1000) # 1000Hz 的 PWM 频率可能是一个合理的起点
+        # Initialize backlight PWM
+        self.backlight_pwm = GPIO.PWM(self.LED_PIN, 1000)  # 1000Hz PWM frequency is a reasonable starting point
         self.backlight_pwm.start(100)
 
-        # 初始化 RGB LED 引脚
+        # Initialize RGB LED pins
         GPIO.setup([self.RED_PIN, self.GREEN_PIN, self.BLUE_PIN], GPIO.OUT)
         self.red_pwm = GPIO.PWM(self.RED_PIN, 100)
         self.green_pwm = GPIO.PWM(self.GREEN_PIN, 100)
         self.blue_pwm = GPIO.PWM(self.BLUE_PIN, 100)
+        self._current_r = 0
+        self._current_g = 0
+        self._current_b = 0
         self.red_pwm.start(0)
         self.green_pwm.start(0)
         self.blue_pwm.start(0)
 
-        # 初始化按键
+        # Initialize button
         GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         self.button_callback = None
         GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING, callback=self._button_event, bouncetime=200)
 
-        # 初始化 SPI
+        # Initialize SPI
         self.spi = spidev.SpiDev()
         self.spi.open(0, 0)
         self.spi.max_speed_hz = 100_000_000
@@ -57,9 +61,9 @@ class EchoViewBoard:
         self._init_display()
         self.fill_screen(0)
 
-    # ========== LCD 显示功能 ==========
+    # ========== LCD Display Functions ==========
 
-    # ========== 背光控制 ==========
+    # ========== Backlight Control ==========
     def set_backlight(self, brightness):
         if 0 <= brightness <= 100:
             duty_cycle = 100-brightness
@@ -154,15 +158,35 @@ class EchoViewBoard:
 
     def draw_image(self, x, y, width, height, pixel_data):
         if (x + width > self.LCD_WIDTH) or (y + height > self.LCD_HEIGHT):
-            raise ValueError("图像尺寸超出屏幕范围")
+            raise ValueError("Image dimensions exceed screen boundaries")
         self.set_window(x, y, x + width - 1, y + height - 1)
         self._send_data(pixel_data)
 
-    # ========== RGB 与按键 ==========
+    # ========== RGB and Button Functions ==========
     def set_rgb(self, r, g, b):
         self.red_pwm.ChangeDutyCycle(100 - (r / 255 * 100))
         self.green_pwm.ChangeDutyCycle(100 - (g / 255 * 100))
         self.blue_pwm.ChangeDutyCycle(100 - (b / 255 * 100))
+        self._current_r = r
+        self._current_g = g
+        self._current_b = b
+
+    def set_rgb_fade(self, r_target, g_target, b_target, duration_ms=100):
+        steps = 20  # Adjust number of steps to control smoothness of the fade
+        delay_ms = duration_ms / steps
+
+        r_step = (r_target - self._current_r) / steps
+        g_step = (g_target - self._current_g) / steps
+        b_step = (b_target - self._current_b) / steps
+
+        for _ in range(steps + 1):
+            r_interim = int(self._current_r + _ * r_step)
+            g_interim = int(self._current_g + _ * g_step)
+            b_interim = int(self._current_b + _ * b_step)
+            self.set_rgb(max(0, min(255, r_interim)),
+                         max(0, min(255, g_interim)),
+                         max(0, min(255, b_interim)))
+            time.sleep(delay_ms / 1000.0)
 
     def button_pressed(self):
         return GPIO.input(self.BUTTON_PIN) == 0
@@ -174,7 +198,7 @@ class EchoViewBoard:
         if self.button_callback:
             self.button_callback()
 
-    # ========== 清理 ==========
+    # ========== Cleanup ==========
     def cleanup(self):
         self.spi.close()
         self.red_pwm.stop()

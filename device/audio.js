@@ -10,7 +10,13 @@ const recordAudio = (outputPath, duration = 10) => {
     console.log(`开始录音, 最长${duration}秒钟...`);
     recordingProcess = exec(cmd, (err, stdout, stderr) => {
       currentRecordingReject = reject;
-      if (err) reject(stderr);
+      if (err) {
+        if (recordingProcess) {
+          recordingProcess.kill();
+          recordingProcess = null;
+        }
+        reject(stderr);
+      }
       else resolve(outputPath);
     });
 
