@@ -8,7 +8,7 @@ const currentStatus = {
   brightness: 100,
   RGB: "#00FF30",
   battery_status: "", // "charging", "low", ""
-  battery_level: 80, // 0-100
+  battery_level: 100, // 0-100
 };
 
 let buttonPressedCallback = () => {};
@@ -53,7 +53,7 @@ const sendToDisplay = async (data) => {
 };
 
 async function display(newStatus = {}) {
-  const { status, emoji, text, RGB, brightness } = {
+  const { status, emoji, text, RGB, brightness, battery_level } = {
     ...currentStatus,
     ...newStatus,
   };
@@ -69,8 +69,9 @@ async function display(newStatus = {}) {
   currentStatus.text = text;
   currentStatus.RGB = RGB;
   currentStatus.brightness = brightness;
+  currentStatus.battery_level = battery_level;
 
-  // 发送scoket到0.0.0.0:12345
+  // 发送socket到0.0.0.0:12345
   const changedValuesObj = Object.fromEntries(changedValues);
   changedValuesObj.brightness = 100;
   const data = JSON.stringify(changedValuesObj);
