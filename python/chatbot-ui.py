@@ -20,6 +20,7 @@ import time
 import socket
 import json
 import sys
+
 from echoview import EchoViewBoard
 import threading
 
@@ -154,6 +155,7 @@ def wrap_text(draw, text, font, max_width):
         test_line = current_line + char
         bbox = font.getbbox(test_line)
         w = bbox[2] - bbox[0]
+        w = font.getlength(test_line)
         if w <= max_width:
             current_line = test_line
         else:
@@ -268,7 +270,7 @@ def render_scroll_info_area_dynamic_font(info_text, font_path, scroll_width, scr
     """
     best_font_size = min_font_size
     total_content_height_best_font = float('inf')
-    horizontal_padding=3 #左右间距
+    horizontal_padding=10 #左右间距
     effective_scroll_width = scroll_width - 2 * horizontal_padding
     # 尝试从最大字体到最小字体，找到能在屏幕内完整显示的最大字体
     for font_size in range(max_font_size, min_font_size - 1, -2):  # 逆序尝试，步长为2以提高效率
