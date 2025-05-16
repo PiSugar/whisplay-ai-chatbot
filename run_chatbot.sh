@@ -17,7 +17,7 @@ sleep 5
 echo "启动Python聊天机器人..." 
 python3 /home/pi/echoview-ai-chatbot/python/chatbot-ui.py &
 # 等待5秒
-sleep 5
+sleep 10
 cd ..
 # 启动Node.js应用
 echo "启动Node.js应用..." 
