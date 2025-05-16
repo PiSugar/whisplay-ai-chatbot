@@ -42,6 +42,7 @@ switch (ttsServer) {
     break;
   case "OPENAI":
     ttsProcessor = require("./openai-tts");
+    break;
   case "TENCENT":
     ttsProcessor = require("./tencent-cloud").synthesizeSpeech;
     break;

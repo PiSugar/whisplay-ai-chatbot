@@ -32,9 +32,8 @@ const getAuthorization = (payload, service) => {
   const httpRequestMethod = "POST";
   const canonicalUri = "/";
   const canonicalQueryString = "";
-  const canonicalHeaders = `content-type:application/json\nhost:${
-    service === "asr" ? ENDPOINT : TTS_ENDPOINT
-  }\n`;
+  const canonicalHeaders = `content-type:application/json\nhost:${service === "asr" ? ENDPOINT : TTS_ENDPOINT
+    }\n`;
   const signedHeaders = "content-type;host";
   const canonicalRequest = `${httpRequestMethod}\n${canonicalUri}\n${canonicalQueryString}\n${canonicalHeaders}\n${signedHeaders}\n${hashedPayload}`;
   const algorithm = "TC3-HMAC-SHA256";
@@ -127,7 +126,11 @@ const synthesizeSpeech = async (text) => {
     });
     // console.log('res.data', res.data)
     console.log("合成语音完成");
-    return res.data.Response.Audio;
+    const buffer = Buffer.from(await res.data.Response.Audio.arrayBuffer());
+    const duration = await mp3Duration(buffer);
+    //
+    return { data: buffer, duration: duration * 1000 };
+
   } catch (err) {
     console.error("合成语音失败：", err.response?.data || err.message);
   }
