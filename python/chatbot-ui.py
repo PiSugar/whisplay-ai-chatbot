@@ -153,7 +153,7 @@ def wrap_text(draw, text, font, max_width):
     return lines
 
 def render_top_area(status_text, emoji_text, font_path, image_width,
-                    status_font_size=28, emoji_font_size=40, battery_level=None,battery_status=None):
+                    status_font_size=28, emoji_font_size=40, battery_level=None,battery_color=None):
     status_font = ImageFont.truetype(font_path, status_font_size)
     emoji_font = ImageFont.truetype(font_path, emoji_font_size)
     battery_font = ImageFont.truetype(font_path, 13)
@@ -168,7 +168,7 @@ def render_top_area(status_text, emoji_text, font_path, image_width,
     # Draw status centered
     status_bbox = status_font.getbbox(status_text)
     status_w = status_bbox[2] - status_bbox[0]
-    draw_mixed_text(draw, image, status_text, status_font, ((image_width - status_w) // 2, 0))
+    draw_mixed_text(draw, image, status_text, status_font, (cornerHeight, 0))
 
     # Draw emoji centered
     emoji_bbox = emoji_font.getbbox(emoji_text)
@@ -182,15 +182,11 @@ def render_top_area(status_text, emoji_text, font_path, image_width,
         battery_height = 15
         battery_margin_right = 20
         battery_x = image_width - battery_width - battery_margin_right
-        battery_y = 8
+        battery_y =( status_font_size)//2
         corner_radius = 3
-
-        fill_color = None
-        if battery_status == "charging":
-            fill_color = "#aaffaa"  # Light green
-        elif battery_status == "low":
-            fill_color = "#FFAA33"  # Light yellow
-
+        fill_color="black"
+        if battery_color is not None:
+            fill_color = battery_color # Light green
         # Outline with rounded corners
         outline_color = "white"
         line_width = 2
@@ -226,10 +222,21 @@ def render_top_area(status_text, emoji_text, font_path, image_width,
         text_y = battery_y + (battery_height - (battery_font.getmetrics()[0] + battery_font.getmetrics()[1])) // 2
         text_w = text_bbox[2] - text_bbox[0]
         text_x = battery_x + (battery_width - text_w) // 2
-        if fill_color is not None:
-            draw.text((text_x, text_y), battery_text, font=battery_font, fill="black")
+        def calculate_luminance(rgb_tuple):
+            """计算 RGB 颜色的亮度。"""
+            if rgb_tuple is None:
+                return -1 # 或者其他表示无效的值
+            r, g, b = rgb_tuple
+            return 0.299 * r + 0.587 * g + 0.114 * b
+
+        luminance = calculate_luminance(fill_color)
+        brightness_threshold = 128 # 你可以根据需要调整这个阈值
+        if luminance > brightness_threshold:
+            text_fill_color = "black"
         else:
-            draw.text((text_x, text_y), battery_text, font=battery_font, fill="white")
+            text_fill_color = "white"
+
+        draw.text((text_x, text_y), battery_text, font=battery_font, fill=text_fill_color)
 
     return image, top_height
 
@@ -250,13 +257,14 @@ def render_scroll_info_area_dynamic_font(info_text, font_path, scroll_width, scr
     """
     best_font_size = min_font_size
     total_content_height_best_font = float('inf')
-
+    horizontal_padding=3 #左右间距
+    effective_scroll_width = scroll_width - 2 * horizontal_padding
     # 尝试从最大字体到最小字体，找到能在屏幕内完整显示的最大字体
     for font_size in range(max_font_size, min_font_size - 1, -2):  # 逆序尝试，步长为2以提高效率
         try:
             info_font = ImageFont.truetype(font_path, font_size)
             dummy_draw = ImageDraw.Draw(Image.new("RGB", (scroll_width, 1000)))
-            lines = wrap_text(dummy_draw, info_text, info_font, scroll_width)
+            lines = wrap_text(dummy_draw, info_text, info_font, effective_scroll_width)
             ascent, descent = info_font.getmetrics()
             line_height = ascent + descent
             total_content_height = len(lines) * line_height+cornerHeight
@@ -276,7 +284,7 @@ def render_scroll_info_area_dynamic_font(info_text, font_path, scroll_width, scr
     if total_content_height_best_font <= scroll_height:
         info_font = ImageFont.truetype(font_path, best_font_size)
         dummy_draw = ImageDraw.Draw(Image.new("RGB", (scroll_width, 1000)))
-        lines = wrap_text(dummy_draw, info_text, info_font, scroll_width)
+        lines = wrap_text(dummy_draw, info_text, info_font, effective_scroll_width)
         ascent, descent = info_font.getmetrics()
         line_height = ascent + descent
         output_height = scroll_height  # 高度为屏幕高度
@@ -284,7 +292,7 @@ def render_scroll_info_area_dynamic_font(info_text, font_path, scroll_width, scr
         draw = ImageDraw.Draw(scroll_img)
         y_offset = (scroll_height - total_content_height_best_font) // 2 # 垂直居中显示
         for i, line in enumerate(lines):
-            draw_mixed_text(draw, scroll_img, line, info_font, (0, y_offset + i * line_height))
+            draw_mixed_text(draw, scroll_img, line, info_font, (horizontal_padding, y_offset + i * line_height))
         return scroll_img
     else:
         # 否则，使用原始的滚动绘制逻辑
@@ -298,7 +306,7 @@ def render_scroll_info_area_dynamic_font(info_text, font_path, scroll_width, scr
         scroll_img = Image.new("RGBA", (scroll_width, output_height), (0, 0, 0, 255))
         draw = ImageDraw.Draw(scroll_img)
         for i, line in enumerate(lines):
-            draw_mixed_text(draw, scroll_img, line, info_font, (0, i * line_height))
+            draw_mixed_text(draw, scroll_img, line, info_font, (horizontal_padding, i * line_height))
         return scroll_img
 
 def scroll_info_area(top_image: Image.Image, info_scroll_img: Image.Image, echoview,
@@ -329,13 +337,13 @@ current_status = ""
 current_emoji = ""
 current_text = ""
 current_battery_level = None
-current_battery_status = ""
+current_battery_color = None
 scroll_thread = None
 scroll_stop_event = threading.Event()
 top_image = None
 clients = {} # 用于存储客户端连接
-def update_display(echoview, font_path, status=None, emoji=None, text=None, scroll_speed=2,battery_level=None,battery_status=None):
-    global current_status, current_emoji, current_text,current_battery_level,current_battery_status
+def update_display(echoview, font_path, status=None, emoji=None, text=None, scroll_speed=2,battery_level=None,battery_color=None):
+    global current_status, current_emoji, current_text,current_battery_level,current_battery_color
     global scroll_thread, scroll_stop_event, top_image,scroll_top
 
     top_changed = False
@@ -349,12 +357,12 @@ def update_display(echoview, font_path, status=None, emoji=None, text=None, scro
     if battery_level is not None and battery_level != current_battery_level:
         current_battery_level = battery_level
         top_changed = True
-    if battery_status is not None and battery_status != current_battery_status:
-        current_battery_status = battery_status
+    if battery_color is not None and battery_color != current_battery_color:
+        current_battery_color = battery_color
         top_changed = True
     if top_changed:
         print("重绘顶部")
-        top_image ,scroll_top= render_top_area(current_status, current_emoji, font_path, echoview.LCD_WIDTH,battery_level=current_battery_level,battery_status=current_battery_status)
+        top_image ,scroll_top= render_top_area(current_status, current_emoji, font_path, echoview.LCD_WIDTH,battery_level=current_battery_level,battery_color=current_battery_color)
         rgb565_data=image_to_rgb565(top_image,echoview.LCD_WIDTH,scroll_top)
         echoview.draw_image(0, 0, echoview.LCD_WIDTH, scroll_top, rgb565_data)
 
@@ -435,15 +443,17 @@ def handle_client(client_socket, addr, echoview, font_path):
                     scroll_speed = content.get("scroll_speed", 2)
                     response_to_client = content.get("response", None)
                     battery_level = content.get("battery_level", None)  # Get battery level
-                    battery_status = content.get("battery_status", None)  # Get battery status
+                    battery_color = content.get("battery_color", None)  # Get battery status
 
                     if rgbled:
                         rgb255_tuple = get_rgb255_from_any(rgbled)
                         echoview.set_rgb_fade(*rgb255_tuple,duration_ms=500)
+                    if battery_color:
+                        battery_tuple = get_rgb255_from_any(battery_color)
                     if brightness:
                         echoview.set_backlight(brightness)
-                    if (text is not None) or (status is not None) or (emoji is not None):
-                        update_display(echoview, font_path, status=status, emoji=emoji, text=text, scroll_speed=scroll_speed,battery_level=battery_level,battery_status=battery_status)
+                    if (text is not None) or (status is not None) or (emoji is not None)or (battery_level is not None)or (battery_color is not None):
+                        update_display(echoview, font_path, status=status, emoji=emoji, text=text, scroll_speed=scroll_speed,battery_level=battery_level,battery_color=battery_tuple)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:
