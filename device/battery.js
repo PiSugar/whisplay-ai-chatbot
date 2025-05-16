@@ -1,9 +1,5 @@
-// 连接电池tcp服务
-// 间隔5秒发送一次get battery
-// 当收到数据battery: 80时，将电池电量更新
-
-import { connect } from 'net';
-import { EventEmitter } from 'events';
+const { connect } = require('net');
+const { EventEmitter } = require('events');
 
 class PiSugarBattery extends EventEmitter {
 
