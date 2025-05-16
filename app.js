@@ -151,5 +151,5 @@ const executeFlow = async (flowStatus, isButtonClick) => {
 };
 
 (async () => {
-  executeFlow("sleep");
+  executeFlow("sleep", true);
 })();
