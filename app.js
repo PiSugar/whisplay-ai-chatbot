@@ -25,7 +25,6 @@ const {
 } = new StreamResponser(
   ttsProcessor,
   (sentences) => {
-    if (statusObj.currentStatus !== 'answering') return
     const fullText = sentences.join("");
     display({
       status: "answering",
@@ -36,7 +35,6 @@ const {
   },
   (text) => {
     console.log("完整回答:", text);
-    if (statusObj.currentStatus !== 'answering') return
     display({
       text,
     });
