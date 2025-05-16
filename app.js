@@ -85,7 +85,9 @@ const executeFlow = async (flowStatus, isButtonClick) => {
         })
         .catch((err) => {
           console.error("录音错误:", err);
-          executeFlow("listen", true);
+          if (statusObj.currentStatus === "listen") {
+            executeFlow("listen", true);
+          }
         });
       onButtonPressed(() => {
         stopRecording();
