@@ -4,36 +4,36 @@ import time
 
 
 class EchoViewBoard:
-    # LCD parameters
+    # LCD 参数
     LCD_WIDTH = 240
     LCD_HEIGHT = 280
-    CornerHeight = 20  # Corner radius pixels
+    CornerHeight=20 #圆角高度占的像素
     DC_PIN = 13
     RST_PIN = 7
     LED_PIN = 15
 
-    # RGB LED pins
+    # RGB LED 引脚
     RED_PIN = 22
     GREEN_PIN = 18
     BLUE_PIN = 16
 
-    # Button pin
+    # 按键引脚
     BUTTON_PIN = 11
 
     def __init__(self):
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(False)
 
-        # Initialize LCD pins
+         # 初始化 LCD 引脚
         GPIO.setup([self.DC_PIN, self.RST_PIN, self.LED_PIN], GPIO.OUT)
         
-        GPIO.output(self.LED_PIN, GPIO.LOW)  # Enable backlight
+        GPIO.output(self.LED_PIN, GPIO.LOW) # 使能背光
 
-        # Initialize backlight PWM
-        self.backlight_pwm = GPIO.PWM(self.LED_PIN, 1000)  # 1000Hz PWM frequency is a reasonable starting point
+        # 初始化背光 PWM
+        self.backlight_pwm = GPIO.PWM(self.LED_PIN, 1000) # 1000Hz 的 PWM 频率可能是一个合理的起点
         self.backlight_pwm.start(100)
 
-        # Initialize RGB LED pins
+         # 初始化 RGB LED 引脚
         GPIO.setup([self.RED_PIN, self.GREEN_PIN, self.BLUE_PIN], GPIO.OUT)
         self.red_pwm = GPIO.PWM(self.RED_PIN, 100)
         self.green_pwm = GPIO.PWM(self.GREEN_PIN, 100)
@@ -45,12 +45,12 @@ class EchoViewBoard:
         self.green_pwm.start(0)
         self.blue_pwm.start(0)
 
-        # Initialize button
+        # 初始化按键
         GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         self.button_callback = None
         GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING, callback=self._button_event, bouncetime=200)
 
-        # Initialize SPI
+        # 初始化 SPI
         self.spi = spidev.SpiDev()
         self.spi.open(0, 0)
         self.spi.max_speed_hz = 100_000_000
@@ -61,9 +61,9 @@ class EchoViewBoard:
         self._init_display()
         self.fill_screen(0)
 
-    # ========== LCD Display Functions ==========
+    # ========== LCD 显示功能 ==========
 
-    # ========== Backlight Control ==========
+    # ========== 背光控制 ==========
     def set_backlight(self, brightness):
         if 0 <= brightness <= 100:
             duty_cycle = 100-brightness
@@ -158,11 +158,11 @@ class EchoViewBoard:
 
     def draw_image(self, x, y, width, height, pixel_data):
         if (x + width > self.LCD_WIDTH) or (y + height > self.LCD_HEIGHT):
-            raise ValueError("Image dimensions exceed screen boundaries")
+            raise ValueError("图像尺寸超出屏幕范围")
         self.set_window(x, y, x + width - 1, y + height - 1)
         self._send_data(pixel_data)
 
-    # ========== RGB and Button Functions ==========
+    # ========== RGB 与按键 ==========
     def set_rgb(self, r, g, b):
         self.red_pwm.ChangeDutyCycle(100 - (r / 255 * 100))
         self.green_pwm.ChangeDutyCycle(100 - (g / 255 * 100))
@@ -172,7 +172,7 @@ class EchoViewBoard:
         self._current_b = b
 
     def set_rgb_fade(self, r_target, g_target, b_target, duration_ms=100):
-        steps = 20  # Adjust number of steps to control smoothness of the fade
+        steps = 20  # 可以调整步数来控制渐变的平滑度
         delay_ms = duration_ms / steps
 
         r_step = (r_target - self._current_r) / steps
@@ -198,7 +198,7 @@ class EchoViewBoard:
         if self.button_callback:
             self.button_callback()
 
-    # ========== Cleanup ==========
+    # ========== 清理 ==========
     def cleanup(self):
         self.spi.close()
         self.red_pwm.stop()

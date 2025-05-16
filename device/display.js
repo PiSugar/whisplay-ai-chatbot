@@ -7,6 +7,8 @@ const currentStatus = {
   scroll_speed: 3,
   brightness: 100,
   RGB: "#00FF30",
+  battery_status: "", // "charging", "low", ""
+  battery_level: 80, // 0-100
 };
 
 let buttonPressedCallback = () => {};

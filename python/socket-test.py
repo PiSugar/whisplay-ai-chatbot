@@ -9,6 +9,7 @@ PORT = 12345
 
 def generate_random_data():
     status_options = ["系统运行中", "维护中", "警告", "正常"]
+    battery_status = ["charging", "low", ""]
     emoji_options = ["🚀", "🛠️", "⚠️", "✅", "💡", "✨"]
     random_text_length = random.randint(10, 100)
     random_text = "".join(random.choice("这是一段随机生成的内容，包含一些中文和英文的混合。abcdefghijklmnopqrstuvwxyz ") for _ in range(random_text_length))
@@ -47,10 +48,12 @@ def generate_random_data():
     data = {
         "RGB": random.choice(test_colors),
         "status": random.choice(status_options),
+        "battery_status":random.choice(battery_status),
+        "battery_level":random.randint(0, 99),
         "emoji": random.choice(emoji_options),
         # "text": ,
         "scroll_speed": random.choice(scroll_speed_options),
-        "brightness": random.choice(brightness_options)
+        "brightness": random.choice(brightness_options),
     }
     if random.random() < 0.3:
         data["text"] =f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {random_text}"
