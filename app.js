@@ -44,10 +44,9 @@ const {
 
 const battery = new Battery()
 battery.connect()
-battery.addListener("batteryLevel", (data) => {
-  console.log("电量:", data);
+battery.addListener("batteryLevel", (level) => {
   display({
-    battery_level: data.level,
+    battery_level: level,
   });
 });
 
