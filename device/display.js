@@ -16,25 +16,35 @@ let buttonPressedCallback = () => {};
 const client = new Socket();
 
 const isReady = new Promise((resolve) => {
-  client.connect(12345, "0.0.0.0", () => {
-    console.log("Connected to local display socket");
-    sendToDisplay(JSON.stringify(currentStatus));
-    client.on("data", (data) => {
-      console.log("Received data from local display:", data.toString());
-      // {"event": "button_pressed"}
-      try {
-        const json = JSON.parse(data.toString());
-        if (json.event === "button_pressed") {
-          buttonPressedCallback();
-          // 处理按钮按下事件
-        }
-      } catch {}
+  const connectToSocket = () => {
+    client.connect(12345, "0.0.0.0", () => {
+      console.log("Connected to local display socket");
+      sendToDisplay(JSON.stringify(currentStatus));
+      client.on("data", (data) => {
+        console.log("Received data from local display:", data.toString());
+        // {"event": "button_pressed"}
+        try {
+          const json = JSON.parse(data.toString());
+          if (json.event === "button_pressed") {
+            buttonPressedCallback();
+            // 处理按钮按下事件
+          }
+        } catch {}
+      });
+      client.on("error", (err) => {
+        console.error("Socket error:", err);
+      });
+      resolve();
     });
+    
     client.on("error", (err) => {
-      console.error("Socket error:", err);
+      console.error("Connection error:", err.message);
+      console.log("Retrying in 5 seconds...");
+      setTimeout(connectToSocket, 5000);
     });
-    resolve();
-  });
+  };
+  
+  connectToSocket();
 });
 
 const onButtonPressed = (callback) => {
