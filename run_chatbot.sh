@@ -12,12 +12,12 @@ echo "PATH: $PATH"
 echo "Python版本: $(python3 --version)" 
 echo "Node版本: $(node --version)"
 # 启动Python聊天机器人UI
-echo "等待10秒..."
-sleep 10
+# echo "等待10秒..."
+# sleep 10
 echo "启动Python聊天机器人..." 
 python3 /home/pi/echoview-ai-chatbot/python/chatbot-ui.py &
-# 等待10秒
-sleep 10
+# 等待30秒
+sleep 30
 cd ..
 # 启动Node.js应用
 echo "启动Node.js应用..." 
