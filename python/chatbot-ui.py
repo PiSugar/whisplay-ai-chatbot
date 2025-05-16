@@ -9,6 +9,17 @@ import time
 import socket
 import json
 import sys
+import unicodedata
+import argparse
+from PIL import Image, ImageDraw, ImageFont
+import cairosvg
+from io import BytesIO
+import os
+import numpy as np
+import time
+import socket
+import json
+import sys
 from echoview import EchoViewBoard
 import threading
 
@@ -205,7 +216,7 @@ def render_top_area(status_text, emoji_text, font_path, image_width,
         draw.line([(battery_x, battery_y + corner_radius), (battery_x, battery_y + battery_height - corner_radius)], fill=outline_color, width=line_width)  # Left
         draw.line([(battery_x + battery_width, battery_y + corner_radius), (battery_x + battery_width, battery_y + battery_height - corner_radius)], fill=outline_color, width=line_width)  # Right
 
-        if fill_color:
+        if fill_color !=(0,0,0):
             draw.rectangle([battery_x + line_width // 2, battery_y + line_width // 2, battery_x + battery_width - line_width // 2, battery_y + battery_height - line_width // 2], fill=fill_color)
 
         # Battery head
@@ -450,6 +461,8 @@ def handle_client(client_socket, addr, echoview, font_path):
                         echoview.set_rgb_fade(*rgb255_tuple,duration_ms=500)
                     if battery_color:
                         battery_tuple = get_rgb255_from_any(battery_color)
+                    else:
+                        battery_tuple=(0,0,0)
                     if brightness:
                         echoview.set_backlight(brightness)
                     if (text is not None) or (status is not None) or (emoji is not None)or (battery_level is not None)or (battery_color is not None):

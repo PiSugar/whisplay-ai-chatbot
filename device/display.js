@@ -7,7 +7,7 @@ const currentStatus = {
   scroll_speed: 3,
   brightness: 100,
   RGB: "#00FF30",
-  battery_status: "", // "charging", "low", ""
+  battery_color: "#000000",
   battery_level: 100, // 0-100
 };
 
@@ -53,7 +53,7 @@ const sendToDisplay = async (data) => {
 };
 
 async function display(newStatus = {}) {
-  const { status, emoji, text, RGB, brightness, battery_level } = {
+  const { status, emoji, text, RGB, brightness, battery_level, battery_color } = {
     ...currentStatus,
     ...newStatus,
   };
@@ -70,6 +70,7 @@ async function display(newStatus = {}) {
   currentStatus.RGB = RGB;
   currentStatus.brightness = brightness;
   currentStatus.battery_level = battery_level;
+  currentStatus.battery_color = battery_color;
 
   // 发送socket到0.0.0.0:12345
   const changedValuesObj = Object.fromEntries(changedValues);
