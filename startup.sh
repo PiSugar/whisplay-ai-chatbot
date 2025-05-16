@@ -15,4 +15,4 @@ StandardError=append:/home/pi/echoview-ai-chatbot/chatbot.log
 
 [Install]
 WantedBy=multi-user.target
-EOF
+EOF'
