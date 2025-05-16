@@ -14,7 +14,7 @@ const {
 const { noop } = require("lodash");
 
 let statusObj = {
-  currentStatus: "sleep",
+  currentStatus: "start",
 }
 
 const {
