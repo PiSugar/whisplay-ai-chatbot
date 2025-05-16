@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { display, extractEmojis, onButtonPressed } = require("./device/display");
+const Battery = require(".device/battery");
 const {
   recordAudio,
   StreamResponser,
@@ -40,6 +41,15 @@ const {
     });
   }
 );
+
+const battery = new Battery()
+battery.connect()
+battery.addListener("batteryLevel", (data) => {
+  console.log("电量:", data);
+  display({
+    battery_level: data.level,
+  });
+});
 
 // flowStatus "sleep", "listen", "asr", "answer"
 let recordFilePath = "";
