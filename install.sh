@@ -148,6 +148,5 @@ yarn --registry=$NPM_REGISTRY
 sudo apt-get update
 sudo apt-get install -y sox mpg123
 sudo apt-get install -y libsox-fmt-mp3
-sudo apt-get install -y python3-cairosvg
 
 

@@ -13,6 +13,10 @@ const {
 } = require("./cloud-api/server");
 const { noop } = require("lodash");
 
+let statusObj = {
+  currentStatus: "sleep",
+}
+
 const {
   partial,
   endPartial,
@@ -21,6 +25,7 @@ const {
 } = new StreamResponser(
   ttsProcessor,
   (sentences) => {
+    if (statusObj.currentStatus !== 'answering') return
     const fullText = sentences.join("");
     display({
       status: "answering",
@@ -31,6 +36,7 @@ const {
   },
   (text) => {
     console.log("完整回答:", text);
+    if (statusObj.currentStatus !== 'answering') return
     display({
       text,
     });
@@ -50,13 +56,15 @@ if (!fs.existsSync(dataDir)) {
   console.log("数据文件夹已存在:", dataDir);
 }
 
-let currentStatus = "start";
 
 const executeFlow = async (flowStatus, isButtonClick) => {
-  if (flowStatus === currentStatus && !isButtonClick) return
+
+  if (statusObj.currentStatus === 'sleep' && !isButtonClick) return
+  if (statusObj.currentStatus === flowStatus) return
+
   switch (flowStatus) {
     case "sleep":
-      currentStatus = "sleep";
+      statusObj.currentStatus = "sleep";
       console.log("待机");
       display({
         status: "idle",
@@ -69,7 +77,7 @@ const executeFlow = async (flowStatus, isButtonClick) => {
       });
       break;
     case "listen":
-      currentStatus = "listen";
+      statusObj.currentStatus = "listen";
       console.log("聆听中...");
       display({ status: "listening", emoji: "😐", RGB: "#00ff00" });
       recordFilePath = `${dataDir}/user-${Date.now()}.mp3`;
@@ -87,7 +95,7 @@ const executeFlow = async (flowStatus, isButtonClick) => {
       });
       break;
     case "asr":
-      currentStatus = "asr";
+      statusObj.currentStatus = "asr";
       console.log("识别中...");
       asrText = "";
       display({ status: "recognizing", emoji: "🤔", text: "" });
@@ -116,7 +124,7 @@ const executeFlow = async (flowStatus, isButtonClick) => {
       });
       break;
     case "answer":
-      currentStatus = "answer";
+      statusObj.currentStatus = "answer";
       console.log("回答中...");
       let userStopAnser = noop;
       const answerPromise = Promise.all([
