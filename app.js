@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { display, extractEmojis, onButtonPressed } = require("./device/display");
-const Battery = require(".device/battery");
+const Battery = require("./device/battery");
 const {
   recordAudio,
   StreamResponser,
