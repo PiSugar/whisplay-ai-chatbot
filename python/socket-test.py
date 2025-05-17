@@ -48,7 +48,7 @@ def generate_random_data():
     data = {
         "RGB": color,
         "status": random.choice(status_options),
-        # "battery_color":color,
+        "battery_color":color,
         "battery_level":random.randint(0, 99),
         "emoji": random.choice(emoji_options),
         # "text": ,
@@ -82,8 +82,8 @@ def main():
                                 if line:
                                     try:
                                         response = json.loads(line)
-                                        if "event" in response and response["event"] == "button_pressed":
-                                            print("[Client] 收到按钮按下通知，正在更新显示内容...")
+                                        if "event" in response:
+                                            print(f"[Client] 收到{response['event']}通知，正在更新显示内容...")
                                             new_payload = generate_random_data()
                                             json_payload = (json.dumps(new_payload) + "\n").encode("utf-8")
                                             sock.sendall(json_payload)

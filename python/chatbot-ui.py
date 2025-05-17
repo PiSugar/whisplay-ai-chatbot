@@ -9,17 +9,6 @@ import time
 import socket
 import json
 import sys
-import unicodedata
-import argparse
-from PIL import Image, ImageDraw, ImageFont
-import cairosvg
-from io import BytesIO
-import os
-import numpy as np
-import time
-import socket
-import json
-import sys
 
 from echoview import EchoViewBoard
 import threading
@@ -429,6 +418,12 @@ def on_button_pressed():
     notification = {"event": "button_pressed"}
     send_to_all_clients(notification)
 
+def on_button_release():
+    """按钮按下时执行的函数"""
+    print("[Server] 按钮被按下")
+    notification = {"event": "button_released"}
+    send_to_all_clients(notification)
+
 def handle_client(client_socket, addr, echoview, font_path):
     print(f"[Socket] 客户端 {addr} 已连接")
     clients[addr] = client_socket
@@ -500,6 +495,7 @@ def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.t
     # 注册按钮按下事件
 
     echoview.on_button_press(on_button_pressed) # 使用模拟的注册
+    echoview.on_button_release(on_button_release) # 使用模拟的注册
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # 添加这一行

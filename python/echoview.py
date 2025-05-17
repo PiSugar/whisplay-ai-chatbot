@@ -7,7 +7,7 @@ class EchoViewBoard:
     # LCD 参数
     LCD_WIDTH = 240
     LCD_HEIGHT = 280
-    CornerHeight=20 #圆角高度占的像素
+    CornerHeight = 20  # 圆角高度占的像素
     DC_PIN = 13
     RST_PIN = 7
     LED_PIN = 15
@@ -24,16 +24,18 @@ class EchoViewBoard:
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(False)
 
-         # 初始化 LCD 引脚
+        # 初始化 LCD 引脚
         GPIO.setup([self.DC_PIN, self.RST_PIN, self.LED_PIN], GPIO.OUT)
-        
-        GPIO.output(self.LED_PIN, GPIO.LOW) # 使能背光
+
+        GPIO.output(self.LED_PIN, GPIO.LOW)  # 使能背光
 
         # 初始化背光 PWM
-        self.backlight_pwm = GPIO.PWM(self.LED_PIN, 1000) # 1000Hz 的 PWM 频率可能是一个合理的起点
+        self.backlight_pwm = GPIO.PWM(
+            self.LED_PIN, 1000
+        )  # 1000Hz 的 PWM 频率可能是一个合理的起点
         self.backlight_pwm.start(100)
 
-         # 初始化 RGB LED 引脚
+        # 初始化 RGB LED 引脚
         GPIO.setup([self.RED_PIN, self.GREEN_PIN, self.BLUE_PIN], GPIO.OUT)
         self.red_pwm = GPIO.PWM(self.RED_PIN, 100)
         self.green_pwm = GPIO.PWM(self.GREEN_PIN, 100)
@@ -47,8 +49,11 @@ class EchoViewBoard:
 
         # 初始化按键
         GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        self.button_callback = None
-        GPIO.add_event_detect(self.BUTTON_PIN, GPIO.FALLING, callback=self._button_event, bouncetime=200)
+        self.button_press_callback = None
+        self.button_release_callback = None
+        GPIO.add_event_detect(
+            self.BUTTON_PIN, GPIO.BOTH, callback=self._button_event, bouncetime=50
+        )
 
         # 初始化 SPI
         self.spi = spidev.SpiDev()
@@ -66,9 +71,8 @@ class EchoViewBoard:
     # ========== 背光控制 ==========
     def set_backlight(self, brightness):
         if 0 <= brightness <= 100:
-            duty_cycle = 100-brightness
+            duty_cycle = 100 - brightness
             self.backlight_pwm.ChangeDutyCycle(duty_cycle)
-
 
     def _reset_lcd(self):
         GPIO.output(self.RST_PIN, GPIO.HIGH)
@@ -93,10 +97,40 @@ class EchoViewBoard:
         self._send_command(0xC4, 0x20)
         self._send_command(0xC6, 0x0F)
         self._send_command(0xD0, 0xA4, 0xA1)
-        self._send_command(0xE0, 0xD0, 0x08, 0x0E, 0x09, 0x09, 0x05,
-                           0x31, 0x33, 0x48, 0x17, 0x14, 0x15, 0x31, 0x34)
-        self._send_command(0xE1, 0xD0, 0x08, 0x0E, 0x09, 0x09, 0x15,
-                           0x31, 0x33, 0x48, 0x17, 0x14, 0x15, 0x31, 0x34)
+        self._send_command(
+            0xE0,
+            0xD0,
+            0x08,
+            0x0E,
+            0x09,
+            0x09,
+            0x05,
+            0x31,
+            0x33,
+            0x48,
+            0x17,
+            0x14,
+            0x15,
+            0x31,
+            0x34,
+        )
+        self._send_command(
+            0xE1,
+            0xD0,
+            0x08,
+            0x0E,
+            0x09,
+            0x09,
+            0x15,
+            0x31,
+            0x33,
+            0x48,
+            0x17,
+            0x14,
+            0x15,
+            0x31,
+            0x34,
+        )
         self._send_command(0x21)
         self._send_command(0x29)
 
@@ -111,14 +145,18 @@ class EchoViewBoard:
         GPIO.output(self.DC_PIN, GPIO.HIGH)
         max_chunk = 4096
         for i in range(0, len(data), max_chunk):
-            self.spi.writebytes(data[i:i + max_chunk])
+            self.spi.writebytes(data[i : i + max_chunk])
 
     def set_window(self, x0, y0, x1, y1, use_horizontal=0):
         if use_horizontal in (0, 1):
             self._send_command(0x2A, x0 >> 8, x0 & 0xFF, x1 >> 8, x1 & 0xFF)
-            self._send_command(0x2B, (y0 + 20) >> 8, (y0 + 20) & 0xFF, (y1 + 20) >> 8, (y1 + 20) & 0xFF)
+            self._send_command(
+                0x2B, (y0 + 20) >> 8, (y0 + 20) & 0xFF, (y1 + 20) >> 8, (y1 + 20) & 0xFF
+            )
         elif use_horizontal in (2, 3):
-            self._send_command(0x2A, (x0 + 20) >> 8, (x0 + 20) & 0xFF, (x1 + 20) >> 8, (x1 + 20) & 0xFF)
+            self._send_command(
+                0x2A, (x0 + 20) >> 8, (x0 + 20) & 0xFF, (x1 + 20) >> 8, (x1 + 20) & 0xFF
+            )
             self._send_command(0x2B, y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF)
         self._send_command(0x2C)
 
@@ -183,20 +221,38 @@ class EchoViewBoard:
             r_interim = int(self._current_r + _ * r_step)
             g_interim = int(self._current_g + _ * g_step)
             b_interim = int(self._current_b + _ * b_step)
-            self.set_rgb(max(0, min(255, r_interim)),
-                         max(0, min(255, g_interim)),
-                         max(0, min(255, b_interim)))
+            self.set_rgb(
+                max(0, min(255, r_interim)),
+                max(0, min(255, g_interim)),
+                max(0, min(255, b_interim)),
+            )
             time.sleep(delay_ms / 1000.0)
 
     def button_pressed(self):
         return GPIO.input(self.BUTTON_PIN) == 0
 
     def on_button_press(self, callback):
-        self.button_callback = callback
+        self.button_press_callback = callback
+
+    def on_button_release(self, callback):
+        self.button_release_callback = callback
+
+    def _button_release_event(self, channel):
+        if self.button_release_callback:
+            self.button_release_callback()
+
+    def _button_press_event(self, channel):
+        if self.button_press_callback:
+            self.button_press_callback()
 
     def _button_event(self, channel):
-        if self.button_callback:
-            self.button_callback()
+        if GPIO.input(channel):
+            # Falling edge (按钮按下)
+            self._button_press_event(channel)
+
+        else:
+            # Rising edge (按钮释放)
+            self._button_release_event(channel)
 
     # ========== 清理 ==========
     def cleanup(self):
