@@ -1,5 +1,5 @@
 const { noop } = require("lodash")
-const { onButtonPressed, onButtonReleased, display } = require("../device/display")
+const { onButtonPressed, onButtonReleased, display, extractEmojis } = require("../device/display")
 const { recordAudioManually, StreamResponser } = require("../device/audio")
 const { recognizeAudio, chatWithLLMStream, ttsProcessor } = require("../cloud-api/server")
 
