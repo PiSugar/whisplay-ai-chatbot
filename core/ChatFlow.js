@@ -15,6 +15,25 @@ class ChatFlow {
   }) {
     this.dataDir = dataDir
     this.setCurrentFlow('sleep')
+    this.streamResponser = new StreamResponser(
+      ttsProcessor,
+      (sentences) => {
+        if (this.currentFlowName !== 'answer') return
+        const fullText = sentences.join("");
+        display({
+          status: "answering",
+          emoji: extractEmojis(fullText) || "😊",
+          text: fullText,
+          RGB: "#0000ff",
+        });
+      },
+      (text) => {
+        if (this.currentFlowName !== 'answer') return
+        display({
+          text,
+        });
+      }
+    );
   }
 
 
@@ -93,25 +112,7 @@ class ChatFlow {
           endPartial,
           getPlayEndPromise,
           stop: stopPlaying,
-        } = new StreamResponser(
-          ttsProcessor,
-          (sentences) => {
-            if (this.currentFlowName !== 'answer') return
-            const fullText = sentences.join("");
-            display({
-              status: "answering",
-              emoji: extractEmojis(fullText) || "😊",
-              text: fullText,
-              RGB: "#0000ff",
-            });
-          },
-          (text) => {
-            if (this.currentFlowName !== 'answer') return
-            display({
-              text,
-            });
-          }
-        );
+        } = this.streamResponser
         chatWithLLMStream([{
           role: 'user',
           content: this.asrText,
