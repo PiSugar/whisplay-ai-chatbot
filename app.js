@@ -25,6 +25,7 @@ battery.addListener("batteryLevel", (data) => {
   });
 });
 
+const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir);
   console.log("创建数据文件夹:", dataDir);
@@ -32,9 +33,6 @@ if (!fs.existsSync(dataDir)) {
   console.log("数据文件夹已存在:", dataDir);
 }
 
-(async () => {
-  const dataDir = path.join(__dirname, "data");
-  new ChatFlow({
-    dataDir,
-  })
-})();
+new ChatFlow({
+  dataDir,
+})
