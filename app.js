@@ -1,18 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { display, extractEmojis, onButtonPressed } = require("./device/display");
+const { display } = require("./device/display");
 const Battery = require("./device/battery");
-const {
-  recordAudio,
-  StreamResponser,
-  stopRecording,
-} = require("./device/audio");
-const {
-  chatWithLLMStream,
-  recognizeAudio,
-  ttsProcessor,
-} = require("./cloud-api/server");
-const { noop } = require("lodash");
 const ChatFlow = require("./core/ChatFlow");
 
 const battery = new Battery()
