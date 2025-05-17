@@ -92,8 +92,8 @@ class ChatFlow {
           } else {
             if (result) {
               console.log("识别结果:", result)
-              this.setCurrentFlow('answer')
               this.asrText = result
+              this.setCurrentFlow('answer')
               display({ status: "recognizing", text: result })
             } else {
               this.setCurrentFlow('sleep')

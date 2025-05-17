@@ -69,7 +69,6 @@ const chatWithLLMStream = async (inputMessages = [], partialCallback, endCallBac
   });
   let partialAnswer = "";
   let functionCallsPackages = [];
-  console.log('chat history', messages);
   axios
     .post(
       "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
