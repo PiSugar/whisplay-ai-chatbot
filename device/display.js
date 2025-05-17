@@ -11,7 +11,8 @@ const currentStatus = {
   battery_level: 100, // 0-100
 };
 
-let buttonPressedCallback = () => {};
+let buttonPressedCallback = () => { };
+let buttonReleasedCallback = () => { };
 
 const client = new Socket();
 
@@ -20,15 +21,16 @@ const isReady = new Promise((resolve) => {
     console.log("Connected to local display socket");
     sendToDisplay(JSON.stringify(currentStatus));
     client.on("data", (data) => {
-      console.log("Received data from local display:", data.toString());
-      // {"event": "button_pressed"}
+      console.log("Received data from EchoView hat:", data.toString());
       try {
         const json = JSON.parse(data.toString());
         if (json.event === "button_pressed") {
           buttonPressedCallback();
-          // 处理按钮按下事件
         }
-      } catch {}
+        if (json.event === "button_released") {
+          buttonReleasedCallback();
+        }
+      } catch { }
     });
     client.on("error", (err) => {
       console.error("Socket error:", err);
@@ -40,6 +42,10 @@ const isReady = new Promise((resolve) => {
 const onButtonPressed = (callback) => {
   buttonPressedCallback = callback;
 };
+
+const onButtonReleased = (callback) => {
+  buttonReleasedCallback = callback;
+}
 
 const sendToDisplay = async (data) => {
   await isReady;
@@ -109,4 +115,4 @@ const flashLED = (color, duration) => {
   };
 };
 
-module.exports = { display, extractEmojis, onButtonPressed, flashLED };
+module.exports = { display, extractEmojis, onButtonPressed, onButtonReleased, flashLED };

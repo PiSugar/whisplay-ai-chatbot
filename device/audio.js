@@ -31,6 +31,33 @@ const recordAudio = (outputPath, duration = 10) => {
   });
 };
 
+const recordAudioManually = (outputPath) => {
+  let stopFunc = noop;
+  const result = new Promise((resolve, reject) => {
+    currentRecordingReject = reject;
+    recordingProcess = exec(`sox -t alsa default -t mp3 ${outputPath}`, (err, stdout, stderr) => {
+      if (err) {
+        if (recordingProcess) {
+          recordingProcess.kill();
+          recordingProcess = null;
+        }
+        reject(stderr);
+      };
+    });
+    stopFunc = () => {
+      if (recordingProcess) {
+        recordingProcess.kill();
+        recordingProcess = null;
+      }
+      resolve(outputPath);
+    };
+  });
+  return {
+    result,
+    stop: stopFunc,
+  }
+}
+
 const stopRecording = () => {
   if (recordingProcess) {
     recordingProcess.kill();
@@ -211,6 +238,7 @@ class StreamResponser {
 
 module.exports = {
   recordAudio,
+  recordAudioManually,
   stopRecording,
   playAudioData,
   // createStreamResponser,
