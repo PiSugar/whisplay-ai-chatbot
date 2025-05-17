@@ -15,6 +15,14 @@ const messages = [
   },
 ];
 
+const resetChatHistory = () => {
+  messages.length = 0;
+  messages.push({
+    role: "system",
+    content: systemPrompt,
+  });
+}
+
 const chatWithLLM = async (userMessage) => {
   console.time("llm");
   messages.push({

@@ -4,6 +4,7 @@ require("dotenv").config();
 let recognizeAudio = noop;
 let chatWithLLMStream = noop;
 let ttsProcessor = noop;
+let resetChatHistory = noop;
 
 const asrServer = process.env.ASR_SERVER || "TENCENT";
 const llmServer = process.env.LLM_SERVER || "VOLCENGINE";
@@ -27,9 +28,11 @@ switch (asrServer) {
 switch (llmServer) {
   case "VOLCENGINE":
     chatWithLLMStream = require("./volcengine-llm").chatWithLLMStream;
+    resetChatHistory = require("./volcengine-llm").resetChatHistory;
     break;
   case "OPENAI":
     chatWithLLMStream = require("./openai-llm").chatWithLLMStream;
+    resetChatHistory = require("./openai-llm").resetChatHistory;
     break;
   default:
     console.warn(`unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI`);
