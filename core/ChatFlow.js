@@ -55,7 +55,10 @@ class ChatFlow {
         });
         break;
       case 'asr':
-        this.currentFlowName = 'listening'
+        this.currentFlowName = 'asr'
+        display({
+          status: "recognizing",
+        })
         Promise.race([
           recognizeAudio(this.currentRecordFilePath),
           new Promise((resolve) => {
@@ -72,7 +75,7 @@ class ChatFlow {
               console.log("识别结果:", result)
               this.setCurrentFlow('answer')
               this.asrText = result
-              display({ text: result })
+              display({ status: "recognizing", text: result })
             } else {
               this.setCurrentFlow('sleep')
             }
@@ -93,7 +96,7 @@ class ChatFlow {
         } = new StreamResponser(
           ttsProcessor,
           (sentences) => {
-            if (this.currentFlowName) return
+            if (this.currentFlowName !== 'answer') return
             const fullText = sentences.join("");
             display({
               status: "answering",
@@ -103,7 +106,7 @@ class ChatFlow {
             });
           },
           (text) => {
-            if (this.currentFlowName) return
+            if (this.currentFlowName !== 'answer') return
             display({
               text,
             });
