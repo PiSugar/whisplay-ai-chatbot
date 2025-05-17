@@ -192,4 +192,4 @@ const chatWithLLMStream = async (inputMessages = [], partialCallback, endCallBac
   return promise;
 };
 
-module.exports = { chatWithLLM, chatWithLLMStream };
+module.exports = { chatWithLLM, chatWithLLMStream, resetChatHistory };
