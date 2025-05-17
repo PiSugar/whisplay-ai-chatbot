@@ -67,7 +67,7 @@ class ChatFlow {
           if (result === "[UserPress]") {
             this.setCurrentFlow('listening')
           } else {
-            if (text) {
+            if (result) {
               this.setCurrentFlow('answer')
               this.asrText = result
               display({ text: result })

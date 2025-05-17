@@ -15,34 +15,6 @@ const {
 const { noop } = require("lodash");
 const ChatFlow = require("./core/ChatFlow");
 
-let statusObj = {
-  currentStatus: "start",
-}
-
-const {
-  partial,
-  endPartial,
-  getPlayEndPromise,
-  stop: stopPlaying,
-} = new StreamResponser(
-  ttsProcessor,
-  (sentences) => {
-    const fullText = sentences.join("");
-    display({
-      status: "answering",
-      emoji: extractEmojis(fullText) || "😊",
-      text: fullText,
-      RGB: "#0000ff",
-    });
-  },
-  (text) => {
-    console.log("完整回答:", text);
-    display({
-      text,
-    });
-  }
-);
-
 const battery = new Battery()
 battery.connect()
 battery.addListener("batteryLevel", (data) => {
@@ -53,12 +25,6 @@ battery.addListener("batteryLevel", (data) => {
   });
 });
 
-// flowStatus "sleep", "listen", "asr", "answer"
-let recordFilePath = "";
-let asrText = "";
-
-// if data folder not exist, create it
-const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir);
   console.log("创建数据文件夹:", dataDir);
@@ -67,6 +33,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 (async () => {
+  const dataDir = path.join(__dirname, "data");
   new ChatFlow({
     dataDir,
   })
