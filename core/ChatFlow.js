@@ -41,7 +41,7 @@ class ChatFlow {
         onButtonPressed(noop)
         // onButtonReleased(noop)
         const { result, stop } = recordAudioManually(this.currentRecordFilePath)
-        onButtonPressed(() => {
+        onButtonReleased(() => {
           stop()
         })
         result.then((text) => {
