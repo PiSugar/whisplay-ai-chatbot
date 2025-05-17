@@ -19,6 +19,7 @@ class ChatFlow {
 
 
   setCurrentFlow = (flowName) => {
+    console.log("切换到流程:", flowName)
     switch (flowName) {
       case 'sleep':
         this.currentFlowName = 'sleep'
