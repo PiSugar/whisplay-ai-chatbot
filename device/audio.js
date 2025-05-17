@@ -6,7 +6,7 @@ let currentRecordingReject = noop;
 
 const recordAudio = (outputPath, duration = 10) => {
   return new Promise((resolve, reject) => {
-    const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 50% 1 1.0 50%`;
+    const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`开始录音, 最长${duration}秒钟...`);
     recordingProcess = exec(cmd, (err, stdout, stderr) => {
       currentRecordingReject = reject;
