@@ -1,7 +1,7 @@
 const { noop } = require("lodash")
 const { onButtonPressed, onButtonReleased, display } = require("../device/display")
 const { recordAudioManually, StreamResponser } = require("../device/audio")
-const { recognizeAudio, chatWithLLMStream } = require("../cloud-api/server")
+const { recognizeAudio, chatWithLLMStream, ttsProcessor } = require("../cloud-api/server")
 
 class ChatFlow {
 
@@ -68,6 +68,7 @@ class ChatFlow {
             this.setCurrentFlow('listening')
           } else {
             if (result) {
+              console.log("识别结果:", result)
               this.setCurrentFlow('answer')
               this.asrText = result
               display({ text: result })
