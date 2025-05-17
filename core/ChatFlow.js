@@ -84,11 +84,6 @@ class ChatFlow {
           this.setCurrentFlow('listening')
         })
         onButtonReleased(noop)
-        display({
-          status: "answering",
-          emoji: "💬",
-          RGB: "#0000ff",
-        });
         const {
           partial,
           endPartial,
