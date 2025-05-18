@@ -9,8 +9,7 @@ battery.connect()
 battery.addListener("batteryLevel", (data) => {
   console.log("电量:", data);
   display({
-    battery_status: data.status,
-    battery_level: data.level,
+    battery_level: data,
   });
 });
 
