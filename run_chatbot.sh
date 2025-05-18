@@ -11,6 +11,8 @@ echo "工作目录: $(pwd)"
 echo "PATH: $PATH" 
 echo "Python版本: $(python3 --version)" 
 echo "Node版本: $(node --version)"
+# 调节音量
+amixer -c 1 set Speaker 120 > /dev/null
 # 启动Python聊天机器人UI
 # echo "等待10秒..."
 # sleep 10
