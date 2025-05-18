@@ -62,6 +62,10 @@ class ChatFlow {
         const { result, stop } = recordAudioManually(this.currentRecordFilePath)
         onButtonReleased(() => {
           stop()
+          display({
+            // yellow
+            RGB: "#ff6800",
+          });
         })
         result.then((text) => {
           this.setCurrentFlow('asr')
