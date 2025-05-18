@@ -18,3 +18,4 @@ if [ $? -eq 0 ]; then
     echo "chatbot.service 已成功重启。"
 else
     echo "重启 chatbot.service 失败，请检查服务是否存在或是否有权限。"
+fi
