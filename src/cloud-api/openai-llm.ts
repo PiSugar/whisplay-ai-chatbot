@@ -1,29 +1,38 @@
-const { OpenAI } = require("openai");
-const { systemPrompt } = require("../config/llm-config");
-require("dotenv").config();
+import { OpenAI } from "openai";
+import { systemPrompt } from "../config/llm-config";
+import dotenv from "dotenv";
+import { Message } from "../type";
+
+dotenv.config();
 
 const apiKey = process.env.OPENAI_API_KEY;
 
-const openai = new OpenAI({
-  apiKey,
-});
+const openai = apiKey
+  ? new OpenAI({
+      apiKey,
+    })
+  : null;
 
-const messages = [
+const messages: Message[] = [
   {
     role: "system",
     content: systemPrompt,
   },
 ];
 
-const resetChatHistory = () => {
+const resetChatHistory = (): void => {
   messages.length = 0;
   messages.push({
     role: "system",
     content: systemPrompt,
   });
-}
+};
 
-const chatWithLLM = async (userMessage) => {
+const chatWithLLM = async (userMessage: string): Promise<string> => {
+  if (!openai) {
+    console.error("OpenAI API key is not set.");
+    return "";
+  }
   console.time("llm");
   messages.push({
     role: "user",
@@ -31,9 +40,9 @@ const chatWithLLM = async (userMessage) => {
   });
   const chatCompletion = await openai.chat.completions.create({
     model: "gpt-4o",
-    messages,
+    messages: messages as any,
   });
-  const answer = chatCompletion.choices[0].message.content;
+  const answer = chatCompletion.choices[0].message.content as string;
   console.log("回答:", chatCompletion.choices[0].message);
   messages.push({
     role: "assistant",
@@ -43,12 +52,20 @@ const chatWithLLM = async (userMessage) => {
   return answer;
 };
 
-const chatWithLLMStream = async (inputMessages = [], partialCallback, endCallback) => {
+const chatWithLLMStream = async (
+  inputMessages: Message[] = [],
+  partialCallback: (partial: string) => void,
+  endCallback: (finalAnswer: string) => void
+): Promise<void> => {
+  if (!openai) {
+    console.error("OpenAI API key is not set.");
+    return;
+  }
   console.time("llm");
   messages.push(...inputMessages);
   const chatCompletion = await openai.chat.completions.create({
     model: "gpt-4o",
-    messages,
+    messages: messages as any,
     stream: true,
   });
   let partialAnswer = "";
@@ -67,8 +84,4 @@ const chatWithLLMStream = async (inputMessages = [], partialCallback, endCallbac
   console.timeEnd("llm");
 };
 
-module.exports = {
-  chatWithLLM,
-  chatWithLLMStream,
-  resetChatHistory,
-};
+export { chatWithLLM, chatWithLLMStream, resetChatHistory };

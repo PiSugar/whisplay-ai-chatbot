@@ -1,6 +1,17 @@
-const { Socket } = require("net");
+import { Socket } from "net";
 
-const currentStatus = {
+interface Status {
+  status: string;
+  emoji: string;
+  text: string;
+  scroll_speed: number;
+  brightness: number;
+  RGB: string;
+  battery_color: string;
+  battery_level: number;
+}
+
+const currentStatus: Status = {
   status: "starting",
   emoji: "😊",
   text: "",
@@ -11,16 +22,16 @@ const currentStatus = {
   battery_level: 100, // 0-100
 };
 
-let buttonPressedCallback = () => { };
-let buttonReleasedCallback = () => { };
+let buttonPressedCallback: () => void = () => {};
+let buttonReleasedCallback: () => void = () => {};
 
 const client = new Socket();
 
-const isReady = new Promise((resolve) => {
+const isReady = new Promise<void>((resolve) => {
   client.connect(12345, "0.0.0.0", () => {
     console.log("Connected to local display socket");
     sendToDisplay(JSON.stringify(currentStatus));
-    client.on("data", (data) => {
+    client.on("data", (data: Buffer) => {
       console.log("Received data from EchoView hat:", data.toString());
       try {
         const json = JSON.parse(data.toString());
@@ -30,24 +41,26 @@ const isReady = new Promise((resolve) => {
         if (json.event === "button_released") {
           buttonReleasedCallback();
         }
-      } catch { }
+      } catch {
+        console.error("Failed to parse JSON from data.");
+      }
     });
-    client.on("error", (err) => {
+    client.on("error", (err: Error) => {
       console.error("Socket error:", err);
     });
     resolve();
   });
 });
 
-const onButtonPressed = (callback) => {
+const onButtonPressed = (callback: () => void): void => {
   buttonPressedCallback = callback;
 };
 
-const onButtonReleased = (callback) => {
+const onButtonReleased = (callback: () => void): void => {
   buttonReleasedCallback = callback;
-}
+};
 
-const sendToDisplay = async (data) => {
+const sendToDisplay = async (data: string): Promise<void> => {
   await isReady;
   try {
     client.write(`${data}\n`, "utf8", () => {
@@ -58,17 +71,17 @@ const sendToDisplay = async (data) => {
   }
 };
 
-async function display(newStatus = {}) {
+async function display(newStatus: Partial<Status> = {}): Promise<void> {
   const { status, emoji, text, RGB, brightness, battery_level, battery_color } = {
     ...currentStatus,
     ...newStatus,
   };
 
   const changedValues = Object.entries(newStatus).filter(
-    ([key, value]) => currentStatus[key] !== value
+    ([key, value]) => (currentStatus as any)[key] !== value
   );
 
-  const isTextChanged = changedValues.some(([key, value]) => key === "text");
+  const isTextChanged = changedValues.some(([key]) => key === "text");
 
   currentStatus.status = status;
   currentStatus.emoji = emoji;
@@ -78,7 +91,6 @@ async function display(newStatus = {}) {
   currentStatus.battery_level = battery_level;
   currentStatus.battery_color = battery_color;
 
-  // 发送socket到0.0.0.0:12345
   const changedValuesObj = Object.fromEntries(changedValues);
   changedValuesObj.brightness = 100;
   const data = JSON.stringify(changedValuesObj);
@@ -86,8 +98,7 @@ async function display(newStatus = {}) {
   sendToDisplay(data);
 }
 
-function extractEmojis(str) {
-  // 使用 Unicode emoji 匹配范围的正则表达式
+function extractEmojis(str: string): string {
   const array = [
     ...str.matchAll(/([\p{Emoji_Presentation}\u200d\ufe0f])/gu),
   ].map((match) => match[0]);
@@ -98,10 +109,9 @@ function extractEmojis(str) {
   return "😐";
 }
 
-const flashLED = (color, duration) => {
+const flashLED = (color: string, duration: number): (() => void) => {
   const int = setInterval(() => {
     display({
-      // blue
       RGB: color,
     });
     setTimeout(() => {
@@ -115,4 +125,4 @@ const flashLED = (color, duration) => {
   };
 };
 
-module.exports = { display, extractEmojis, onButtonPressed, onButtonReleased, flashLED };
+export { display, extractEmojis, onButtonPressed, onButtonReleased, flashLED };

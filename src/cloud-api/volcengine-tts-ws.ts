@@ -1,16 +1,19 @@
-const axios = require("axios");
-const WebSocket = require("ws");
-const zlib = require("zlib");
-const { v4: uuidv4 } = require("uuid");
-require("dotenv").config();
+import axios from "axios";
+import WebSocket from "ws";
+import zlib from "zlib";
+import { v4 as uuidv4 } from "uuid";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // ByteDance TTS
-const byteDanceAppId = process.env.VOLCENGINE_APP_ID;
-const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN;
+const byteDanceAppId = process.env.VOLCENGINE_APP_ID || "";
+const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN || "";
 
 const host = "openspeech.bytedance.com";
 const api_url = `wss://${host}/api/v1/tts/ws_binary`;
 const default_header = Buffer.from([0x11, 0x10, 0x11, 0x00]);
+
 const audio_config = {
   voice_type: "zh_female_wanwanxiaohe_moon_bigtts",
   rate: 16000,
@@ -20,54 +23,56 @@ const audio_config = {
   encoding: "mp3",
 };
 
+interface SynthesizeResponse {
+  data: Buffer | string;
+  duration: number;
+}
+
+let cb: (response: SynthesizeResponse) => void = () => {};
+
 const client = new WebSocket(api_url, {
-  headers: { Authorization: `Bearer; ${accessToken}` },
+  headers: { Authorization: `Bearer ${byteDanceAccessToken}` },
   perMessageDeflate: false,
 });
-
-let cb = () => {};
 
 client.on("open", () => {
   console.log("TTS WebSocket connection opened");
 });
 
-client.on("message", (res, err) => {
-  if (err) {
-    console.log("tts message error: " + err);
+client.on("message", (data: WebSocket.Data) => {
+  if (!(data instanceof Buffer)) {
+    console.error("Unexpected data type received");
     return;
   }
-  // const protocol_version = res[0] >> 4;
-  const header_size = res[0] & 0x0f;
-  const message_type = res[1] >> 4;
-  const message_type_specific_flags = res[1] & 0x0f;
-  // const serialization_method = res[2] >> 4;
-  const message_compression = res[2] & 0x0f;
-  let payload = res.slice(header_size * 4);
+
+  const header_size = data[0] & 0x0f;
+  const message_type = data[1] >> 4;
+  const message_type_specific_flags = data[1] & 0x0f;
+  const message_compression = data[2] & 0x0f;
+  let payload = data.slice(header_size * 4);
   let done = false;
+
   if (message_type === 0xb) {
-    // audio-only server response
     if (message_type_specific_flags === 0) {
-      // no sequence number as ACK
-      return false;
+      return;
     } else {
       const sequence_number = payload.readInt32BE(0);
       payload = payload.slice(8);
-
       done = sequence_number < 0;
     }
   } else if (message_type === 0xf) {
     const code = payload.readUInt32BE(0);
     const msg_size = payload.readUInt32BE(4);
-    let error_msg = payload.slice(8);
+    let error_msg: any = payload.slice(8);
     if (message_compression === 1) {
       error_msg = zlib.gunzipSync(error_msg);
     }
     error_msg = error_msg.toString("utf-8");
-    console.log(`Error message code: ${code}`);
-    console.log(`Error message size: ${msg_size} bytes`);
-    console.log(`Error message: ${error_msg}`);
+    console.error(`Error message code: ${code}`);
+    console.error(`Error message size: ${msg_size} bytes`);
+    console.error(`Error message: ${error_msg}`);
     client.close();
-    cb({ data: '', duration: 0 });
+    cb({ data: "", duration: 0 });
     return;
   } else if (message_type === 0xc) {
     payload = payload.slice(4);
@@ -76,21 +81,24 @@ client.on("message", (res, err) => {
     }
     console.log(`Frontend message: ${payload}`);
   } else {
-    console.log("undefined message type!");
+    console.error("Undefined message type!");
     done = true;
   }
+
   cb({ data: payload, duration: 200 });
 });
 
-client.on("error", (err) => {
-  console.log("volcengine tts error: " + err);
+client.on("error", (err: Error) => {
+  console.error("volcengine tts error: " + err.message);
 });
 
 client.on("close", () => {
   console.log("TTS WebSocket connection closed");
 });
 
-function synthesizeSpeech(text) {
+function synthesizeSpeech(text: string): Promise<SynthesizeResponse> {
+  const device_id = "default_device_id"; // Replace with actual device ID if needed
+
   const request_json = {
     app: {
       appid: byteDanceAppId,
@@ -111,7 +119,7 @@ function synthesizeSpeech(text) {
 
   const submit_request_json = JSON.parse(JSON.stringify(request_json));
   let payload_bytes = Buffer.from(JSON.stringify(submit_request_json));
-  payload_bytes = zlib.gzipSync(payload_bytes); // if no compression, comment this line
+  payload_bytes = zlib.gzipSync(payload_bytes); // If no compression, comment this line
   const full_client_request = Buffer.concat([
     default_header,
     Buffer.alloc(4),
@@ -119,10 +127,11 @@ function synthesizeSpeech(text) {
   ]);
   full_client_request.writeUInt32BE(payload_bytes.length, 4);
 
-  client && client.send(full_client_request);
+  client.send(full_client_request);
+
   return new Promise((resolve) => {
     cb = resolve;
   });
 }
 
-module.exports = synthesizeSpeech;
+export default synthesizeSpeech;

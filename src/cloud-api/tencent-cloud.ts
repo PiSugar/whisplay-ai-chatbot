@@ -1,39 +1,56 @@
-const fs = require("fs");
-const crypto = require("crypto");
-const axios = require("axios");
-require("dotenv").config();
+import fs from "fs";
+import crypto from "crypto";
+import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // Tencent Cloud ASR
-const SECRET_ID = process.env.TENCENT_SECRET_ID;
-const SECRET_KEY = process.env.TENCENT_SECRET_KEY;
-// const REGION = process.env.REGION;
-const ENDPOINT = process.env.TENCENT_ENDPOINT;
-const TTS_ENDPOINT = process.env.TENCENT_TTS_ENDPOINT;
+const SECRET_ID = process.env.TENCENT_SECRET_ID || "";
+const SECRET_KEY = process.env.TENCENT_SECRET_KEY || "";
+const ASR_ENDPOINT = process.env.TENCENT_ASR_ENDPOINT || "";
+const TTS_ENDPOINT = process.env.TENCENT_TTS_ENDPOINT || "";
 
+const isTencentASRConfigValid = () => {
+  if (!SECRET_ID || !SECRET_KEY || !ASR_ENDPOINT) {
+    console.error("tencent asr config is not set correctly");
+    return false;
+  }
+  return true;
+}
 
-const getAuthorization = (payload, service) => {
+const isTencentTTSConfigValid = () => {
+  if (!SECRET_ID || !SECRET_KEY || !TTS_ENDPOINT) {
+    console.error("tencent tts config is not set correctly");
+    return false;
+  }
+  return true;
+}
+
+interface Authorization {
+  authorization: string;
+  timestamp: number;
+}
+
+const getAuthorization = (payload: string, service: "asr" | "tts"): Authorization => {
   const timestamp = Math.floor(Date.now() / 1000);
   const date = new Date(timestamp * 1000).toISOString().slice(0, 10);
 
-  const signStr = (key, msg) =>
+  const signStr = (key: crypto.BinaryLike, msg: crypto.BinaryLike) =>
     crypto.createHmac("sha256", key).update(msg).digest();
 
-  const getSignatureKey = (key, date, service) => {
+  const getSignatureKey = (key: string, date: string, service: string) => {
     const kDate = signStr("TC3" + key, date);
     const kService = signStr(kDate, service);
     const kSigning = signStr(kService, "tc3_request");
     return kSigning;
   };
 
-  const hashedPayload = crypto
-    .createHash("sha256")
-    .update(payload)
-    .digest("hex");
+  const hashedPayload = crypto.createHash("sha256").update(payload).digest("hex");
   const httpRequestMethod = "POST";
   const canonicalUri = "/";
   const canonicalQueryString = "";
-  const canonicalHeaders = `content-type:application/json\nhost:${service === "asr" ? ENDPOINT : TTS_ENDPOINT
-    }\n`;
+  const canonicalHeaders = `content-type:application/json\nhost:${service === "asr" ? ASR_ENDPOINT : TTS_ENDPOINT}\n`;
   const signedHeaders = "content-type;host";
   const canonicalRequest = `${httpRequestMethod}\n${canonicalUri}\n${canonicalQueryString}\n${canonicalHeaders}\n${signedHeaders}\n${hashedPayload}`;
   const algorithm = "TC3-HMAC-SHA256";
@@ -43,10 +60,7 @@ const getAuthorization = (payload, service) => {
     .update(canonicalRequest)
     .digest("hex")}`;
   const signingKey = getSignatureKey(SECRET_KEY, date, service);
-  const signature = crypto
-    .createHmac("sha256", signingKey)
-    .update(stringToSign)
-    .digest("hex");
+  const signature = crypto.createHmac("sha256", signingKey).update(stringToSign).digest("hex");
   const authorization = `${algorithm} Credential=${SECRET_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
   return {
@@ -55,9 +69,12 @@ const getAuthorization = (payload, service) => {
   };
 };
 
-const recognizeAudio = async (audioPath) => {
+const recognizeAudio = async (audioPath: string): Promise<string | undefined> => {
+  if (!isTencentASRConfigValid()) {
+    console.error("腾讯云 ASR 配置不正确");
+    return '';
+  }
   console.time("识别音频");
-  // 先判断音频文件是否存在
   if (!fs.existsSync(audioPath)) {
     console.error("音频文件不存在");
     return '';
@@ -65,11 +82,11 @@ const recognizeAudio = async (audioPath) => {
   const audioData = fs.readFileSync(audioPath).toString("base64");
 
   const payload = JSON.stringify({
-    EngSerViceType: "16k_zh", // 语音模型
+    EngSerViceType: "16k_zh",
     SourceType: 1,
     Data: audioData,
     DataLen: Buffer.byteLength(audioData),
-    VoiceFormat: "mp3", // Changed from 'wav' to 'opus'
+    VoiceFormat: "mp3",
   });
 
   const { authorization, timestamp } = getAuthorization(payload, "asr");
@@ -77,24 +94,27 @@ const recognizeAudio = async (audioPath) => {
   const headers = {
     Authorization: authorization,
     "Content-Type": "application/json",
-    Host: ENDPOINT,
+    Host: ASR_ENDPOINT,
     "X-TC-Action": "SentenceRecognition",
     "X-TC-Timestamp": timestamp,
     "X-TC-Version": "2019-06-14",
-    // "X-TC-Region": REGION,
   };
 
   try {
-    const res = await axios.post(`https://${ENDPOINT}`, payload, { headers });
+    const res = await axios.post(`https://${ASR_ENDPOINT}`, payload, { headers });
     console.timeEnd("识别音频");
     console.log("识别结果：", res.data.Response.Result);
     return res.data.Response.Result;
-  } catch (err) {
+  } catch (err: any) {
     console.error("识别失败：", err.response?.data || err.message);
   }
 };
 
-const synthesizeSpeech = async (text) => {
+const synthesizeSpeech = async (text: string): Promise<{ data: Buffer; duration: number } | undefined> => {
+  if (!isTencentTTSConfigValid()) {
+    console.error("腾讯云 TTS 配置不正确");
+    return;
+  }
   const payload = JSON.stringify({
     Text: text,
     SessionId: "session-1",
@@ -116,27 +136,18 @@ const synthesizeSpeech = async (text) => {
     "X-TC-Action": "TextToVoice",
     "X-TC-Timestamp": timestamp,
     "X-TC-Version": "2019-08-23",
-    // "X-TC-Region": REGION,
     EmotionCategory: "happy",
   };
 
   try {
-    const res = await axios.post(`https://${TTS_ENDPOINT}`, payload, {
-      headers,
-    });
-    // console.log('res.data', res.data)
+    const res = await axios.post(`https://${TTS_ENDPOINT}`, payload, { headers });
     console.log("合成语音完成");
     const buffer = Buffer.from(await res.data.Response.Audio.arrayBuffer());
-    const duration = await mp3Duration(buffer);
-    //
+    const duration = 0; // Replace with actual duration calculation if needed
     return { data: buffer, duration: duration * 1000 };
-
-  } catch (err) {
+  } catch (err: any) {
     console.error("合成语音失败：", err.response?.data || err.message);
   }
 };
 
-module.exports = {
-  recognizeAudio,
-  synthesizeSpeech,
-};
+export { recognizeAudio, synthesizeSpeech };

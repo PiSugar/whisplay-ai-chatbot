@@ -1,10 +1,10 @@
-const { exec, spawn } = require("child_process");
-const { noop } = require("lodash");
+import { exec, spawn, ChildProcess } from "child_process";
+import { noop } from "lodash";
 
-let recordingProcess = null;
-let currentRecordingReject = noop;
+let recordingProcess: ChildProcess | null = null;
+let currentRecordingReject: (reason?: any) => void = noop;
 
-const recordAudio = (outputPath, duration = 10) => {
+const recordAudio = (outputPath: string, duration: number = 10): Promise<string> => {
   return new Promise((resolve, reject) => {
     const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`开始录音, 最长${duration}秒钟...`);
@@ -16,8 +16,9 @@ const recordAudio = (outputPath, duration = 10) => {
           recordingProcess = null;
         }
         reject(stderr);
+      } else {
+        resolve(outputPath);
       }
-      else resolve(outputPath);
     });
 
     // Set a timeout to kill the recording process after the specified duration
@@ -31,9 +32,9 @@ const recordAudio = (outputPath, duration = 10) => {
   });
 };
 
-const recordAudioManually = (outputPath) => {
-  let stopFunc = noop;
-  const result = new Promise((resolve, reject) => {
+const recordAudioManually = (outputPath: string): { result: Promise<string>; stop: () => void } => {
+  let stopFunc: () => void = noop;
+  const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
     recordingProcess = exec(`sox -t alsa default -t mp3 ${outputPath}`, (err, stdout, stderr) => {
       if (err) {
@@ -42,7 +43,7 @@ const recordAudioManually = (outputPath) => {
           recordingProcess = null;
         }
         reject(stderr);
-      };
+      }
     });
     stopFunc = () => {
       if (recordingProcess) {
@@ -55,33 +56,34 @@ const recordAudioManually = (outputPath) => {
   return {
     result,
     stop: stopFunc,
-  }
-}
+  };
+};
 
-const stopRecording = () => {
+const stopRecording = (): void => {
   if (recordingProcess) {
     recordingProcess.kill();
     recordingProcess = null;
     try {
       currentRecordingReject();
-    } catch (e) { }
+    } catch (e) {}
     console.log("录音已停止");
   } else {
     console.log("没有正在录音的进程");
   }
 };
 
-const player = {
+interface Player {
+  isPlaying: boolean;
+  process: ChildProcess;
+}
+
+const player: Player = {
   isPlaying: false,
   process: spawn("mpg123", ["-", "--scale", "2"]),
 };
 
-const playAudioData = (resAudioData, audioDuration) => {
-  // const audioData = Buffer.from(resAudioData).toString('base64');
-  // console.time('存储mp3');
+const playAudioData = (resAudioData: string, audioDuration: number): Promise<void> => {
   const audioBuffer = Buffer.from(resAudioData, "base64");
-  // fs.writeFileSync('output.mp3', audioBuffer);
-  // console.timeEnd('存储mp3');
   return new Promise((resolve, reject) => {
     console.log("播放时长:", audioDuration);
     player.isPlaying = true;
@@ -94,10 +96,10 @@ const playAudioData = (resAudioData, audioDuration) => {
     const process = player.process;
 
     try {
-      process.stdin.write(audioBuffer);
-    } catch (e) { }
-    process.stdout.on("data", (data) => console.log(data.toString()));
-    process.stderr.on("data", (data) => console.error(data.toString()));
+      process.stdin?.write(audioBuffer);
+    } catch (e) {}
+    process.stdout?.on("data", (data) => console.log(data.toString()));
+    process.stderr?.on("data", (data) => console.error(data.toString()));
     process.on("exit", (code) => {
       player.isPlaying = false;
       if (code !== 0) {
@@ -111,14 +113,14 @@ const playAudioData = (resAudioData, audioDuration) => {
   });
 };
 
-const stopPlaying = () => {
+const stopPlaying = (): void => {
   if (player.isPlaying) {
     try {
       console.log("中止播放音频");
       const process = player.process;
-      process.stdin.end();
+      process.stdin?.end();
       process.kill();
-    } catch { }
+    } catch {}
     player.isPlaying = false;
     // 重新创建进程
     setTimeout(() => {
@@ -132,18 +134,18 @@ const stopPlaying = () => {
 // 退出程序时关闭音频播放器
 process.on("SIGINT", () => {
   try {
-    player.stdin.end();
-    player.kill();
-  } catch { }
+    player.process.stdin?.end();
+    player.process.kill();
+  } catch {}
   process.exit();
 });
 
-function splitSentences(text) {
+function splitSentences(text: string): { sentences: string[]; remaining: string } {
   const regex = /.*?([。！？!?，,]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\.)(?=\s|$)/gs;
 
-  const sentences = [];
+  const sentences: string[] = [];
   let lastIndex = 0;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = regex.exec(text)) !== null) {
     sentences.push(match[0].trim());
@@ -155,19 +157,27 @@ function splitSentences(text) {
   return { sentences, remaining };
 }
 
+type TTSFunc = (text: string) => Promise<{ data: string; duration: number }>;
+type SentencesCallback = (sentences: string[]) => void;
+type TextCallback = (text: string) => void;
+
 class StreamResponser {
-  constructor(ttsFunc, sentencesCallback, textCallback) {
+  private ttsFunc: TTSFunc;
+  private sentencesCallback?: SentencesCallback;
+  private textCallback?: TextCallback;
+  private partialContent: string = "";
+  private isStartSpeak: boolean = false;
+  private playEndResolve: () => void = () => {};
+  private speakArray: Promise<{ data: string; duration: number }>[] = [];
+  private parsedSentences: string[] = [];
+
+  constructor(ttsFunc: TTSFunc, sentencesCallback?: SentencesCallback, textCallback?: TextCallback) {
     this.ttsFunc = ttsFunc;
     this.sentencesCallback = sentencesCallback;
     this.textCallback = textCallback;
-    this.partialContent = "";
-    this.isStartSpeak = false;
-    this.playEndResolve = () => { };
-    this.speakArray = [];
-    this.parsedSentences = [];
   }
 
-  playAudioInOrder = async () => {
+  private playAudioInOrder = async (): Promise<void> => {
     let currentIndex = 0;
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
@@ -189,12 +199,12 @@ class StreamResponser {
     playNext();
   };
 
-  partial = (text) => {
+  partial = (text: string): void => {
     this.partialContent += text;
     const { sentences, remaining } = splitSentences(this.partialContent);
     if (sentences.length > 0) {
       this.parsedSentences.push(...sentences);
-      this.sentencesCallback && this.sentencesCallback(this.parsedSentences);
+      this.sentencesCallback?.(this.parsedSentences);
       this.speakArray.push(
         ...sentences.map((item) =>
           this.ttsFunc(item).finally(() => {
@@ -209,24 +219,24 @@ class StreamResponser {
     this.partialContent = remaining;
   };
 
-  endPartial = () => {
+  endPartial = (): void => {
     if (this.partialContent) {
       this.parsedSentences.push(this.partialContent);
-      this.sentencesCallback && this.sentencesCallback(this.parsedSentences);
+      this.sentencesCallback?.(this.parsedSentences);
       this.speakArray.push(this.ttsFunc(this.partialContent));
       this.partialContent = "";
     }
-    this.textCallback && this.textCallback(this.parsedSentences.join(""));
+    this.textCallback?.(this.parsedSentences.join(""));
     this.parsedSentences.length = 0;
   };
 
-  getPlayEndPromise = () => {
+  getPlayEndPromise = (): Promise<void> => {
     return new Promise((resolve) => {
       this.playEndResolve = resolve;
     });
   };
 
-  stop = () => {
+  stop = (): void => {
     this.speakArray.length = 0;
     this.isStartSpeak = false;
     this.partialContent = "";
@@ -236,11 +246,10 @@ class StreamResponser {
   };
 }
 
-module.exports = {
+export {
   recordAudio,
   recordAudioManually,
   stopRecording,
   playAudioData,
-  // createStreamResponser,
   StreamResponser,
 };
