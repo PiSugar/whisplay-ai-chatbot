@@ -22,7 +22,8 @@ python3 /home/pi/echoview-ai-chatbot/python/chatbot-ui.py &
 sleep 30
 cd ..
 # 启动Node.js应用
-echo "启动Node.js应用..." 
-node /home/pi/echoview-ai-chatbot/app.js
+echo "启动Node.js应用..."
+cd /home/pi/echoview-ai-chatbot
+yarn start
 # 记录结束状态
 echo "===== 服务结束: $(date) ====="

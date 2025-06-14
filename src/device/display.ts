@@ -32,9 +32,13 @@ const isReady = new Promise<void>((resolve) => {
     console.log("Connected to local display socket");
     sendToDisplay(JSON.stringify(currentStatus));
     client.on("data", (data: Buffer) => {
-      console.log("Received data from EchoView hat:", data.toString());
+      const dataString = data.toString();
+      console.log("Received data from EchoView hat:", dataString);
+      if (dataString.trim() === "OK") {
+        return;
+      }
       try {
-        const json = JSON.parse(data.toString());
+        const json = JSON.parse(dataString);
         if (json.event === "button_pressed") {
           buttonPressedCallback();
         }
@@ -42,7 +46,7 @@ const isReady = new Promise<void>((resolve) => {
           buttonReleasedCallback();
         }
       } catch {
-        console.error("Failed to parse JSON from data.");
+        console.error("Failed to parse JSON from data");
       }
     });
     client.on("error", (err: Error) => {
@@ -72,10 +76,11 @@ const sendToDisplay = async (data: string): Promise<void> => {
 };
 
 async function display(newStatus: Partial<Status> = {}): Promise<void> {
-  const { status, emoji, text, RGB, brightness, battery_level, battery_color } = {
-    ...currentStatus,
-    ...newStatus,
-  };
+  const { status, emoji, text, RGB, brightness, battery_level, battery_color } =
+    {
+      ...currentStatus,
+      ...newStatus,
+    };
 
   const changedValues = Object.entries(newStatus).filter(
     ([key, value]) => (currentStatus as any)[key] !== value
