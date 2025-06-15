@@ -3,7 +3,7 @@ import spidev
 import time
 
 
-class EchoViewBoard:
+class WhisplayBoard:
     # LCD 参数
     LCD_WIDTH = 240
     LCD_HEIGHT = 280

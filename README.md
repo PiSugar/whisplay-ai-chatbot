@@ -1,1 +1,1 @@
-echoview-ai-chatboot
+whisplay-ai-chatboot

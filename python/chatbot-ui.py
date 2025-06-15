@@ -10,7 +10,7 @@ import socket
 import json
 import sys
 
-from echoview import EchoViewBoard
+from echoview import WhisplayBoard
 import threading
 
 scroll_thread = None
@@ -487,7 +487,7 @@ def handle_client(client_socket, addr, echoview, font_path):
         client_socket.close()
 
 def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.ttf"):
-    echoview = EchoViewBoard()
+    echoview = WhisplayBoard()
     global cornerHeight
     cornerHeight=echoview.CornerHeight
     print(f"[LCD] 初始化完成，大小: {echoview.LCD_WIDTH}x{echoview.LCD_HEIGHT}")
