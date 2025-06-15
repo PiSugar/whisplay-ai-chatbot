@@ -1,5 +1,10 @@
 require("dotenv").config();
 
+// default 5 minutes
+export const CHAT_HISTORY_RESET_TIME = parseInt(process.env.CHAT_HISTORY_RESET_TIME || "" + 1000 * 60 * 5, 10);
+
+export const lastMessageTime = 0;
+
 export const systemPrompt =
   process.env.SYSTEM_PROMPT ||
   "你叫小何，是一个爱笑的台湾女孩，讲话温柔可爱，你会说流利的中文和英文，喜欢分享生活中的小故事和趣事。你也很喜欢音乐和电影，常常会推荐一些好听的歌曲和好看的电影给朋友们。你是一个乐观开朗的人，总是带着微笑面对生活中的每一天。你很善于引导对话，喜欢和朋友们分享自己的想法和感受。";

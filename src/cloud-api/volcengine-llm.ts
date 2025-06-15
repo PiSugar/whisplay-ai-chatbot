@@ -1,6 +1,6 @@
 import axios from "axios";
 import { get, isEmpty } from "lodash";
-import { systemPrompt } from "../config/llm-config";
+import { CHAT_HISTORY_RESET_TIME, lastMessageTime, systemPrompt } from "../config/llm-config";
 import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-config";
 import dotenv from "dotenv";
@@ -32,6 +32,9 @@ const chatWithLLM = async (
   if (!doubaoAccessToken) {
     console.error("Doubao access token is not set.");
     return;
+  }
+  if (Date.now() - lastMessageTime > CHAT_HISTORY_RESET_TIME) {
+    resetChatHistory();
   }
   console.time("llm");
   messages.push({
