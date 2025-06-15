@@ -1,8 +1,8 @@
 import { OpenAI } from "openai";
 import {
-  CHAT_HISTORY_RESET_TIME,
-  lastMessageTime,
+  shouldResetChatHistory,
   systemPrompt,
+  updateLastMessageTime,
 } from "../config/llm-config";
 import dotenv from "dotenv";
 import { Message } from "../type";
@@ -37,9 +37,10 @@ const chatWithLLM = async (userMessage: string): Promise<string> => {
     console.error("OpenAI API key is not set.");
     return "";
   }
-  if (Date.now() - lastMessageTime > CHAT_HISTORY_RESET_TIME) {
+  if (shouldResetChatHistory()) {
     resetChatHistory();
   }
+  updateLastMessageTime();
   console.time("llm");
   messages.push({
     role: "user",
