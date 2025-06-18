@@ -5,9 +5,10 @@ let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
 
 const killAllRecordingProcesses = (): void => {
-  recordingProcessList.forEach((process) => {
+  recordingProcessList.forEach((child) => {
     try {
-      process.kill();
+      child.stdin?.end();
+      if (child.pid) process.kill(-child.pid);
     } catch (e) {}
   });
   recordingProcessList.length = 0;
@@ -20,15 +21,22 @@ const recordAudio = (
   return new Promise((resolve, reject) => {
     const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`开始录音, 最长${duration}秒钟...`);
-    const recordingProcess = exec(cmd, (err, stdout, stderr) => {
-      currentRecordingReject = reject;
-      if (err) {
-        killAllRecordingProcesses();
-        reject(stderr);
-      } else {
-        resolve(outputPath);
+    const recordingProcess = exec(
+      cmd,
+      (err, stdout, stderr) => {
+        currentRecordingReject = reject;
+        if (err) {
+          killAllRecordingProcesses();
+          reject(stderr);
+        } else {
+          resolve(outputPath);
+        }
+      },
+      {
+        detached: true,
+        stdio: "ignore",
       }
-    });
+    );
     recordingProcessList.push(recordingProcess);
 
     // Set a timeout to kill the recording process after the specified duration
