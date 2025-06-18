@@ -10,7 +10,7 @@ import socket
 import json
 import sys
 
-from echoview import WhisplayBoard
+from whisplay import WhisplayBoard
 import threading
 
 scroll_thread = None
