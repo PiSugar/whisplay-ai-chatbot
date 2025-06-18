@@ -8,7 +8,7 @@ const killAllRecordingProcesses = (): void => {
   recordingProcessList.forEach((child) => {
     try {
       child.stdin?.end();
-      if (child.pid) process.kill(-child.pid);
+      child.kill('SIGKILL');
     } catch (e) {}
   });
   recordingProcessList.length = 0;
@@ -31,10 +31,6 @@ const recordAudio = (
         } else {
           resolve(outputPath);
         }
-      },
-      {
-        detached: true,
-        stdio: "ignore",
       }
     );
     recordingProcessList.push(recordingProcess);
