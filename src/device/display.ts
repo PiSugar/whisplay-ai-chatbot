@@ -40,7 +40,7 @@ export class WhisplayDisplay {
   startPythonProcess(): void {
     const command = `cd ${resolve(
       __dirname,
-      "../python"
+      "../../python"
     )} && python3 chatbot-ui.py`;
     console.log("Starting Python process...");
     this.pythonProcess = exec(command, (error, stdout, stderr) => {
