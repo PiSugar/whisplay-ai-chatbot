@@ -1,5 +1,4 @@
 Pillow
 cairosvg
 numpy
-RPi.GPIO
 spidev
