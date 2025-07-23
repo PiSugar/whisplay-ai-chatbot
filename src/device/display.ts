@@ -32,8 +32,9 @@ export class WhisplayDisplay {
   private pythonProcess: any; // Placeholder for Python process if needed
 
   constructor() {
+    this.startPythonProcess();
     this.isReady = new Promise<void>((resolve) => {
-      this.connect(resolve);
+      this.connectWithRetry(10, resolve);
     });
   }
 
@@ -67,12 +68,28 @@ export class WhisplayDisplay {
     }
   }
 
-  async connect(resolve: () => void): Promise<void> {
-    if (this.pythonProcess) {
-      this.pythonProcess.kill();
-    }
-    this.startPythonProcess();
-    await new Promise((res) => setTimeout(res, 10000)); // Wait for Python process to start
+  async connectWithRetry(
+    retries: number = 6,
+    outerResolve: () => void
+  ): Promise<void> {
+    await new Promise((resolve, reject) => {
+      const attemptConnection = (attempt: number) => {
+        this.connect(resolve).catch((err) => {
+          if (attempt < retries) {
+            console.log(`Connection attempt ${attempt} failed, retrying...`);
+            setTimeout(() => attemptConnection(attempt + 1), 10000);
+          } else {
+            console.error("Failed to connect after multiple attempts:", err);
+            reject(err);
+          }
+        });
+      };
+      attemptConnection(1);
+    });
+    outerResolve();
+  }
+
+  async connect(resolve: (value: any) => void): Promise<void> {
     console.log("Connecting to local display socket...");
     this.client.connect(12345, "0.0.0.0", () => {
       console.log("Connected to local display socket");
@@ -98,7 +115,7 @@ export class WhisplayDisplay {
       this.client.on("error", (err: Error) => {
         console.error("Socket error:", err);
       });
-      resolve();
+      resolve(true);
     });
   }
 
@@ -166,6 +183,8 @@ export const onButtonPressed =
 export const onButtonReleased =
   displayInstance.onButtonReleased.bind(displayInstance);
 
+
+// kill the Python process on exit signals
 process.on("SIGINT", () => {
   console.log("SIGINT received, killing Python process...");
   displayInstance.killPythonProcess();
@@ -175,4 +194,12 @@ process.on("SIGTERM", () => {
   console.log("SIGTERM received, killing Python process...");
   displayInstance.killPythonProcess();
   process.exit(0);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  displayInstance.killPythonProcess();
+});
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  displayInstance.killPythonProcess();
 });
