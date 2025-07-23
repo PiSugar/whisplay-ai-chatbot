@@ -1,4 +1,5 @@
 import { exec } from "child_process";
+import { resolve } from "path";
 import { Socket } from "net";
 
 interface Status {
@@ -37,15 +38,24 @@ export class WhisplayDisplay {
   }
 
   startPythonProcess(): void {
+    const command = `cd ${resolve(
+      __dirname,
+      "../python"
+    )} && python3 chatbot-ui.py`;
     console.log("Starting Python process...");
-    this.pythonProcess = exec(
-      `cd ${__dirname}/../python && python3 chatbot-ui.py`,
-      (error, stdout, stderr) => {
-        if (error) {
-          console.error("Error starting Python process:", error);
-          return;
-        }
+    this.pythonProcess = exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error("Error starting Python process:", error);
+        return;
       }
+      console.log("Python process stdout:", stdout);
+      console.error("Python process stderr:", stderr);
+    });
+    this.pythonProcess.stdout.on("data", (data: any) =>
+      console.log(data.toString())
+    );
+    this.pythonProcess.stderr.on("data", (data: any) =>
+      console.error(data.toString())
     );
   }
 
