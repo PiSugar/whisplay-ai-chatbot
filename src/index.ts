@@ -11,9 +11,11 @@ import Battery from "./device/battery";
 import ChatFlow from "./core/ChatFlow";
 
 const battery = new Battery();
-battery.connect();
+battery.connect().catch(e => {
+  console.error("fail to connect to battery service:", e);
+});
 battery.addListener("batteryLevel", (data: any) => {
-  console.log("电量:", data);
+  console.log("battery level:", data);
   display({
     battery_level: data,
   });
@@ -22,9 +24,9 @@ battery.addListener("batteryLevel", (data: any) => {
 const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir);
-  console.log("创建数据文件夹:", dataDir);
+  console.log("created data directory:", dataDir);
 } else {
-  console.log("数据文件夹已存在:", dataDir);
+  console.log("dataDir exists:", dataDir);
 }
 
 new ChatFlow({
