@@ -8,7 +8,8 @@ const {
   createSteamResponser,
 } = require("../device/audio");
 
-const { display, extractEmojis } = require("../device/display");
+const { display } = require("../device/display");
+const { extractEmojis } = require("../utils");
 
 const { partial, endPartial, getPlayEndPromise } = createSteamResponser(
   volcengineTTS,

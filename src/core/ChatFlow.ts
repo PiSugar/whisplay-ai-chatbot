@@ -1,16 +1,12 @@
 import { noop } from "lodash";
-import {
-  onButtonPressed,
-  onButtonReleased,
-  display,
-  extractEmojis,
-} from "../device/display";
+import { onButtonPressed, onButtonReleased, display } from "../device/display";
 import { recordAudioManually, StreamResponser } from "../device/audio";
 import {
   recognizeAudio,
   chatWithLLMStream,
   ttsProcessor,
 } from "../cloud-api/server";
+import { extractEmojis } from "../utils";
 
 interface ChatFlowConstructor {
   dataDir: string;

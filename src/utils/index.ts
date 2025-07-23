@@ -30,3 +30,14 @@ export const combineFunction = (packages: FunctionCall[][]): FunctionCall[] => {
 };
 
 // combineFunction([[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]])
+
+export const extractEmojis = (str: string): string => {
+  const array = [
+    ...str.matchAll(/([\p{Emoji_Presentation}\u200d\ufe0f])/gu),
+  ].map((match) => match[0]);
+
+  if (array.length > 0) {
+    return array[0];
+  }
+  return "😐";
+};

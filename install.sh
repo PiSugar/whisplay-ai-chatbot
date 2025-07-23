@@ -9,6 +9,44 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# check if .env file exists
+if [ ! -f .env ]; then
+    echo "Please create a .env file with the necessary environment variables."
+    exit 1
+fi
+
+# apt install sox libsox-fmt-mp3 mpg123
+sudo apt-get update
+sudo apt-get install -y sox mpg123 libsox-fmt-mp3 python3-dev libcairo2 libcairo2-dev
+
+# enable spi
+sudo raspi-config nonint do_spi 0
+
+# install python dependencies
+echo "Installing Python dependencies..."
+cd python
+pip install -r requirements.txt --break-system-packages
+# download fonts and emojis
+wget https://cdn.pisugar.com/EchoView/NotoSansSC-Bold.ttf
+wget https://cdn.pisugar.com/EchoView/emoji_svg.zip
+unzip emoji_svg.zip 
+cd ..
+
+
+# Check if git is installed
+# if ! command_exists git; then
+#     echo "git is not installed. Installing git..."
+#     sudo apt-get install -y git
+
+#     # Verify installation
+#     if command_exists git; then
+#         echo "git installed successfully."
+#     else
+#         echo "Failed to install git."
+#         exit 1
+#     fi
+# fi
+
 # Function to install nvm and Node.js 18
 install_node_nvm() {
     echo "Installing Node.js 18 using nvm..."
@@ -106,20 +144,6 @@ if ! command_exists npm; then
     fi
 fi
 
-# check if git is installed
-# if ! command_exists git; then
-#     echo "git is not installed. Installing git..."
-#     sudo apt-get install -y git
-
-#     # Verify installation
-#     if command_exists git; then
-#         echo "git installed successfully."
-#     else
-#         echo "Failed to install git."
-#         exit 1
-#     fi
-# fi
-
 # check if yarn is installed
 if ! command_exists yarn; then
     echo "yarn is not installed. Installing yarn..."
@@ -142,10 +166,8 @@ fi
 
 echo "Installing dependencies..."
 yarn --registry=$NPM_REGISTRY
+yarn build
 
 
-# apt install sox libsox-fmt-mp3 mpg123
-sudo apt-get update
-sudo apt-get install -y sox mpg123 libsox-fmt-mp3 python3-dev libcairo2 libcairo2-dev
 
 
