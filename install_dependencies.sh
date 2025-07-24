@@ -9,12 +9,6 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# check if .env file exists
-if [ ! -f .env ]; then
-    echo "Please create a .env file with the necessary environment variables."
-    exit 1
-fi
-
 # apt install sox libsox-fmt-mp3 mpg123
 sudo apt-get update
 sudo apt-get install -y sox mpg123 libsox-fmt-mp3 python3-dev libcairo2 libcairo2-dev
@@ -163,10 +157,6 @@ fi
 #sudo ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/node" "/usr/local/bin/node"
 #sudo ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npm" "/usr/local/bin/npm"
 #sudo ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npx" "/usr/local/bin/npx"
-
-echo "Installing dependencies..."
-yarn --registry=$NPM_REGISTRY
-yarn build
 
 
 

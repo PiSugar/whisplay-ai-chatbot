@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # WORKING_DIR="/home/pi/whisplay-ai-chatbot"
+echo "Setting up the chatbot service..."
 
 sudo bash -c 'cat > /etc/systemd/system/chatbot.service <<EOF
 [Unit]
@@ -16,3 +17,6 @@ StandardError=append:/home/pi/whisplay-ai-chatbot/chatbot.log
 [Install]
 WantedBy=multi-user.target
 EOF'
+
+sudo systemctl enable chatbot.service
+sudo systemctl start chatbot.service
