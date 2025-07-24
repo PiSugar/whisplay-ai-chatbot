@@ -158,6 +158,8 @@ fi
 #sudo ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npm" "/usr/local/bin/npm"
 #sudo ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npx" "/usr/local/bin/npx"
 
+echo "Installing Node.js dependencies..."
+yarn
 
 
 
