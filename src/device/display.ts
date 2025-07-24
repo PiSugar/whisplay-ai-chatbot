@@ -74,15 +74,19 @@ export class WhisplayDisplay {
   ): Promise<void> {
     await new Promise((resolve, reject) => {
       const attemptConnection = (attempt: number) => {
-        this.connect().catch((err) => {
-          if (attempt < retries) {
-            console.log(`Connection attempt ${attempt} failed, retrying...`);
-            setTimeout(() => attemptConnection(attempt + 1), 10000);
-          } else {
-            console.error("Failed to connect after multiple attempts:", err);
-            reject(err);
-          }
-        });
+        this.connect()
+          .then(() => {
+            resolve(true);
+          })
+          .catch((err) => {
+            if (attempt < retries) {
+              console.log(`Connection attempt ${attempt} failed, retrying...`);
+              setTimeout(() => attemptConnection(attempt + 1), 10000);
+            } else {
+              console.error("Failed to connect after multiple attempts:", err);
+              reject(err);
+            }
+          });
       };
       attemptConnection(1);
     });
