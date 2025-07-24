@@ -51,7 +51,7 @@ const chatWithLLM = async (userMessage: string): Promise<string> => {
     messages: messages as any,
   });
   const answer = chatCompletion.choices[0].message.content as string;
-  console.log("回答:", chatCompletion.choices[0].message);
+  console.log("Answer:", chatCompletion.choices[0].message);
   messages.push({
     role: "assistant",
     content: answer,

@@ -20,7 +20,7 @@ export const recognizeAudio = async (
     return "";
   }
   if (!fs.existsSync(audioFilePath)) {
-    console.error("音频文件不存在:", audioFilePath);
+    console.error("Audio file does not exist:", audioFilePath);
     return "";
   }
 
@@ -29,10 +29,10 @@ export const recognizeAudio = async (
       file: fs.createReadStream(audioFilePath),
       model: "whisper-1",
     });
-    console.log("识别结果:", transcription.text);
+    console.log("Transcription result:", transcription.text);
     return transcription.text;
   } catch (error) {
-    console.error("音频识别失败:", error);
+    console.error("Audio recognition failed:", error);
     return "";
   }
 };

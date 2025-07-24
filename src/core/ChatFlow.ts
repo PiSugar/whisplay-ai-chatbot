@@ -1,3 +1,4 @@
+import { getCurrentTimeTag } from './../utils/index';
 import { noop } from "lodash";
 import { onButtonPressed, onButtonReleased, display } from "../device/display";
 import { recordAudioManually, StreamResponser } from "../device/audio";
@@ -20,6 +21,7 @@ class ChatFlow {
   streamResponser: StreamResponser;
 
   constructor({ dataDir }: ChatFlowConstructor) {
+    console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
     this.dataDir = dataDir;
     this.setCurrentFlow("sleep");
     this.streamResponser = new StreamResponser(
@@ -44,7 +46,7 @@ class ChatFlow {
   }
 
   setCurrentFlow = (flowName: string): void => {
-    console.log("切换到流程:", flowName);
+    console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
     switch (flowName) {
       case "sleep":
         this.currentFlowName = "sleep";

@@ -85,13 +85,17 @@ const stopRecording = (): void => {
 
 interface Player {
   isPlaying: boolean;
-  process: ChildProcess;
+  process: ChildProcess | null;
 }
 
 const player: Player = {
   isPlaying: false,
-  process: spawn("mpg123", ["-", "--scale", "2"]),
+  process: null,
 };
+
+setTimeout(() => {
+  player.process = spawn("mpg123", ["-", "--scale", "2"]);
+}, 5000);
 
 const playAudioData = (
   resAudioData: string,
@@ -108,6 +112,10 @@ const playAudioData = (
     }, audioDuration); // 加1秒缓冲
 
     const process = player.process;
+
+    if (!process) {
+      return reject(new Error("Audio player is not initialized."));
+    }
 
     try {
       process.stdin?.write(audioBuffer);

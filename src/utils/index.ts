@@ -3,6 +3,7 @@
 
 import { get } from "lodash";
 import { FunctionCall } from "../type";
+import moment from "moment";
 
 export const combineFunction = (packages: FunctionCall[][]): FunctionCall[] => {
   return packages.reduce((callFunctions: FunctionCall[], itemArray) => {
@@ -40,4 +41,8 @@ export const extractEmojis = (str: string): string => {
     return array[0];
   }
   return "😐";
+};
+
+export const getCurrentTimeTag = (): string => {
+  return moment().format("YYYY-MM-DD HH:mm:ss");
 };

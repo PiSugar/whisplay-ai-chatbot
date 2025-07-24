@@ -16,6 +16,7 @@
     "dotenv": "^16.5.0",
     "lodash": "^4.17.21",
     "mic": "^2.1.2",
+    "moment": "^2.30.1",
     "mp3-duration": "^1.1.0",
     "node-emoji": "^2.2.0",
     "node-lame": "^1.3.2",
