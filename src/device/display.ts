@@ -34,7 +34,7 @@ export class WhisplayDisplay {
   constructor() {
     this.startPythonProcess();
     this.isReady = new Promise<void>((resolve) => {
-      this.connectWithRetry(10, resolve);
+      this.connectWithRetry(15, resolve);
     });
   }
 
@@ -69,7 +69,7 @@ export class WhisplayDisplay {
   }
 
   async connectWithRetry(
-    retries: number = 6,
+    retries: number = 10,
     outerResolve: () => void
   ): Promise<void> {
     await new Promise((resolve, reject) => {
@@ -81,7 +81,7 @@ export class WhisplayDisplay {
           .catch((err) => {
             if (attempt < retries) {
               console.log(`Connection attempt ${attempt} failed, retrying...`);
-              setTimeout(() => attemptConnection(attempt + 1), 10000);
+              setTimeout(() => attemptConnection(attempt + 1), 5000);
             } else {
               console.error("Failed to connect after multiple attempts:", err);
               reject(err);
