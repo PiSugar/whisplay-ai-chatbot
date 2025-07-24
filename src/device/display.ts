@@ -25,7 +25,7 @@ export class WhisplayDisplay {
     battery_level: 100, // 0-100
   };
 
-  private client = new Socket();
+  private client = null as Socket | null;
   private buttonPressedCallback: () => void = () => {};
   private buttonReleasedCallback: () => void = () => {};
   private isReady: Promise<void>;
@@ -92,6 +92,11 @@ export class WhisplayDisplay {
   async connect(): Promise<void> {
     console.log("Connecting to local display socket...");
     return new Promise<void>((resolve, reject) => {
+      // 销毁原来的this.client
+      if (this.client) {
+        this.client.destroy();
+      }
+      this.client = new Socket();
       this.client.connect(12345, "0.0.0.0", () => {
         console.log("Connected to local display socket");
         this.sendToDisplay(JSON.stringify(this.currentStatus));
@@ -136,7 +141,7 @@ export class WhisplayDisplay {
   private async sendToDisplay(data: string): Promise<void> {
     await this.isReady;
     try {
-      this.client.write(`${data}\n`, "utf8", () => {
+      this.client?.write(`${data}\n`, "utf8", () => {
         // console.log("send", data);
       });
     } catch (error) {
