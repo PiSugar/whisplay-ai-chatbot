@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import { resolve } from "path";
 import { Socket } from "net";
+import { getCurrentTimeTag } from "../utils";
 
 interface Status {
   status: string;
@@ -108,7 +109,10 @@ export class WhisplayDisplay {
       });
       this.client.on("data", (data: Buffer) => {
         const dataString = data.toString();
-        console.log("Received data from EchoView hat:", dataString);
+        console.log(
+          `[${getCurrentTimeTag()}] Received data from Whisplay hat:`,
+          dataString
+        );
         if (dataString.trim() === "OK") {
           return;
         }
@@ -197,7 +201,8 @@ export class WhisplayDisplay {
 const displayInstance = new WhisplayDisplay();
 
 export const display = displayInstance.display.bind(displayInstance);
-export const getCurrentStatus = displayInstance.getCurrentStatus.bind(displayInstance);
+export const getCurrentStatus =
+  displayInstance.getCurrentStatus.bind(displayInstance);
 export const onButtonPressed =
   displayInstance.onButtonPressed.bind(displayInstance);
 export const onButtonReleased =
