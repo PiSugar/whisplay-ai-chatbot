@@ -11,7 +11,7 @@ echo "PATH: $PATH"
 echo "Python版本: $(python3 --version)" 
 echo "Node版本: $(node --version)"
 # 调节音量
-amixer -c 1 set Speaker 120 > /dev/null
+# amixer -c 1 set Speaker 120 > /dev/null
 echo "启动Node.js应用..."
 cd /home/pi/whisplay-ai-chatbot
 yarn start
