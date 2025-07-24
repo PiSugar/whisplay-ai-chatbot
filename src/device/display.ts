@@ -92,37 +92,36 @@ export class WhisplayDisplay {
   async connect(): Promise<void> {
     console.log("Connecting to local display socket...");
     return new Promise<void>((resolve, reject) => {
-      try {
-        this.client.connect(12345, "0.0.0.0", () => {
-          console.log("Connected to local display socket");
-          this.sendToDisplay(JSON.stringify(this.currentStatus));
-          this.client.on("data", (data: Buffer) => {
-            const dataString = data.toString();
-            console.log("Received data from EchoView hat:", dataString);
-            if (dataString.trim() === "OK") {
-              return;
-            }
-            try {
-              const json = JSON.parse(dataString);
-              if (json.event === "button_pressed") {
-                this.buttonPressedCallback();
-              }
-              if (json.event === "button_released") {
-                this.buttonReleasedCallback();
-              }
-            } catch {
-              console.error("Failed to parse JSON from data");
-            }
-          });
-          this.client.on("error", (err: Error) => {
-            console.error("Socket error:", err);
-          });
-          resolve();
-        });
-      } catch (error) {
-        console.error("Error connecting to local display socket:", error);
-        reject(error);
-      }
+      this.client.connect(12345, "0.0.0.0", () => {
+        console.log("Connected to local display socket");
+        this.sendToDisplay(JSON.stringify(this.currentStatus));
+        resolve();
+      });
+      this.client.on("data", (data: Buffer) => {
+        const dataString = data.toString();
+        console.log("Received data from EchoView hat:", dataString);
+        if (dataString.trim() === "OK") {
+          return;
+        }
+        try {
+          const json = JSON.parse(dataString);
+          if (json.event === "button_pressed") {
+            this.buttonPressedCallback();
+          }
+          if (json.event === "button_released") {
+            this.buttonReleasedCallback();
+          }
+        } catch {
+          console.error("Failed to parse JSON from data");
+        }
+      });
+      this.client.on("error", (err: any) => {
+        console.error("Socket error:", err);
+        // 如果是ECONNREFUSED
+        if (err.code === "ECONNREFUSED") {
+          reject(err);
+        }
+      });
     });
   }
 
