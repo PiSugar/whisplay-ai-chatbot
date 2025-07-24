@@ -140,8 +140,10 @@ const stopPlaying = (): void => {
     try {
       console.log("中止播放音频");
       const process = player.process;
-      process.stdin?.end();
-      process.kill();
+      if (process) {
+        process.stdin?.end();
+        process.kill();
+      }
     } catch {}
     player.isPlaying = false;
     // 重新创建进程
@@ -156,8 +158,10 @@ const stopPlaying = (): void => {
 // 退出程序时关闭音频播放器
 process.on("SIGINT", () => {
   try {
-    player.process.stdin?.end();
-    player.process.kill();
+    if (player.process) {
+      player.process.stdin?.end();
+      player.process.kill();
+    }
   } catch {}
   process.exit();
 });
