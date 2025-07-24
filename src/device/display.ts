@@ -74,7 +74,7 @@ export class WhisplayDisplay {
   ): Promise<void> {
     await new Promise((resolve, reject) => {
       const attemptConnection = (attempt: number) => {
-        this.connect(resolve).catch((err) => {
+        this.connect().catch((err) => {
           if (attempt < retries) {
             console.log(`Connection attempt ${attempt} failed, retrying...`);
             setTimeout(() => attemptConnection(attempt + 1), 10000);
@@ -89,33 +89,40 @@ export class WhisplayDisplay {
     outerResolve();
   }
 
-  async connect(resolve: (value: any) => void): Promise<void> {
+  async connect(): Promise<void> {
     console.log("Connecting to local display socket...");
-    this.client.connect(12345, "0.0.0.0", () => {
-      console.log("Connected to local display socket");
-      this.sendToDisplay(JSON.stringify(this.currentStatus));
-      this.client.on("data", (data: Buffer) => {
-        const dataString = data.toString();
-        console.log("Received data from EchoView hat:", dataString);
-        if (dataString.trim() === "OK") {
-          return;
-        }
-        try {
-          const json = JSON.parse(dataString);
-          if (json.event === "button_pressed") {
-            this.buttonPressedCallback();
-          }
-          if (json.event === "button_released") {
-            this.buttonReleasedCallback();
-          }
-        } catch {
-          console.error("Failed to parse JSON from data");
-        }
-      });
-      this.client.on("error", (err: Error) => {
-        console.error("Socket error:", err);
-      });
-      resolve(true);
+    return new Promise<void>((resolve, reject) => {
+      try {
+        this.client.connect(12345, "0.0.0.0", () => {
+          console.log("Connected to local display socket");
+          this.sendToDisplay(JSON.stringify(this.currentStatus));
+          this.client.on("data", (data: Buffer) => {
+            const dataString = data.toString();
+            console.log("Received data from EchoView hat:", dataString);
+            if (dataString.trim() === "OK") {
+              return;
+            }
+            try {
+              const json = JSON.parse(dataString);
+              if (json.event === "button_pressed") {
+                this.buttonPressedCallback();
+              }
+              if (json.event === "button_released") {
+                this.buttonReleasedCallback();
+              }
+            } catch {
+              console.error("Failed to parse JSON from data");
+            }
+          });
+          this.client.on("error", (err: Error) => {
+            console.error("Socket error:", err);
+          });
+          resolve();
+        });
+      } catch (error) {
+        console.error("Error connecting to local display socket:", error);
+        reject(error);
+      }
     });
   }
 
@@ -182,7 +189,6 @@ export const onButtonPressed =
   displayInstance.onButtonPressed.bind(displayInstance);
 export const onButtonReleased =
   displayInstance.onButtonReleased.bind(displayInstance);
-
 
 // kill the Python process on exit signals
 process.on("SIGINT", () => {
