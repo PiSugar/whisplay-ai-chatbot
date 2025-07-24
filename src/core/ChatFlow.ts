@@ -58,7 +58,7 @@ class ChatFlow {
           status: "idle",
           emoji: "😴",
           RGB: "#000055",
-          // text: "Press the button to start",
+          text: "Press the button to start",
         });
         break;
       case "listening":
