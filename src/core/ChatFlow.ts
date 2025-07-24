@@ -1,6 +1,11 @@
-import { getCurrentTimeTag } from './../utils/index';
-import { noop } from "lodash";
-import { onButtonPressed, onButtonReleased, display } from "../device/display";
+import { getCurrentTimeTag } from "./../utils/index";
+import { get, noop } from "lodash";
+import {
+  onButtonPressed,
+  onButtonReleased,
+  display,
+  getCurrentStatus,
+} from "../device/display";
 import { recordAudioManually, StreamResponser } from "../device/audio";
 import {
   recognizeAudio,
@@ -58,7 +63,11 @@ class ChatFlow {
           status: "idle",
           emoji: "😴",
           RGB: "#000055",
-          text: "Press the button to start",
+          ...(getCurrentStatus().text === "Listening..."
+            ? {
+                text: "Press the button to start",
+              }
+            : {}),
         });
         break;
       case "listening":

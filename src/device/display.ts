@@ -153,6 +153,10 @@ export class WhisplayDisplay {
     }
   }
 
+  getCurrentStatus(): Status {
+    return this.currentStatus;
+  }
+
   async display(newStatus: Partial<Status> = {}): Promise<void> {
     const {
       status,
@@ -193,6 +197,7 @@ export class WhisplayDisplay {
 const displayInstance = new WhisplayDisplay();
 
 export const display = displayInstance.display.bind(displayInstance);
+export const getCurrentStatus = displayInstance.getCurrentStatus.bind(displayInstance);
 export const onButtonPressed =
   displayInstance.onButtonPressed.bind(displayInstance);
 export const onButtonReleased =
