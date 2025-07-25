@@ -311,10 +311,10 @@ def render_scroll_info_area_dynamic_font(info_text, font_path, scroll_width, scr
             draw_mixed_text(draw, scroll_img, line, info_font, (horizontal_padding, i * line_height))
         return scroll_img
 
-def scroll_info_area(top_image: Image.Image, info_scroll_img: Image.Image, echoview,
+def scroll_info_area(top_image: Image.Image, info_scroll_img: Image.Image, whisplay,
                      scroll_speed=2, delay=0.05, stop_event=None):
-    screen_width = echoview.LCD_WIDTH
-    screen_height = echoview.LCD_HEIGHT
+    screen_width = whisplay.LCD_WIDTH
+    screen_height = whisplay.LCD_HEIGHT
     scroll_height = screen_height - scroll_top
     scroll_img_height = info_scroll_img.height
 
@@ -326,7 +326,7 @@ def scroll_info_area(top_image: Image.Image, info_scroll_img: Image.Image, echov
             frame = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
             # frame.paste(crop, (0, scroll_top))
             rgb565_data = image_to_rgb565(frame, screen_width,  scroll_height)
-            echoview.draw_image(0, scroll_top, screen_width, scroll_height, rgb565_data)
+            whisplay.draw_image(0, scroll_top, screen_width, scroll_height, rgb565_data)
             time.sleep(delay)
 
         while not stop_event.is_set():
@@ -344,7 +344,7 @@ scroll_thread = None
 scroll_stop_event = threading.Event()
 top_image = None
 clients = {} # 用于存储客户端连接
-def update_display(echoview, font_path, status=None, emoji=None, text=None, scroll_speed=2,battery_level=None,battery_color=None):
+def update_display(whisplay, font_path, status=None, emoji=None, text=None, scroll_speed=2,battery_level=None,battery_color=None):
     global current_status, current_emoji, current_text,current_battery_level,current_battery_color
     global scroll_thread, scroll_stop_event, top_image,scroll_top
 
@@ -364,9 +364,9 @@ def update_display(echoview, font_path, status=None, emoji=None, text=None, scro
         top_changed = True
     if top_changed:
         print("重绘顶部")
-        top_image ,scroll_top= render_top_area(current_status, current_emoji, font_path, echoview.LCD_WIDTH,battery_level=current_battery_level,battery_color=current_battery_color)
-        rgb565_data=image_to_rgb565(top_image,echoview.LCD_WIDTH,scroll_top)
-        echoview.draw_image(0, 0, echoview.LCD_WIDTH, scroll_top, rgb565_data)
+        top_image ,scroll_top= render_top_area(current_status, current_emoji, font_path, whisplay.LCD_WIDTH,battery_level=current_battery_level,battery_color=current_battery_color)
+        rgb565_data=image_to_rgb565(top_image,whisplay.LCD_WIDTH,scroll_top)
+        whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, scroll_top, rgb565_data)
 
     if text is not None and text != current_text:
         current_text = text
@@ -380,14 +380,14 @@ def update_display(echoview, font_path, status=None, emoji=None, text=None, scro
         scroll_img  = render_scroll_info_area_dynamic_font(
                 info_text=current_text,
                 font_path=font_path,
-                scroll_width=echoview.LCD_WIDTH,
-                scroll_height=echoview.LCD_HEIGHT - scroll_top
+                scroll_width=whisplay.LCD_WIDTH,
+                scroll_height=whisplay.LCD_HEIGHT - scroll_top
         )
 
 
         scroll_thread = threading.Thread(
             target=scroll_info_area,
-            args=(top_image, scroll_img, echoview),
+            args=(top_image, scroll_img, whisplay),
             kwargs={'scroll_speed': scroll_speed, 'delay': 0.05, 'stop_event': scroll_stop_event}
         )
         scroll_thread.start()
@@ -395,10 +395,10 @@ def update_display(echoview, font_path, status=None, emoji=None, text=None, scro
 
     elif top_changed and scroll_thread is None:
         # 没有滚动线程，也没新文本，只需要更新 top 部分
-        frame = Image.new("RGBA", (echoview.LCD_WIDTH, echoview.LCD_HEIGHT), (0, 0, 0, 255))
+        frame = Image.new("RGBA", (whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), (0, 0, 0, 255))
         frame.paste(top_image, (0, 0))
-        rgb565_data = image_to_rgb565(frame, echoview.LCD_WIDTH, echoview.LCD_HEIGHT)
-        echoview.draw_image(0, 0, echoview.LCD_WIDTH, echoview.LCD_HEIGHT, rgb565_data)
+        rgb565_data = image_to_rgb565(frame, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)
+        whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, rgb565_data)
 
 
 def send_to_all_clients(message):
@@ -424,7 +424,7 @@ def on_button_release():
     notification = {"event": "button_released"}
     send_to_all_clients(notification)
 
-def handle_client(client_socket, addr, echoview, font_path):
+def handle_client(client_socket, addr, whisplay, font_path):
     print(f"[Socket] 客户端 {addr} 已连接")
     clients[addr] = client_socket
     try:
@@ -455,15 +455,15 @@ def handle_client(client_socket, addr, echoview, font_path):
 
                     if rgbled:
                         rgb255_tuple = get_rgb255_from_any(rgbled)
-                        echoview.set_rgb_fade(*rgb255_tuple,duration_ms=500)
+                        whisplay.set_rgb_fade(*rgb255_tuple,duration_ms=500)
                     if battery_color:
                         battery_tuple = get_rgb255_from_any(battery_color)
                     else:
                         battery_tuple=(0,0,0)
                     if brightness:
-                        echoview.set_backlight(brightness)
+                        whisplay.set_backlight(brightness)
                     if (text is not None) or (status is not None) or (emoji is not None)or (battery_level is not None)or (battery_color is not None):
-                        update_display(echoview, font_path, status=status, emoji=emoji, text=text, scroll_speed=scroll_speed,battery_level=battery_level,battery_color=battery_tuple)
+                        update_display(whisplay, font_path, status=status, emoji=emoji, text=text, scroll_speed=scroll_speed,battery_level=battery_level,battery_color=battery_tuple)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:
@@ -487,15 +487,15 @@ def handle_client(client_socket, addr, echoview, font_path):
         client_socket.close()
 
 def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.ttf"):
-    echoview = WhisplayBoard()
+    whisplay = WhisplayBoard()
     global cornerHeight
-    cornerHeight=echoview.CornerHeight
-    print(f"[LCD] 初始化完成，大小: {echoview.LCD_WIDTH}x{echoview.LCD_HEIGHT}")
+    cornerHeight=whisplay.CornerHeight
+    print(f"[LCD] 初始化完成，大小: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
 
     # 注册按钮按下事件
 
-    echoview.on_button_press(on_button_pressed) # 使用模拟的注册
-    echoview.on_button_release(on_button_release) # 使用模拟的注册
+    whisplay.on_button_press(on_button_pressed) # 使用模拟的注册
+    whisplay.on_button_release(on_button_release) # 使用模拟的注册
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # 添加这一行
@@ -506,7 +506,7 @@ def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.t
     try:
         while True:
             client_socket, addr = server_socket.accept()
-            client_thread = threading.Thread(target=handle_client, args=(client_socket, addr, echoview, font_path))
+            client_thread = threading.Thread(target=handle_client, args=(client_socket, addr, whisplay, font_path))
             client_thread.daemon = True # 设置为守护线程，主线程退出时子线程也会退出
             client_thread.start()
     except KeyboardInterrupt:

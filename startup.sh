@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# disable graphical interface
+sudo systemctl set-default multi-user.target
+
 # WORKING_DIR="/home/pi/whisplay-ai-chatbot"
 echo "Setting up the chatbot service..."
 

@@ -15,5 +15,7 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+source ~/.bashrc
+
 yarn --registry=$NPM_REGISTRY
 yarn build
