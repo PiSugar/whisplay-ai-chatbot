@@ -492,6 +492,14 @@ def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.t
     cornerHeight=whisplay.CornerHeight
     print(f"[LCD] 初始化完成，大小: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
 
+    # 启动时先显示img/logo.png
+    logo_path = os.path.join("img", "logo.png")
+    if os.path.exists(logo_path):
+        logo_image = Image.open(logo_path).convert("RGBA")
+        logo_image = logo_image.resize((whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), Image.LANCZOS)
+        rgb565_data = image_to_rgb565(logo_image, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)
+        whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, rgb565_data)
+
     # 注册按钮按下事件
 
     whisplay.on_button_press(on_button_pressed) # 使用模拟的注册

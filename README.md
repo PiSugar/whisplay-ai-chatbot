@@ -6,9 +6,9 @@ This is a pocket-sized AI chatbot device built using a Raspberry Pi Zero 2w. Jus
 
 ## Hardware
 
-* Raspberry Pi zero 2w
-* PiSugar Whisplay HAT (including LCD screen, on-board speaker and microphone)
-* PiSugar 3 1200mAh
+- Raspberry Pi zero 2w
+- PiSugar Whisplay HAT (including LCD screen, on-board speaker and microphone)
+- PiSugar 3 1200mAh
 
 ## Drivers
 
@@ -40,15 +40,24 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    ```
    Please note that this will disable the graphical interface and set the system to multi-user mode, which is suitable for headless operation.
 
+## Display Battery Level
+
+The battery level display depends on the pisugar-power-manager. If you are using PiSugar2 or PiSugar3, you need to install the pisugar-power-manager first. You can find the installation instructions in the [PiSugar Power Manager repository](https://github.com/PiSugar/pisugar-power-manager-rs).
+
+Or use the following command to install it:
+
+```bash
+wget https://cdn.pisugar.com/release/pisugar-power-manager.sh
+bash pisugar-power-manager.sh -c release
+```
+
 ## Enclosure
 
 [Whisplay Chatbot Case](https://github.com/PiSugar/suit-cases/tree/main/pisugar3-whisplay-chatbot)
 
 ## Goals
 
-* Integrate the tool with the API
-* Enable the AI assistant to adjust the volume autonomously
-* Reset the conversation history if there is no speech for five minutes
-* Support speaker recognition
-
-
+- Integrate the tool with the API
+- Enable the AI assistant to adjust the volume autonomously
+- Reset the conversation history if there is no speech for five minutes
+- Support speaker recognition
