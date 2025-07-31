@@ -9,13 +9,14 @@ dotenv.config();
 // ByteDance TTS
 const byteDanceAppId = process.env.VOLCENGINE_APP_ID || "";
 const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN || "";
+const byteDanceVoiceType = process.env.VOLCENGINE_VOICE_TYPE || "zh_female_wanwanxiaohe_moon_bigtts";
 
 const host = "openspeech.bytedance.com";
 const api_url = `wss://${host}/api/v1/tts/ws_binary`;
 const default_header = Buffer.from([0x11, 0x10, 0x11, 0x00]);
 
 const audio_config = {
-  voice_type: "zh_female_wanwanxiaohe_moon_bigtts",
+  voice_type: byteDanceVoiceType,
   rate: 16000,
   speed_ratio: 1.0,
   pitch_ratio: 1.0,
