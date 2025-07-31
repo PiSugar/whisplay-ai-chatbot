@@ -1,16 +1,5 @@
-import { OpenAI } from "openai";
 import mp3Duration from "mp3-duration";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const openAIAPIKey = process.env.OPENAI_API_KEY;
-
-const openai = openAIAPIKey
-  ? new OpenAI({
-      apiKey: openAIAPIKey,
-    })
-  : null;
+import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 
 const openaiTTS = async (
   text: string

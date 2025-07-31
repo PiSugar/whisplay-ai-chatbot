@@ -1,21 +1,11 @@
-import { OpenAI } from "openai";
 import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
 } from "../config/llm-config";
-import dotenv from "dotenv";
 import { Message } from "../type";
+import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 
-dotenv.config();
-
-const apiKey = process.env.OPENAI_API_KEY;
-
-const openai = apiKey
-  ? new OpenAI({
-      apiKey,
-    })
-  : null;
 
 const messages: Message[] = [
   {
