@@ -7,6 +7,7 @@ dotenv.config();
 // ByteDance TTS
 const byteDanceAppId = process.env.VOLCENGINE_APP_ID as string;
 const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN as string;
+const byteDanceVoiceType = process.env.VOLCENGINE_VOICE_TYPE || "zh_female_wanwanxiaohe_moon_bigtts";
 
 interface Payload {
   app: {
@@ -53,7 +54,7 @@ const volcengineTTS = async (text: string): Promise<TTSResponse | undefined> => 
       uid: "01",
     },
     audio: {
-      voice_type: "zh_female_wanwanxiaohe_moon_bigtts",
+      voice_type: byteDanceVoiceType,
       encoding: "mp3",
       speed_ratio: 1,
       volume_ratio: 2.0,
