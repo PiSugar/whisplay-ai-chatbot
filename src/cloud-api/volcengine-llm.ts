@@ -6,7 +6,7 @@ import {
   updateLastMessageTime,
 } from "../config/llm-config";
 import { combineFunction } from "../utils";
-import { llmTools, llmFuncMap } from "../config/llm-config";
+import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../type";
 
@@ -14,6 +14,7 @@ dotenv.config();
 
 // Doubao LLM
 const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN || "";
+const doubaoLLMModel = process.env.VOLCENGINE_DOUBAO_LLM_MODEL || "doubao-1-5-lite-32k-250115"; // Default model
 
 const messages: Message[] = [
   {
@@ -30,55 +31,10 @@ const resetChatHistory = (): void => {
   });
 };
 
-const chatWithLLM = async (
-  userMessage: string
-): Promise<string | undefined> => {
-  if (!doubaoAccessToken) {
-    console.error("Doubao access token is not set.");
-    return;
-  }
-  if (shouldResetChatHistory()) {
-    resetChatHistory();
-  }
-  updateLastMessageTime();
-  console.time("llm");
-  messages.push({
-    role: "user",
-    content: userMessage,
-  });
-
-  try {
-    const response = await axios.post(
-      "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
-      {
-        model: "doubao-1-5-lite-32k-250115",
-        messages,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${doubaoAccessToken}`,
-        },
-      }
-    );
-
-    const result = response.data;
-    const answer = result.choices[0].message.content;
-    console.log("回答:", result.choices[0].message);
-    messages.push({
-      role: "assistant",
-      content: answer,
-    });
-    return answer;
-  } catch (error: any) {
-    console.error("Error:", error.response?.data || error.message);
-  }
-};
-
 const chatWithLLMStream = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
-  endCallBack: () => void
+  endCallback: () => void
 ): Promise<void> => {
   if (!doubaoAccessToken) {
     console.error("Doubao access token is not set.");
@@ -96,7 +52,7 @@ const chatWithLLMStream = async (
     const response = await axios.post(
       "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
       {
-        model: "doubao-1-5-lite-32k-250115",
+        model: doubaoLLMModel,
         messages,
         stream: true,
         tools: llmTools,
@@ -190,14 +146,12 @@ const chatWithLLMStream = async (
 
         await chatWithLLMStream(newMessages, partialCallback, () => {
           endResolve();
-          endCallBack();
+          endCallback();
         });
         return;
-      }
-
-      if (partialAnswer) {
+      } else {
         endResolve();
-        endCallBack();
+        endCallback();
       }
     });
   } catch (error: any) {
@@ -207,4 +161,4 @@ const chatWithLLMStream = async (
   return promise;
 };
 
-export { chatWithLLM, chatWithLLMStream, resetChatHistory };
+export { chatWithLLMStream, resetChatHistory };
