@@ -8,60 +8,71 @@ import { execSync } from "child_process";
 // Front Left: Playback 121 [95%] [0.00dB]
 // Front Right: Playback 121 [95%] [0.00dB]
 
-const minDb = -120; // minimum decibel value
-const maxDb = 0; // maximum decibel value
-const minValue = 0; // minimum linear value
-const maxValue = 127; // maximum linear value
+// curve
+const percentToAmixerValueMap = [
+  [0, 0],
+  [10, 67],
+  [20, 85],
+  [30, 96],
+  [40, 103],
+  [50, 109],
+  [60, 114],
+  [70, 118],
+  [80, 121],
+  [90, 124],
+  [100, 127],
+];
 
-const getAlsaVolumeDbValueFromAmixer = (): number => {
+const getVolumeValueFromAmixer = (): number => {
   const output = execSync("amixer -c 1 get Speaker").toString();
   const regex = /Front Left: Playback (\d+) \[(\d+)%\] \[([-\d.]+)dB\]/;
   const match = output.match(regex);
-  if (match && match[3]) {
-    const volume = parseFloat(match[3]);
+  if (match && match[1]) {
+    const volume = parseFloat(match[1]);
     return volume;
   }
   return 0; // Default to min if not found
 };
 
-function dbToLogPercent(dB: number, minDb: number, maxDb: number): number {
-  if (dB <= minDb) return 0;
-  if (dB >= maxDb) return 100;
-
-  const linearRatio = Math.pow(10, dB / 20);
-  const linearMin = Math.pow(10, minDb / 20);
-  const linearMax = Math.pow(10, maxDb / 20);
-
-  const percent = (linearRatio - linearMin) / (linearMax - linearMin) * 100;
-  return Math.round(percent * 100) / 100;
+function logPercentToAmixerValue(logPercent: number): number {
+  if (logPercent < 0 || logPercent > 100) {
+    throw new Error("logPercent must be between 0 and 100");
+  }
+  // 根据percentToAmixerValueMap获得amixerValue，曲线中间的值则根据线性插值
+  for (let i = 0; i < percentToAmixerValueMap.length - 1; i++) {
+    const [percent1, amixerValue1] = percentToAmixerValueMap[i];
+    const [percent2, amixerValue2] = percentToAmixerValueMap[i + 1];
+    if (logPercent >= percent1 && logPercent <= percent2) {
+      // 线性插值
+      return (
+        amixerValue1 +
+        (amixerValue2 - amixerValue1) *
+          ((logPercent - percent1) / (percent2 - percent1))
+      );
+    }
+  }
+  return 0; // Default to min if not found
 }
 
-function logPercentToDb(percent: number, minDb: number, maxDb: number): number {
-  if (percent <= 0) return minDb;
-  if (percent >= 100) return maxDb;
-
-  const linearMin = Math.pow(10, minDb / 20);
-  const linearMax = Math.pow(10, maxDb / 20);
-  const linearValue = linearMin + (linearMax - linearMin) * (percent / 100);
-  const dB = 20 * Math.log10(linearValue);
-
-  return Math.round(dB * 100) / 100;
-}
-
-function logPercentToAmixerValue(percent: number): number {
-  const dB = logPercentToDb(percent, minDb, maxDb);
-  const linearValue = Math.pow(10, dB / 20);
-  const amixerValue = Math.round((linearValue / (maxValue - minValue)) * (maxValue - minValue) + minValue);
-  return Math.max(minValue, Math.min(amixerValue, maxValue));
-}
-
-export function setVolumeByAmixer(logPercent: number): void {
-  const amixerValue = logPercentToAmixerValue(logPercent);
-  execSync(`amixer -c 1 set Speaker ${amixerValue}`);
-  console.log(`Volume set to ${logPercent}% (${amixerValue} in amixer)`);
+export const getCurrentLogPercent = (): number => {
+  const value = getVolumeValueFromAmixer();
+  // 根据percentToAmixerValueMap获得logPercent，曲线中间的值则根据线性插值
+  for (let i = 0; i < percentToAmixerValueMap.length - 1; i++) {
+    const [percent1, amixerValue1] = percentToAmixerValueMap[i];
+    const [percent2, amixerValue2] = percentToAmixerValueMap[i + 1];
+    if (value >= amixerValue1 && value <= amixerValue2) {
+      // 线性插值
+      return (
+        percent1 +
+        (percent2 - percent1) *
+          ((value - amixerValue1) / (amixerValue2 - amixerValue1))
+      );
+    }
+  }
+  return 0;
 };
 
-export function getCurrentLogPercent(): number {
-  const alsaVolumeDb = getAlsaVolumeDbValueFromAmixer();
-  return dbToLogPercent(alsaVolumeDb, minDb, maxDb);
-}
+export const setVolumeByAmixer = (logPercent: number): void => {
+  const value = logPercentToAmixerValue(logPercent);
+  execSync(`amixer -c 1 set Speaker ${value}`);
+};
