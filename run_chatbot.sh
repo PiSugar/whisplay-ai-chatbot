@@ -12,7 +12,8 @@ echo "Python version: $(python3 --version)"
 echo "Node version: $(node --version)"
 sleep 5
 # Adjust volume
-# amixer -c 1 set Speaker 120 > /dev/null
+amixer -c 1 set Speaker 95%
+# Start the service
 echo "Starting Node.js application..."
 cd /home/pi/whisplay-ai-chatbot
 yarn start
