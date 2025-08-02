@@ -1,25 +1,7 @@
 import { LLMTool } from "../type";
 import { execSync } from "child_process";
-import { dbPercentToLinear, linearToDbPercent } from "../utils/volume";
+import { setVolumeByAmixer, getCurrentLogPercent } from "../utils/volume";
 
-
-const getVolumeValue = (): number => {
-  // amixer -c 1 get Speaker
-  // Capabilities: volume
-  // Playback channels: Front Left - Front Right
-  // Limits: Playback 0 - 127
-  // Mono:
-  // Front Left: Playback 121 [95%] [0.00dB]
-  // Front Right: Playback 121 [95%] [0.00dB]
-  const output = execSync("amixer -c 1 get Speaker").toString();
-  const regex = /Front Left: Playback (\d+) \[(\d+)%\]/;
-  const match = output.match(regex);
-  if (match && match[1]) {
-    const volume = parseInt(match[1], 10);
-    return volume;
-  }
-  return 0; // Default to min if not found
-};
 
 export const llmTools: LLMTool[] = [
   {
@@ -41,9 +23,7 @@ export const llmTools: LLMTool[] = [
     func: async (params) => {
       const { percent } = params;
       if (percent >= 0 && percent <= 100) {
-        const amixerValue = dbPercentToLinear(percent);
-        execSync(`amixer -c 1 set Speaker ${amixerValue}%`);
-        console.log(`Volume set to ${percent}% (${amixerValue} in amixer)`);
+        setVolumeByAmixer(percent);
         return `Volume set to ${percent}%`;
       } else {
         console.error("Volume range error");
@@ -63,14 +43,13 @@ export const llmTools: LLMTool[] = [
       },
     },
     func: async (params) => {
-      const currentAmixerValue = getVolumeValue();
-      const currentAlsaPercent = linearToDbPercent(currentAmixerValue);
-      const newAlsaPercent = Math.min(currentAlsaPercent + 10, 100);
-      const newAmixerValue = dbPercentToLinear(newAlsaPercent);
-      console.log(`Current volume: ${currentAlsaPercent}%, New volume: ${newAlsaPercent}%`);
-      // Set the new volume
-      execSync(`amixer -c 1 set Speaker ${newAmixerValue}%`);
-      console.log(`Volume increased to ${newAmixerValue}%`);
+      const currentLogPercent = getCurrentLogPercent();
+      if (currentLogPercent >= 100) {
+        return "Volume is already at maximum";
+      }
+      const newAmixerValue = Math.min(currentLogPercent + 10, 100);
+      setVolumeByAmixer(newAmixerValue);
+      console.log(`Current volume: ${currentLogPercent}%, New volume: ${newAmixerValue}%`);
       return `Volume increased by 10%, now at ${newAmixerValue}%`;
     },
   },
@@ -86,14 +65,13 @@ export const llmTools: LLMTool[] = [
       },
     },
     func: async (params) => {
-      const currentAmixerValue = getVolumeValue();
-      const currentAlsaPercent = linearToDbPercent(currentAmixerValue);
-      const newAlsaPercent = Math.max(currentAlsaPercent - 10, 0);
-      const newAmixerValue = dbPercentToLinear(newAlsaPercent);
-      console.log(`Current volume: ${currentAlsaPercent}%, New volume: ${newAlsaPercent}%`);
-      // Set the new volume
-      execSync(`amixer -c 1 set Speaker ${newAmixerValue}%`);
-      console.log(`Volume decreased to ${newAmixerValue}%`);
+      const currentLogPercent = getCurrentLogPercent();
+      if (currentLogPercent <= 0) {
+        return "Volume is already at minimum";
+      }
+      const newAmixerValue = Math.max(currentLogPercent - 10, 0);
+      setVolumeByAmixer(newAmixerValue);
+      console.log(`Current volume: ${currentLogPercent}%, New volume: ${newAmixerValue}%`);
       return `Volume decreased by 10%, now at ${newAmixerValue}%`;
     },
   },
