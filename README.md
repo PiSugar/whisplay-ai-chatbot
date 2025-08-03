@@ -40,6 +40,23 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    ```
    Please note that this will disable the graphical interface and set the system to multi-user mode, which is suitable for headless operation.
 
+## Build After Code Changes
+
+If you make changes to the code, you need to rebuild the project. You can do this by running:
+
+```bash
+yarn
+yarn build
+```
+
+## Update Environment Variables
+
+If you need to update the environment variables, you can edit the `.env` file directly. After making changes, please run `yarn copy-env` to copy the updated environment variables to `dist/.env`. Then, restart the chatbot service with:
+
+```bash
+systemctl restart whisplay-ai-chatbot.service
+```
+
 ## Display Battery Level
 
 The battery level display depends on the pisugar-power-manager. If you are using PiSugar2 or PiSugar3, you need to install the pisugar-power-manager first. You can find the installation instructions in the [PiSugar Power Manager repository](https://github.com/PiSugar/pisugar-power-manager-rs).
