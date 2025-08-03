@@ -1,10 +1,11 @@
 import { LLMTool } from "../type";
+import { readFileSync } from "fs"
+import {  resolve } from "path";
 import { execSync } from "child_process";
 import { setVolumeByAmixer, getCurrentLogPercent } from "../utils/volume";
 
-
-export const llmTools: LLMTool[] = [
-  {
+const defaultTools: LLMTool[] = [
+   {
     type: "function",
     function: {
       name: "setVolume",
@@ -75,7 +76,29 @@ export const llmTools: LLMTool[] = [
       return `Volume decreased by 10%, now at ${newAmixerValue}%`;
     },
   },
-  // mute volume
+]
+
+// 如果有custom-tools文件夹，收集custom-tools文件夹中的文件导出的所有tools
+const customTools: LLMTool[] = [];
+const customToolsPath = resolve(__dirname, "../custom-tools");
+try {
+  const customToolsFiles = readFileSync(customToolsPath, { encoding: "utf-8" })
+    .split("\n")
+    .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
+
+  customToolsFiles.forEach((file) => {
+    const toolModule = require(resolve(customToolsPath, file));
+    if (toolModule.llmTools && Array.isArray(toolModule.llmTools)) {
+      customTools.push(...toolModule.llmTools);
+    }
+  });
+} catch (error) {
+  console.error("Error loading custom tools:", error);
+}
+
+export const llmTools: LLMTool[] = [
+  ...defaultTools,
+  ...customTools,
 ];
 
 export const llmFuncMap = llmTools.reduce((acc, tool) => {
