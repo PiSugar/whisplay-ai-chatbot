@@ -178,8 +178,16 @@ function splitSentences(text: string): {
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(text)) !== null) {
-    sentences.push(match[0].trim());
-    lastIndex = regex.lastIndex;
+    const sentence = match[0].trim();
+    // Check if the sentence is just a number followed by punctuation
+    if (!/^\d+[.。！？!?，,]$/.test(sentence)) {
+      sentences.push(sentence);
+      lastIndex = regex.lastIndex;
+    } else {
+      // If it's just a number with punctuation, reset lastIndex to include this in the next match
+      regex.lastIndex = match.index;
+      break;
+    }
   }
 
   const remaining = text.slice(lastIndex).trim();
