@@ -1,5 +1,5 @@
 import { LLMTool } from "../type";
-import { readFileSync } from "fs"
+import { readdirSync, readFileSync } from "fs"
 import {  resolve } from "path";
 import { execSync } from "child_process";
 import { setVolumeByAmixer, getCurrentLogPercent } from "../utils/volume";
@@ -80,16 +80,24 @@ const defaultTools: LLMTool[] = [
 
 // 如果有custom-tools文件夹，收集custom-tools文件夹中的文件导出的所有tools
 const customTools: LLMTool[] = [];
-const customToolsPath = resolve(__dirname, "./custom-tools");
+const customToolsFolderPath = resolve(__dirname, "./custom-tools");
 try {
-  const customToolsFiles = readFileSync(customToolsPath, { encoding: "utf-8" })
-    .split("\n")
-    .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
-
-  customToolsFiles.forEach((file) => {
-    const toolModule = require(resolve(customToolsPath, file));
-    if (toolModule.llmTools && Array.isArray(toolModule.llmTools)) {
-      customTools.push(...toolModule.llmTools);
+  // 遍历 custom-tools文件夹中的所有文件
+  readdirSync(customToolsFolderPath).forEach((file) => {
+    const filePath = resolve(customToolsFolderPath, file);
+    // 只处理.ts和.js文件
+    if (file.endsWith(".ts") || file.endsWith(".js")) {
+      try {
+        // 动态导入文件
+        const toolModule = require(filePath);
+        if (toolModule.default && Array.isArray(toolModule.default)) {
+          customTools.push(...toolModule.default);
+        } else if (toolModule.llmTools && Array.isArray(toolModule.llmTools)) {
+          customTools.push(...toolModule.llmTools);
+        }
+      } catch (error) {
+        console.error(`Error loading tool from ${filePath}:`, error);
+      }
     }
   });
 } catch (error) {
