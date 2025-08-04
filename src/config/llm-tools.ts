@@ -80,7 +80,7 @@ const defaultTools: LLMTool[] = [
 
 // 如果有custom-tools文件夹，收集custom-tools文件夹中的文件导出的所有tools
 const customTools: LLMTool[] = [];
-const customToolsPath = resolve(__dirname, "../custom-tools");
+const customToolsPath = resolve(__dirname, "./custom-tools");
 try {
   const customToolsFiles = readFileSync(customToolsPath, { encoding: "utf-8" })
     .split("\n")
