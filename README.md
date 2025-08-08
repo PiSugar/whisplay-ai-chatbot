@@ -5,7 +5,7 @@
 This is a pocket-sized AI chatbot device built using a Raspberry Pi Zero 2w. Just press the button, speak, and it talks back—like a futuristic walkie-talkie with a mind of its own.
 
 Test Video:
-https://www.youtube.com/watch?v=lOVA0Gui-4Q
+[https://www.youtube.com/watch?v=lOVA0Gui-4Q](https://www.youtube.com/playlist?list=PLpTS9YM-tG_mW5H7Xs2EO0qvlAI-Jm1e_)
 
 ## Hardware
 
