@@ -51,11 +51,12 @@ const chatWithLLMStream = async (
           role: msg.role,
           content: msg.content,
         })),
+        think: false,
         stream: true,
         options: {
           temperature: 0.7,
         },
-        tools: llmTools,
+        // tools: llmTools,
       },
       {
         headers: {
