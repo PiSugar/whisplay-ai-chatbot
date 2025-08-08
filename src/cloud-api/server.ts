@@ -14,6 +14,10 @@ import {
   chatWithLLMStream as OpenAILLMStream,
   resetChatHistory as OpenAIResetChatHistory,
 } from "./openai-llm";
+import {
+  chatWithLLMStream as OllamaLLMStream,
+  resetChatHistory as OllamaResetChatHistory,
+} from "./ollama-llm";
 import VolcengineTTS from "./volcengine-tts";
 import OpenAITTS from "./openai-tts";
 
@@ -69,6 +73,10 @@ switch (llmServer) {
   case "OPENAI":
     chatWithLLMStream = OpenAILLMStream;
     resetChatHistory = OpenAIResetChatHistory;
+    break;
+  case "OLLAMA":
+    chatWithLLMStream = OllamaLLMStream;
+    resetChatHistory = OllamaResetChatHistory;
     break;
   default:
     console.warn(

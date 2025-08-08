@@ -8,8 +8,8 @@ dotenv.config();
 // Tencent Cloud ASR
 const SECRET_ID = process.env.TENCENT_SECRET_ID || "";
 const SECRET_KEY = process.env.TENCENT_SECRET_KEY || "";
-const ASR_ENDPOINT = process.env.TENCENT_ASR_ENDPOINT || "";
-const TTS_ENDPOINT = process.env.TENCENT_TTS_ENDPOINT || "";
+const ASR_ENDPOINT = process.env.TENCENT_ASR_ENDPOINT || "asr.tencentcloudapi.com";
+const TTS_ENDPOINT = process.env.TENCENT_TTS_ENDPOINT || "tts.tencentcloudapi.com";
 
 const isTencentASRConfigValid = () => {
   if (!SECRET_ID || !SECRET_KEY || !ASR_ENDPOINT) {
