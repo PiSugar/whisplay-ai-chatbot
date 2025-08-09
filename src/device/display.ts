@@ -216,7 +216,7 @@ export class WhisplayDisplay {
       ([key, value]) => (this.currentStatus as any)[key] !== value
     );
 
-    const isTextChanged = !onlySendText && changedValues.some(([key]) => key === "text");
+    const isTextChanged = changedValues.some(([key]) => key === "text");
     if (isTextChanged) {
       this.sendingText = text;
     }
