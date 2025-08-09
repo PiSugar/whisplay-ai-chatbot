@@ -17,14 +17,15 @@ interface Status {
 const MAX_CHARACTERS = 25 * 6; // 25 characters per line, 6 lines
 
 const autoCropText = (text: string): string => {
-  if (text.length <= MAX_CHARACTERS) {
-    return text;
-  }
-  const { sentences, remaining } = splitSentences(text);
-  while (sentences.join(" ").length > MAX_CHARACTERS && sentences.length > 0) {
-    sentences.shift();
-  }
-  return sentences.join(" ") + remaining;
+  return text;
+  // if (text.length <= MAX_CHARACTERS) {
+  //   return text;
+  // }
+  // const { sentences, remaining } = splitSentences(text);
+  // while (sentences.join(" ").length > MAX_CHARACTERS && sentences.length > 0) {
+  //   sentences.shift();
+  // }
+  // return sentences.join(" ") + remaining;
 };
 
 export class WhisplayDisplay {

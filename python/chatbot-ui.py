@@ -9,21 +9,16 @@ import time
 import socket
 import json
 import sys
+import threading
+# import difflib
 
 from whisplay import WhisplayBoard
-import threading
 
 scroll_thread = None
 scroll_stop_event = threading.Event()
+
 def rgb565_to_rgb255(color_565):
-    """将 RGB565 颜色值转换为 (R, G, B) 元组，每个分量范围为 0-255。
-
-    Args:
-        color_565: 一个整数，表示 16 位的 RGB565 颜色值。
-
-    Returns:
-        一个包含三个整数的元组 (R, G, B)，分别代表红色、绿色和蓝色分量，范围为 0-255。
-    """
+    """将 RGB565 颜色值转换为 (R, G, B) 元组，每个分量范围为 0-255。"""
     red_5bit = (color_565 >> 11) & 0x1F
     green_6bit = (color_565 >> 5) & 0x3F
     blue_5bit = color_565 & 0x1F
@@ -33,15 +28,7 @@ def rgb565_to_rgb255(color_565):
     return (red_8bit, green_8bit, blue_8bit)
 
 def hex_to_rgb255(hex_color):
-    """将十六进制颜色代码转换为 (R, G, B) 元组，每个分量范围为 0-255。
-
-    Args:
-        hex_color: 一个字符串，表示 6 位或 8 位的十六进制颜色代码 (例如 "#FF0000" 或 "#FF0000FF")。
-
-    Returns:
-        一个包含三个整数的元组 (R, G, B)，分别代表红色、绿色和蓝色分量，范围为 0-255。
-        如果输入的十六进制颜色代码格式不正确，则返回 None。
-    """
+    """将十六进制颜色代码转换为 (R, G, B) 元组，每个分量范围为 0-255。"""
     hex_color = hex_color.lstrip("#")
     if not all(c in "0123456789abcdefABCDEF" for c in hex_color):
         return None
@@ -54,21 +41,12 @@ def hex_to_rgb255(hex_color):
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
-        # Alpha 通道在这里被忽略，但你可以根据需要使用它
         return (r, g, b)
     else:
         return None
 
 def get_rgb255_from_any(rgbled):
-    """自动检测输入格式并转换为 RGB (0-255) 元组。
-
-    Args:
-        rgbled: 可以是 RGB565 格式的整数或十六进制颜色字符串。
-
-    Returns:
-        一个包含三个整数的元组 (R, G, B)，范围为 0-255。
-        如果无法识别或转换格式，则返回 None。
-    """
+    """自动检测输入格式并转换为 RGB (0-255) 元组。"""
     if isinstance(rgbled, int):
         if 0 <= rgbled <= 0xFFFF:
             return rgb565_to_rgb255(rgbled)
@@ -242,111 +220,244 @@ def render_top_area(status_text, emoji_text, font_path, image_width,
 
     return image, top_height
 
-def render_scroll_info_area_dynamic_font(info_text, font_path, scroll_width, scroll_height, min_font_size=20, max_font_size=20):
-    """
-    根据内容高度和屏幕高度动态调整字体大小，如果能完整显示则使用最大字体，否则使用指定字体大小滚动显示。
+class OptimizedScrollRenderer:
+    """优化的滚动文本渲染器"""
+    
+    def __init__(self, font_path, scroll_width, scroll_height, min_font_size=20, max_font_size=20):
+        self.font_path = font_path
+        self.scroll_width = scroll_width
+        self.scroll_height = scroll_height
+        self.min_font_size = min_font_size
+        self.max_font_size = max_font_size
+        self.horizontal_padding = 10
+        self.effective_scroll_width = scroll_width - 2 * self.horizontal_padding
+        
+        # 文本相关状态
+        self.current_text = ""
+        self.wrapped_lines = []
+        self.line_height = 0
+        self.font_size = min_font_size
+        self.font = None
+        self.total_content_height = 0
+        self.is_scrollable = False
+        
+        # 渲染缓存
+        self.line_cache = {}  # 缓存已渲染的行
+        self.cache_max_size = 50  # 最大缓存行数
+        
+    def is_text_continuation(self, old_text, new_text, threshold=0.7):
+        """判断新文本是否为旧文本的延续"""
+        if not old_text or not new_text:
+            return False
+            
+        # 如果新文本以旧文本开头，很可能是延续
+        if new_text.startswith(old_text):
+            return True
 
-    Args:
-        info_text (str): 要显示的文本内容。
-        font_path (str): 字体文件路径。
-        scroll_width (int): 滚动区域的宽度。
-        scroll_height (int): 滚动区域的高度。
-        min_font_size (int): 最小允许的字体大小。
-        max_font_size (int): 最大允许的字体大小。
+        return False
+            
+        # 使用相似度匹配
+        # similarity = difflib.SequenceMatcher(None, old_text, new_text).ratio()
+        
+        # # 检查是否有足够的相似前缀
+        # matcher = difflib.SequenceMatcher(None, old_text, new_text)
+        # match = matcher.find_longest_match(0, len(old_text), 0, len(new_text))
+        
+        # # 如果最长匹配从开头开始且占比足够大
+        # if match.a == 0 and match.b == 0 and match.size >= len(old_text) * 0.8:
+        #     return True
+            
+        # return similarity > threshold
+    
+    def setup_font_and_layout(self, text):
+        """设置字体和布局信息"""
+        # 尝试找到合适的字体大小
+        best_font_size = self.min_font_size
+        total_content_height_best_font = float('inf')
+        
+        for font_size in range(self.max_font_size, self.min_font_size - 1, -2):
+            try:
+                test_font = ImageFont.truetype(self.font_path, font_size)
+                dummy_draw = ImageDraw.Draw(Image.new("RGB", (self.scroll_width, 1000)))
+                lines = wrap_text(dummy_draw, text, test_font, self.effective_scroll_width)
+                ascent, descent = test_font.getmetrics()
+                line_height = ascent + descent
+                total_content_height = len(lines) * line_height + cornerHeight
+                
+                if total_content_height <= self.scroll_height:
+                    best_font_size = font_size
+                    total_content_height_best_font = total_content_height
+                    break
+            except Exception as e:
+                continue
+        
+        # 设置字体和布局参数
+        if total_content_height_best_font <= self.scroll_height:
+            self.font_size = best_font_size
+            self.is_scrollable = False
+        else:
+            self.font_size = self.min_font_size
+            self.is_scrollable = True
+            
+        self.font = ImageFont.truetype(self.font_path, self.font_size)
+        dummy_draw = ImageDraw.Draw(Image.new("RGB", (self.scroll_width, 1000)))
+        self.wrapped_lines = wrap_text(dummy_draw, text, self.font, self.effective_scroll_width)
+        ascent, descent = self.font.getmetrics()
+        self.line_height = ascent + descent
+        self.total_content_height = len(self.wrapped_lines) * self.line_height + cornerHeight
+    
+    def render_line(self, line_index):
+        """渲染单行文本，使用缓存优化"""
+        if line_index in self.line_cache:
+            return self.line_cache[line_index]
+            
+        if line_index >= len(self.wrapped_lines):
+            return None
+            
+        line_text = self.wrapped_lines[line_index]
+        line_img = Image.new("RGBA", (self.scroll_width, self.line_height), (0, 0, 0, 255))
+        draw = ImageDraw.Draw(line_img)
+        draw_mixed_text(draw, line_img, line_text, self.font, (self.horizontal_padding, 0))
+        
+        # 缓存管理
+        if len(self.line_cache) >= self.cache_max_size:
+            # 删除最旧的缓存项
+            oldest_key = next(iter(self.line_cache))
+            del self.line_cache[oldest_key]
+            
+        self.line_cache[line_index] = line_img
+        return line_img
+    
+    def render_visible_area(self, y_offset):
+        """渲染可见区域"""
+        if not self.is_scrollable:
+            # 非滚动模式，直接居中显示
+            scroll_img = Image.new("RGBA", (self.scroll_width, self.scroll_height), (0, 0, 0, 255))
+            draw = ImageDraw.Draw(scroll_img)
+            y_start = (self.scroll_height - self.total_content_height) // 2
+            
+            for i, line in enumerate(self.wrapped_lines):
+                draw_mixed_text(draw, scroll_img, line, self.font, 
+                              (self.horizontal_padding, y_start + i * self.line_height))
+            return scroll_img
+        
+        # 滚动模式，按需渲染
+        frame = Image.new("RGBA", (self.scroll_width, self.scroll_height), (0, 0, 0, 255))
+        
+        # 计算需要渲染的行范围
+        start_line = max(0, y_offset // self.line_height)
+        end_line = min(len(self.wrapped_lines), 
+                      (y_offset + self.scroll_height) // self.line_height + 2)
+        
+        # 渲染可见行
+        for line_idx in range(start_line, end_line):
+            line_img = self.render_line(line_idx)
+            if line_img:
+                line_y = line_idx * self.line_height - y_offset
+                if -self.line_height < line_y < self.scroll_height:
+                    frame.paste(line_img, (0, line_y))
+        
+        return frame
+    
+    def update_text(self, new_text):
+        """更新文本内容"""
+        old_text = self.current_text
+        self.current_text = new_text
+        
+        # 检查是否为延续文本
+        is_continuation = self.is_text_continuation(old_text, new_text)
+        
+        if not is_continuation:
+            # 不是延续，清空缓存
+            self.line_cache.clear()
+        
+        self.setup_font_and_layout(new_text)
+        return is_continuation
 
-    Returns:
-        Image.Image: 包含渲染文本的图像。
-    """
-    best_font_size = min_font_size
-    total_content_height_best_font = float('inf')
-    horizontal_padding=10 #左右间距
-    effective_scroll_width = scroll_width - 2 * horizontal_padding
-    # 尝试从最大字体到最小字体，找到能在屏幕内完整显示的最大字体
-    for font_size in range(max_font_size, min_font_size - 1, -2):  # 逆序尝试，步长为2以提高效率
-        try:
-            info_font = ImageFont.truetype(font_path, font_size)
-            dummy_draw = ImageDraw.Draw(Image.new("RGB", (scroll_width, 1000)))
-            lines = wrap_text(dummy_draw, info_text, info_font, effective_scroll_width)
-            ascent, descent = info_font.getmetrics()
-            line_height = ascent + descent
-            total_content_height = len(lines) * line_height+cornerHeight
-
-            if total_content_height <= scroll_height:
-                best_font_size = font_size
-                total_content_height_best_font = total_content_height
-                break  # 找到合适的字体大小，停止尝试
-        except IOError:
-            print(f"Error: Font file not found at {font_path}")
-            return Image.new("RGBA", (scroll_width, scroll_height), (0, 0, 0, 255))
-        except Exception as e:
-            print(f"Error creating font with size {font_size}: {e}")
-            continue
-
-    # 如果找到能在屏幕内完整显示的字体
-    if total_content_height_best_font <= scroll_height:
-        info_font = ImageFont.truetype(font_path, best_font_size)
-        dummy_draw = ImageDraw.Draw(Image.new("RGB", (scroll_width, 1000)))
-        lines = wrap_text(dummy_draw, info_text, info_font, effective_scroll_width)
-        ascent, descent = info_font.getmetrics()
-        line_height = ascent + descent
-        output_height = scroll_height  # 高度为屏幕高度
-        scroll_img = Image.new("RGBA", (scroll_width, output_height), (0, 0, 0, 255))
-        draw = ImageDraw.Draw(scroll_img)
-        y_offset = (scroll_height - total_content_height_best_font) // 2 # 垂直居中显示
-        for i, line in enumerate(lines):
-            draw_mixed_text(draw, scroll_img, line, info_font, (horizontal_padding, y_offset + i * line_height))
-        return scroll_img
-    else:
-        # 否则，使用原始的滚动绘制逻辑
-        info_font = ImageFont.truetype(font_path, min_font_size) # 使用最小字体或您指定的默认滚动字体大小
-        dummy_draw = ImageDraw.Draw(Image.new("RGB", (scroll_width, 1000)))
-        lines = wrap_text(dummy_draw, info_text, info_font, scroll_width)
-        ascent, descent = info_font.getmetrics()
-        line_height = ascent + descent
-        total_content_height = len(lines) * line_height+cornerHeight
-        output_height = max(scroll_height, total_content_height)
-        scroll_img = Image.new("RGBA", (scroll_width, output_height), (0, 0, 0, 255))
-        draw = ImageDraw.Draw(scroll_img)
-        for i, line in enumerate(lines):
-            draw_mixed_text(draw, scroll_img, line, info_font, (horizontal_padding, i * line_height))
-        return scroll_img
-
-def scroll_info_area(top_image: Image.Image, info_scroll_img: Image.Image, whisplay,
-                     scroll_speed=2, delay=0.05, stop_event=None):
-    screen_width = whisplay.LCD_WIDTH
-    screen_height = whisplay.LCD_HEIGHT
-    scroll_height = screen_height - scroll_top
-    scroll_img_height = info_scroll_img.height
-
-    while not stop_event.is_set():
-        for y_offset in range(0, max(0, scroll_img_height - scroll_height + 1), scroll_speed):
-            if stop_event.is_set():
+class ScrollManager:
+    """滚动管理器"""
+    
+    def __init__(self, whisplay, renderer):
+        self.whisplay = whisplay
+        self.renderer = renderer
+        self.scroll_thread = None
+        self.scroll_stop_event = threading.Event()
+        self.current_y_offset = 0
+        self.scroll_lock = threading.Lock()
+        
+    def scroll_content(self, scroll_speed=2, delay=0.05):
+        """滚动内容"""
+        if not self.renderer.is_scrollable:
+            # 非滚动内容，直接显示
+            frame = self.renderer.render_visible_area(0)
+            rgb565_data = image_to_rgb565(frame, self.whisplay.LCD_WIDTH, 
+                                        frame.height)
+            self.whisplay.draw_image(0, scroll_top, self.whisplay.LCD_WIDTH, 
+                                   frame.height, rgb565_data)
+            return
+        
+        max_scroll = max(0, self.renderer.total_content_height - self.renderer.scroll_height)
+        
+        while not self.scroll_stop_event.is_set():
+            # 滚动循环
+            for y_offset in range(0, max_scroll + 1, scroll_speed):
+                if self.scroll_stop_event.is_set():
+                    return
+                    
+                with self.scroll_lock:
+                    self.current_y_offset = y_offset
+                    frame = self.renderer.render_visible_area(y_offset)
+                    
+                rgb565_data = image_to_rgb565(frame, self.whisplay.LCD_WIDTH, 
+                                            frame.height)
+                self.whisplay.draw_image(0, scroll_top, self.whisplay.LCD_WIDTH, 
+                                       frame.height, rgb565_data)
+                time.sleep(delay)
+            
+            # 滚动到底部后暂停
+            time.sleep(1)
+    
+    def update_text(self, new_text, scroll_speed=2):
+        """更新滚动文本"""
+        with self.scroll_lock:
+            is_continuation = self.renderer.update_text(new_text)
+            
+            if is_continuation and self.scroll_thread and self.scroll_thread.is_alive():
+                # 是延续文本且正在滚动，不重置滚动位置
+                print("[Scroll] 检测到延续文本，继续当前滚动")
                 return
-            frame = Image.new("RGBA", (screen_width, scroll_height), (0, 0, 0, 255))
-            frame = info_scroll_img.crop((0, y_offset, screen_width, min(scroll_img_height, y_offset + scroll_height)))
-            # frame.paste(crop, (0, scroll_top))
-            rgb565_data = image_to_rgb565(frame, screen_width,  scroll_height)
-            whisplay.draw_image(0, scroll_top, screen_width, scroll_height, rgb565_data)
-            time.sleep(delay)
+            
+            # 停止当前滚动
+            if self.scroll_thread and self.scroll_thread.is_alive():
+                self.scroll_stop_event.set()
+                self.scroll_thread.join(timeout=1.0)
+            
+            # 重置滚动状态
+            self.scroll_stop_event = threading.Event()
+            self.current_y_offset = 0
+            
+            # 启动新的滚动线程
+            self.scroll_thread = threading.Thread(
+                target=self.scroll_content,
+                kwargs={'scroll_speed': scroll_speed, 'delay': 0.05}
+            )
+            self.scroll_thread.daemon = True
+            self.scroll_thread.start()
 
-        while not stop_event.is_set():
-            time.sleep(delay)
-        return
-
-
-# 全局变量分别保存当前状态、emoji、滚动文本以及滚动线程和控制事件
+# 全局变量
 current_status = ""
 current_emoji = ""
 current_text = ""
 current_battery_level = None
 current_battery_color = None
-scroll_thread = None
-scroll_stop_event = threading.Event()
+scroll_manager = None
 top_image = None
-clients = {} # 用于存储客户端连接
-def update_display(whisplay, font_path, status=None, emoji=None, text=None, scroll_speed=2,battery_level=None,battery_color=None):
-    global current_status, current_emoji, current_text,current_battery_level,current_battery_color
-    global scroll_thread, scroll_stop_event, top_image,scroll_top
+clients = {}
+
+def update_display(whisplay, font_path, status=None, emoji=None, text=None, 
+                  scroll_speed=2, battery_level=None, battery_color=None):
+    global current_status, current_emoji, current_text, current_battery_level
+    global current_battery_color, scroll_manager, top_image, scroll_top
 
     top_changed = False
 
@@ -362,44 +473,34 @@ def update_display(whisplay, font_path, status=None, emoji=None, text=None, scro
     if battery_color is not None and battery_color != current_battery_color:
         current_battery_color = battery_color
         top_changed = True
+        
     if top_changed:
         print("重绘顶部")
-        top_image ,scroll_top= render_top_area(current_status, current_emoji, font_path, whisplay.LCD_WIDTH,battery_level=current_battery_level,battery_color=current_battery_color)
-        rgb565_data=image_to_rgb565(top_image,whisplay.LCD_WIDTH,scroll_top)
+        top_image, scroll_top = render_top_area(current_status, current_emoji, 
+                                               font_path, whisplay.LCD_WIDTH,
+                                               battery_level=current_battery_level,
+                                               battery_color=current_battery_color)
+        rgb565_data = image_to_rgb565(top_image, whisplay.LCD_WIDTH, scroll_top)
         whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, scroll_top, rgb565_data)
+        
+        # 重新初始化滚动管理器（因为scroll_top可能改变）
+        if scroll_manager:
+            renderer = OptimizedScrollRenderer(font_path, whisplay.LCD_WIDTH,
+                                             whisplay.LCD_HEIGHT - scroll_top)
+            renderer.update_text(current_text)
+            scroll_manager = ScrollManager(whisplay, renderer)
 
     if text is not None and text != current_text:
         current_text = text
-
-        # 停止原有滚动线程
-        if scroll_thread and scroll_thread.is_alive():
-            scroll_stop_event.set()
-            scroll_thread.join()
-        scroll_stop_event = threading.Event()
-
-        scroll_img  = render_scroll_info_area_dynamic_font(
-                info_text=current_text,
-                font_path=font_path,
-                scroll_width=whisplay.LCD_WIDTH,
-                scroll_height=whisplay.LCD_HEIGHT - scroll_top
-        )
-
-
-        scroll_thread = threading.Thread(
-            target=scroll_info_area,
-            args=(top_image, scroll_img, whisplay),
-            kwargs={'scroll_speed': scroll_speed, 'delay': 0.05, 'stop_event': scroll_stop_event}
-        )
-        scroll_thread.start()
-       
-
-    elif top_changed and scroll_thread is None:
-        # 没有滚动线程，也没新文本，只需要更新 top 部分
-        frame = Image.new("RGBA", (whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), (0, 0, 0, 255))
-        frame.paste(top_image, (0, 0))
-        rgb565_data = image_to_rgb565(frame, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)
-        whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, rgb565_data)
-
+        
+        # 初始化滚动管理器（如果还没有）
+        if scroll_manager is None:
+            renderer = OptimizedScrollRenderer(font_path, whisplay.LCD_WIDTH,
+                                             whisplay.LCD_HEIGHT - scroll_top)
+            scroll_manager = ScrollManager(whisplay, renderer)
+        
+        # 更新文本
+        scroll_manager.update_text(current_text, scroll_speed)
 
 def send_to_all_clients(message):
     """向所有连接的客户端发送消息"""
@@ -407,10 +508,14 @@ def send_to_all_clients(message):
     for addr, client_socket in clients.items():
         try:
             client_socket.sendall(message_json)
-            print(f"[Server] 向客户端 {addr} 发送通知: {message}")
+            # message 太长中间使用省略号
+            if len(message_json) > 100:
+                display_message = message_json[:50] + b"..." + message_json[-50:]
+            else:
+                display_message = message_json
+            print(f"[Server] 向客户端 {addr} 发送通知: {display_message}")
         except Exception as e:
             print(f"[Server] 向客户端 {addr} 发送通知失败: {e}")
-            # 可以选择在这里处理断开的客户端
 
 def on_button_pressed():
     """按钮按下时执行的函数"""
@@ -419,8 +524,8 @@ def on_button_pressed():
     send_to_all_clients(notification)
 
 def on_button_release():
-    """按钮按下时执行的函数"""
-    print("[Server] 按钮被按下")
+    """按钮释放时执行的函数"""
+    print("[Server] 按钮被释放")
     notification = {"event": "button_released"}
     send_to_all_clients(notification)
 
@@ -434,7 +539,7 @@ def handle_client(client_socket, addr, whisplay, font_path):
             if not data:
                 break
             buffer += data
-            # print(f"[Socket - {addr}] 当前缓存 buffer: {repr(buffer)}")
+            
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
                 if not line.strip():
@@ -450,20 +555,26 @@ def handle_client(client_socket, addr, whisplay, font_path):
                     brightness = content.get("brightness", None)
                     scroll_speed = content.get("scroll_speed", 2)
                     response_to_client = content.get("response", None)
-                    battery_level = content.get("battery_level", None)  # Get battery level
-                    battery_color = content.get("battery_color", None)  # Get battery status
+                    battery_level = content.get("battery_level", None)
+                    battery_color = content.get("battery_color", None)
 
                     if rgbled:
                         rgb255_tuple = get_rgb255_from_any(rgbled)
-                        whisplay.set_rgb_fade(*rgb255_tuple,duration_ms=500)
+                        whisplay.set_rgb_fade(*rgb255_tuple, duration_ms=500)
+                    
                     if battery_color:
                         battery_tuple = get_rgb255_from_any(battery_color)
                     else:
-                        battery_tuple=(0,0,0)
+                        battery_tuple = (0, 0, 0)
+                        
                     if brightness:
                         whisplay.set_backlight(brightness)
-                    if (text is not None) or (status is not None) or (emoji is not None)or (battery_level is not None)or (battery_color is not None):
-                        update_display(whisplay, font_path, status=status, emoji=emoji, text=text, scroll_speed=scroll_speed,battery_level=battery_level,battery_color=battery_tuple)
+                        
+                    if (text is not None) or (status is not None) or (emoji is not None) or \
+                       (battery_level is not None) or (battery_color is not None):
+                        update_display(whisplay, font_path, status=status, emoji=emoji, 
+                                     text=text, scroll_speed=scroll_speed,
+                                     battery_level=battery_level, battery_color=battery_tuple)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:
@@ -473,6 +584,7 @@ def handle_client(client_socket, addr, whisplay, font_path):
                             print(f"[Socket - {addr}] 发送响应: {response_to_client}")
                         except Exception as e:
                             print(f"[Socket - {addr}] 发送响应错误: {e}")
+                            
                 except json.JSONDecodeError:
                     client_socket.send(b"ERROR: invalid JSON\n")
                 except Exception as e:
@@ -489,10 +601,10 @@ def handle_client(client_socket, addr, whisplay, font_path):
 def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.ttf"):
     whisplay = WhisplayBoard()
     global cornerHeight
-    cornerHeight=whisplay.CornerHeight
+    cornerHeight = whisplay.CornerHeight
     print(f"[LCD] 初始化完成，大小: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
 
-    # 启动时先显示img/logo.png
+    # 启动时先显示logo
     logo_path = os.path.join("img", "logo.png")
     if os.path.exists(logo_path):
         logo_image = Image.open(logo_path).convert("RGBA")
@@ -501,28 +613,31 @@ def start_socket_server(host='0.0.0.0', port=12345, font_path="NotoSansSC-Bold.t
         whisplay.set_backlight(100)
         whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, rgb565_data)
 
-    # 注册按钮按下事件
-
-    whisplay.on_button_press(on_button_pressed) # 使用模拟的注册
-    whisplay.on_button_release(on_button_release) # 使用模拟的注册
+    # 注册按钮事件
+    whisplay.on_button_press(on_button_pressed)
+    whisplay.on_button_release(on_button_release)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # 添加这一行
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((host, port))
-    server_socket.listen(1) # 允许更多连接
+    server_socket.listen(5)  # 允许更多连接
     print(f"[Socket] 正在监听 {host}:{port} ...")
 
     try:
         while True:
             client_socket, addr = server_socket.accept()
-            client_thread = threading.Thread(target=handle_client, args=(client_socket, addr, whisplay, font_path))
-            client_thread.daemon = True # 设置为守护线程，主线程退出时子线程也会退出
+            client_thread = threading.Thread(target=handle_client, 
+                                           args=(client_socket, addr, whisplay, font_path))
+            client_thread.daemon = True
             client_thread.start()
     except KeyboardInterrupt:
         print("[Socket] 服务器停止")
+        # 停止所有滚动线程
+        if scroll_manager and scroll_manager.scroll_thread:
+            scroll_manager.scroll_stop_event.set()
+            scroll_manager.scroll_thread.join(timeout=1.0)
     finally:
         server_socket.close()
-        # 可以选择在这里等待所有客户端线程结束，如果需要更优雅的关闭
 
 
 if __name__ == "__main__":
