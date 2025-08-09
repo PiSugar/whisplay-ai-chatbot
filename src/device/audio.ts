@@ -245,7 +245,7 @@ class StreamResponser {
       this.speakArray.push(this.ttsFunc(this.partialContent));
       this.partialContent = "";
     }
-    this.textCallback?.(this.parsedSentences.join(""));
+    this.textCallback?.(this.parsedSentences.join(" "));
     this.parsedSentences.length = 0;
   };
 
