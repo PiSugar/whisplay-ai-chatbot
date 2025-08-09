@@ -17,6 +17,7 @@ dotenv.config();
 const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
+const enableThinking = process.env.ENABLE_THINKING === "true";
 
 const messages: Message[] = [
   {
@@ -57,11 +58,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       `${ollamaEndpoint}/api/chat`,
       {
         model: ollamaModel,
-        messages: messages.map(msg => ({
+        messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
         })),
-        think: false,
+        think: enableThinking,
         stream: true,
         options: {
           temperature: 0.7,
@@ -84,7 +85,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       for (const line of filteredLines) {
         try {
           const parsedData = JSON.parse(line);
-          
+
           // Handle content from Ollama
           if (parsedData.message?.content) {
             const content = parsedData.message.content;
@@ -95,7 +96,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           // Handle thinking from Ollama
           if (parsedData.message?.thinking) {
             const thinking = parsedData.message.thinking;
-            partialThinkingCallback?.(partialThinking);
+            partialThinkingCallback?.(thinking);
             partialThinking += thinking;
           }
 
@@ -103,7 +104,6 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           if (parsedData.message?.tool_calls) {
             functionCallsPackages.push(parsedData.message.tool_calls);
           }
-          
         } catch (error) {
           console.error("Error parsing data:", error, line);
         }

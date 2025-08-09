@@ -16,6 +16,7 @@ dotenv.config();
 // Doubao LLM
 const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN || "";
 const doubaoLLMModel = process.env.VOLCENGINE_DOUBAO_LLM_MODEL || "doubao-1-5-lite-32k-250115"; // Default model
+const enableThinking = process.env.ENABLE_THINKING === "true";
 
 const messages: Message[] = [
   {
@@ -63,6 +64,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         messages,
         stream: true,
         tools: llmTools,
+        think: enableThinking,
       },
       {
         headers: {
