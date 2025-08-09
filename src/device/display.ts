@@ -22,7 +22,7 @@ const autoCropText = (text: string): string => {
   }
   const { sentences, remaining } = splitSentences(text);
   while (sentences.join(" ").length > MAX_CHARACTERS && sentences.length > 0) {
-    sentences.pop();
+    sentences.shift();
   }
   return sentences.join(" ") + remaining;
 };
