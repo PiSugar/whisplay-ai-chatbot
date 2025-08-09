@@ -38,6 +38,10 @@ const chatWithLLMStream = async (
     console.error("OpenAI API key is not set.");
     return;
   }
+  if (shouldResetChatHistory()) {
+    resetChatHistory();
+  }
+  updateLastMessageTime();
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;

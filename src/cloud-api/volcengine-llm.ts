@@ -40,6 +40,10 @@ const chatWithLLMStream = async (
     console.error("Doubao access token is not set.");
     return;
   }
+  if (shouldResetChatHistory()) {
+    resetChatHistory();
+  }
+  updateLastMessageTime();
   messages.push(...inputMessages);
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {

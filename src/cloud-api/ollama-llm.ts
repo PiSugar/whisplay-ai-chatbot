@@ -1,7 +1,9 @@
 import axios from "axios";
 import { get, isEmpty } from "lodash";
 import {
+  shouldResetChatHistory,
   systemPrompt,
+  updateLastMessageTime,
 } from "../config/llm-config";
 import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
@@ -13,6 +15,7 @@ dotenv.config();
 // Ollama LLM configuration
 const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
+const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
 
 const messages: Message[] = [
   {
@@ -34,6 +37,10 @@ const chatWithLLMStream = async (
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void
 ): Promise<void> => {
+  if (shouldResetChatHistory()) {
+    resetChatHistory();
+  }
+  updateLastMessageTime();
   messages.push(...inputMessages);
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
@@ -56,7 +63,7 @@ const chatWithLLMStream = async (
         options: {
           temperature: 0.7,
         },
-        // tools: llmTools,
+        tools: ollamaEnableTools ? llmTools : [],
       },
       {
         headers: {
