@@ -21,10 +21,10 @@ const autoCropText = (text: string): string => {
     return text;
   }
   const { sentences, remaining } = splitSentences(text);
-  while (sentences.join("").length > MAX_CHARACTERS && sentences.length > 0) {
+  while (sentences.join(" ").length > MAX_CHARACTERS && sentences.length > 0) {
     sentences.pop();
   }
-  return sentences.join("") + remaining;
+  return sentences.join(" ") + remaining;
 };
 
 export class WhisplayDisplay {
@@ -177,6 +177,9 @@ export class WhisplayDisplay {
   }
 
   async display(newStatus: Partial<Status> = {}): Promise<void> {
+    if (newStatus.text) {
+      newStatus.text = autoCropText(newStatus.text);
+    }
     const {
       status,
       emoji,
@@ -198,7 +201,7 @@ export class WhisplayDisplay {
 
     this.currentStatus.status = status;
     this.currentStatus.emoji = emoji;
-    this.currentStatus.text = autoCropText(text);
+    this.currentStatus.text = text;
     this.currentStatus.RGB = RGB;
     this.currentStatus.brightness = brightness;
     this.currentStatus.battery_level = battery_level;
