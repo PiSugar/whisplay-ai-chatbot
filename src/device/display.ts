@@ -59,9 +59,12 @@ export class WhisplayDisplay {
     });
     this.queueSendingInterval = setInterval(() => {
       if (this.sendingText) {
-        this.display({
-          text: this.sendingText,
-        });
+        this.display(
+          {
+            text: this.sendingText,
+          },
+          true
+        );
         this.sendingText = "";
       }
     }, 2000); // Adjust the interval as needed
@@ -189,7 +192,10 @@ export class WhisplayDisplay {
     return this.currentStatus;
   }
 
-  async display(newStatus: Partial<Status> = {}): Promise<void> {
+  async display(
+    newStatus: Partial<Status> = {},
+    onlySendText: boolean = false
+  ): Promise<void> {
     if (newStatus.text !== undefined) {
       newStatus.text = autoCropText(newStatus.text);
     }
@@ -225,7 +231,9 @@ export class WhisplayDisplay {
 
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;
-    delete changedValuesObj.text; // text is sent in a queue
+    if (!onlySendText) {
+      delete changedValuesObj.text; // text is sent in a queue
+    }
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) console.log("send data:", data);
     this.sendToDisplay(data);
