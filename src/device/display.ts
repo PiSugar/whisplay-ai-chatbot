@@ -2,6 +2,7 @@ import { exec } from "child_process";
 import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag, splitSentences } from "../utils";
+import { omit } from "lodash";
 
 interface Status {
   status: string;
@@ -14,17 +15,21 @@ interface Status {
   battery_level: number;
 }
 
-const MAX_CHARACTERS = 25 * 6; // 25 characters per line, 6 lines
+const MAX_CHARACTERS = 25 * 10; // 25 characters per line, 6 lines
 
 const autoCropText = (text: string): string => {
   if (text.length <= MAX_CHARACTERS) {
     return text;
   }
   const { sentences, remaining } = splitSentences(text);
-  while (sentences.join("").length > MAX_CHARACTERS && sentences.length > 0) {
-    sentences.pop();
+  const sentencesToDisplay = [...sentences];
+  while (
+    sentencesToDisplay.join("").length > MAX_CHARACTERS &&
+    sentencesToDisplay.length > 0
+  ) {
+    sentencesToDisplay.shift();
   }
-  return sentences.join("") + remaining;
+  return sentencesToDisplay.join("") + remaining;
 };
 
 export class WhisplayDisplay {
@@ -44,14 +49,22 @@ export class WhisplayDisplay {
   private buttonReleasedCallback: () => void = () => {};
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
-
-  
+  private sendingText: string = "";
+  private queueSendingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.startPythonProcess();
     this.isReady = new Promise<void>((resolve) => {
       this.connectWithRetry(15, resolve);
     });
+    this.queueSendingInterval = setInterval(() => {
+      if (this.sendingText) {
+        this.display({
+          text: this.sendingText,
+        });
+        this.sendingText = "";
+      }
+    }, 2000); // Adjust the interval as needed
   }
 
   startPythonProcess(): void {
@@ -177,6 +190,9 @@ export class WhisplayDisplay {
   }
 
   async display(newStatus: Partial<Status> = {}): Promise<void> {
+    if (newStatus.text !== undefined) {
+      newStatus.text = autoCropText(newStatus.text);
+    }
     const {
       status,
       emoji,
@@ -195,10 +211,13 @@ export class WhisplayDisplay {
     );
 
     const isTextChanged = changedValues.some(([key]) => key === "text");
+    if (isTextChanged) {
+      this.sendingText = text;
+    }
 
     this.currentStatus.status = status;
     this.currentStatus.emoji = emoji;
-    this.currentStatus.text = autoCropText(text);
+    this.currentStatus.text = text;
     this.currentStatus.RGB = RGB;
     this.currentStatus.brightness = brightness;
     this.currentStatus.battery_level = battery_level;
@@ -206,6 +225,7 @@ export class WhisplayDisplay {
 
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;
+    delete changedValuesObj.text; // text is sent in a queue
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) console.log("send data:", data);
     this.sendToDisplay(data);
