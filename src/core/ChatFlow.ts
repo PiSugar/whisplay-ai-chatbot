@@ -60,7 +60,7 @@ class ChatFlow {
       this.thinkingSentences.push(...sentences);
       const displayText = this.thinkingSentences.join(" ");
       display({
-        status: "thinking",
+        status: "Thinking",
         emoji: "🤔",
         text: displayText,
         RGB: "#ff6800", // yellow

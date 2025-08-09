@@ -191,7 +191,7 @@ class StreamResponser {
     sentencesCallback?: SentencesCallback,
     textCallback?: TextCallback
   ) {
-    this.ttsFunc = ttsFunc;
+    this.ttsFunc = (text) => ttsFunc(purifyText(text));
     this.sentencesCallback = sentencesCallback;
     this.textCallback = textCallback;
   }
@@ -213,6 +213,7 @@ class StreamResponser {
         this.playEndResolve();
         this.isStartSpeak = false;
         this.speakArray.length = 0;
+        this.speakArray = [];
       }
     };
     playNext();
@@ -226,7 +227,7 @@ class StreamResponser {
       this.sentencesCallback?.(this.parsedSentences);
       this.speakArray.push(
         ...sentences.map((item) =>
-          this.ttsFunc(purifyText(item)).finally(() => {
+          this.ttsFunc(item).finally(() => {
             if (!this.isStartSpeak) {
               this.playAudioInOrder();
               this.isStartSpeak = true;
@@ -256,6 +257,7 @@ class StreamResponser {
   };
 
   stop = (): void => {
+    this.speakArray = [];
     this.speakArray.length = 0;
     this.isStartSpeak = false;
     this.partialContent = "";
