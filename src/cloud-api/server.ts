@@ -20,6 +20,7 @@ import {
 } from "./ollama-llm";
 import VolcengineTTS from "./volcengine-tts";
 import OpenAITTS from "./openai-tts";
+import { ChatWithLLMStreamFunction, RecognizeAudioFunction, TTSProcessorFunction } from "./type";
 
 dotenv.config();
 
@@ -29,15 +30,6 @@ interface Message {
   tool_calls?: any[];
   tool_call_id?: string;
 }
-
-type RecognizeAudioFunction = (audioPath: string) => Promise<any>;
-type ChatWithLLMStreamFunction = (
-  inputMessages: Message[],
-  partialCallback: (partialAnswer: string) => void,
-  endCallBack: () => void
-) => Promise<any>;
-type ResetChatHistoryFunction = () => void;
-type TTSProcessorFunction = (text: string) => Promise<any>;
 
 let recognizeAudio: RecognizeAudioFunction = noop as any;
 let chatWithLLMStream: ChatWithLLMStreamFunction = noop as any;

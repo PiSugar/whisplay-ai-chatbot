@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 import { isEmpty } from "lodash";
 import {
   shouldResetChatHistory,
@@ -9,6 +9,7 @@ import { FunctionCall, Message } from "../type";
 import { combineFunction } from "../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../config/llm-tools";
+import { ChatWithLLMStreamFunction } from "./type";
 
 dotenv.config();
 // OpenAI LLM
@@ -29,10 +30,11 @@ const resetChatHistory = (): void => {
   });
 };
 
-const chatWithLLMStream = async (
+const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partial: string) => void,
-  endCallback: () => void
+  endCallback: () => void,
+  partialThinkingCallback?: (partialThinking: string) => void
 ): Promise<void> => {
   if (!openai) {
     console.error("OpenAI API key is not set.");
@@ -54,14 +56,20 @@ const chatWithLLMStream = async (
     tools: llmTools as any,
   });
   let partialAnswer = "";
+  let partialThinking = "";
   const functionCallsPackages: any[] = [];
   for await (const chunk of chatCompletion) {
     if (chunk.choices[0].delta.content) {
       partialCallback(chunk.choices[0].delta.content);
       partialAnswer += chunk.choices[0].delta.content;
-      if (chunk.choices[0].delta.tool_calls) {
-        functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
-      }
+    }
+    // openai does not have "thinking" field
+    // if (chunk.choices[0].delta.thinking) {
+    //   partialThinkingCallback?.(chunk.choices[0].delta.thinking);
+    //   partialThinking += chunk.choices[0].delta.thinking;
+    // }
+    if (chunk.choices[0].delta.tool_calls) {
+      functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
     }
   }
   const answer = partialAnswer;

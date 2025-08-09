@@ -15,7 +15,7 @@ battery.connect().catch(e => {
   console.error("fail to connect to battery service:", e);
 });
 battery.addListener("batteryLevel", (data: any) => {
-  console.log("battery level:", data);
+  // console.log("battery level:", data);
   display({
     battery_level: data,
   });

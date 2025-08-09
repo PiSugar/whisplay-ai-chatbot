@@ -18,7 +18,7 @@
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
     "mp3-duration": "^1.1.0",
-    "openai": "^4.95.1",
+    "openai": "^5.12.2",
     "tencentcloud-sdk-nodejs": "^4.1.16",
     "uuid": "^11.1.0",
     "ws": "^8.18.1",

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { get, isEmpty } from "lodash";
+import { get, isEmpty, partial } from "lodash";
 import {
   shouldResetChatHistory,
   systemPrompt,
@@ -9,6 +9,7 @@ import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../type";
+import { ChatWithLLMStreamFunction } from "./type";
 
 dotenv.config();
 
@@ -32,10 +33,11 @@ const resetChatHistory = (): void => {
   });
 };
 
-const chatWithLLMStream = async (
+const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
-  endCallback: () => void
+  endCallback: () => void,
+  partialThinkingCallback?: (partialThinking: string) => void
 ): Promise<void> => {
   if (shouldResetChatHistory()) {
     resetChatHistory();
@@ -47,6 +49,7 @@ const chatWithLLMStream = async (
     endResolve = resolve;
   });
   let partialAnswer = "";
+  let partialThinking = "";
   const functionCallsPackages: any[] = [];
 
   try {
@@ -87,6 +90,13 @@ const chatWithLLMStream = async (
             const content = parsedData.message.content;
             partialCallback(content);
             partialAnswer += content;
+          }
+
+          // Handle thinking from Ollama
+          if (parsedData.message?.thinking) {
+            const thinking = parsedData.message.thinking;
+            partialThinkingCallback?.(partialThinking);
+            partialThinking += thinking;
           }
 
           // Handle tool calls from Ollama

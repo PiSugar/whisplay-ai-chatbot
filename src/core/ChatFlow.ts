@@ -24,6 +24,7 @@ class ChatFlow {
   currentRecordFilePath: string = "";
   asrText: string = "";
   streamResponser: StreamResponser;
+  thinking: string = "";
 
   constructor({ dataDir }: ChatFlowConstructor) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -49,6 +50,16 @@ class ChatFlow {
       }
     );
   }
+
+  partialThinkingCallback = (partialThinking: string): void => {
+    if (this.currentFlowName !== "answer") return;
+    this.thinking += partialThinking;
+    display({
+      status: "thinking",
+      emoji: "🤔",
+      text: this.thinking,
+    });
+  };
 
   setCurrentFlow = (flowName: string): void => {
     console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
@@ -113,8 +124,8 @@ class ChatFlow {
             if (result) {
               console.log("识别结果:", result);
               this.asrText = result;
-              this.setCurrentFlow("answer");
               display({ status: "recognizing", text: result });
+              this.setCurrentFlow("answer");
             } else {
               this.setCurrentFlow("sleep");
             }
@@ -133,6 +144,7 @@ class ChatFlow {
           getPlayEndPromise,
           stop: stopPlaying,
         } = this.streamResponser;
+        this.thinking = "";
         chatWithLLMStream(
           [
             {
@@ -141,7 +153,8 @@ class ChatFlow {
             },
           ],
           partial,
-          endPartial
+          endPartial,
+          this.partialThinkingCallback,
         );
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {

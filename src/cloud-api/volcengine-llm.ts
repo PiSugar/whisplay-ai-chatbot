@@ -9,6 +9,7 @@ import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../type";
+import { ChatWithLLMStreamFunction } from "./type";
 
 dotenv.config();
 
@@ -31,10 +32,11 @@ const resetChatHistory = (): void => {
   });
 };
 
-const chatWithLLMStream = async (
+const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
-  endCallback: () => void
+  endCallback: () => void,
+  partialThinkingCallback?: (partialThinking: string) => void
 ): Promise<void> => {
   if (!doubaoAccessToken) {
     console.error("Doubao access token is not set.");
@@ -50,6 +52,7 @@ const chatWithLLMStream = async (
     endResolve = resolve;
   });
   let partialAnswer = "";
+  let partialThinking = "";
   const functionCallsPackages: any[] = [];
 
   try {
@@ -92,7 +95,13 @@ const chatWithLLMStream = async (
         const toolCalls = parsedData
           .map((item) => get(item, "choices[0].delta.tool_calls", []))
           .filter((arr) => !isEmpty(arr));
-
+        const thinking = parsedData
+          .map((item) => get(item, "choices[0].delta.thinking", ""))
+          .join("");
+        if (thinking) {
+          partialThinkingCallback?.(thinking);
+          partialThinking += thinking;
+        }
         if (toolCalls.length) {
           functionCallsPackages.push(...toolCalls);
         }
@@ -100,6 +109,7 @@ const chatWithLLMStream = async (
           partialCallback(answer);
           partialAnswer += answer;
         }
+
       } catch (error) {
         console.error("Error parsing data:", error, data);
       }
