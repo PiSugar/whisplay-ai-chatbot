@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import { resolve } from "path";
 import { Socket } from "net";
-import { getCurrentTimeTag } from "../utils";
+import { getCurrentTimeTag, splitSentences } from "../utils";
 
 interface Status {
   status: string;
@@ -13,6 +13,19 @@ interface Status {
   battery_color: string;
   battery_level: number;
 }
+
+const MAX_CHARACTERS = 25 * 6; // 25 characters per line, 6 lines
+
+const autoCropText = (text: string): string => {
+  if (text.length <= MAX_CHARACTERS) {
+    return text;
+  }
+  const { sentences, remaining } = splitSentences(text);
+  while (sentences.join("").length > MAX_CHARACTERS && sentences.length > 0) {
+    sentences.pop();
+  }
+  return sentences.join("") + remaining;
+};
 
 export class WhisplayDisplay {
   private currentStatus: Status = {
@@ -31,6 +44,8 @@ export class WhisplayDisplay {
   private buttonReleasedCallback: () => void = () => {};
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
+
+  
 
   constructor() {
     this.startPythonProcess();
@@ -183,7 +198,7 @@ export class WhisplayDisplay {
 
     this.currentStatus.status = status;
     this.currentStatus.emoji = emoji;
-    this.currentStatus.text = text;
+    this.currentStatus.text = autoCropText(text);
     this.currentStatus.RGB = RGB;
     this.currentStatus.brightness = brightness;
     this.currentStatus.battery_level = battery_level;
