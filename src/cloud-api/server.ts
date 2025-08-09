@@ -20,7 +20,7 @@ import {
 } from "./ollama-llm";
 import VolcengineTTS from "./volcengine-tts";
 import OpenAITTS from "./openai-tts";
-import { ChatWithLLMStreamFunction, RecognizeAudioFunction, TTSProcessorFunction } from "./type";
+import { ChatWithLLMStreamFunction, RecognizeAudioFunction, ResetChatHistoryFunction, TTSProcessorFunction } from "./type";
 
 dotenv.config();
 
