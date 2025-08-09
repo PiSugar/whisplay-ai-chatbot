@@ -35,7 +35,7 @@ class ChatFlow {
       ttsProcessor,
       (sentences: string[]) => {
         if (this.currentFlowName !== "answer") return;
-        const fullText = sentences.join("");
+        const fullText = sentences.join(" ");
         display({
           status: "answering",
           emoji: extractEmojis(fullText) || "😊",
@@ -58,7 +58,7 @@ class ChatFlow {
     const { sentences, remaining } = splitSentences(this.partialThinking);
     if (sentences.length > 0) {
       this.thinkingSentences.push(...sentences);
-      const displayText = this.thinkingSentences.join("");
+      const displayText = this.thinkingSentences.join(" ");
       display({
         status: "thinking",
         emoji: "🤔",
