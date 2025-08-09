@@ -209,7 +209,11 @@ class StreamResponser {
         }
         currentIndex++;
         playNext();
+      } else if (this.partialContent) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        playNext();
       } else {
+        console.log(`Play all audio completed. Total: ${this.speakArray.length}`);
         this.playEndResolve();
         this.isStartSpeak = false;
         this.speakArray.length = 0;
