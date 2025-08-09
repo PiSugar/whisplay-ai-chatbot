@@ -46,3 +46,33 @@ export const extractEmojis = (str: string): string => {
 export const getCurrentTimeTag = (): string => {
   return moment().format("YYYY-MM-DD HH:mm:ss");
 };
+
+
+export function splitSentences(text: string): {
+  sentences: string[];
+  remaining: string;
+} {
+  const regex =
+    /.*?([。！？!?，,]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\.)(?=\s|$)/gs;
+
+  const sentences: string[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    const sentence = match[0].trim();
+    // Check if the sentence is just a number followed by punctuation
+    if (!/^\d+[.。！？!?，,]$/.test(sentence)) {
+      sentences.push(sentence);
+      lastIndex = regex.lastIndex;
+    } else {
+      // If it's just a number with punctuation, reset lastIndex to include this in the next match
+      regex.lastIndex = match.index;
+      break;
+    }
+  }
+
+  const remaining = text.slice(lastIndex).trim();
+
+  return { sentences, remaining };
+}

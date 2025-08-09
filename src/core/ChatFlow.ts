@@ -1,4 +1,4 @@
-import { getCurrentTimeTag } from "./../utils/index";
+import { getCurrentTimeTag, splitSentences } from "./../utils/index";
 import { get, noop } from "lodash";
 import {
   onButtonPressed,
@@ -24,7 +24,8 @@ class ChatFlow {
   currentRecordFilePath: string = "";
   asrText: string = "";
   streamResponser: StreamResponser;
-  thinking: string = "";
+  partialThinking: string = "";
+  thinkingSentences: string[] = [];
 
   constructor({ dataDir }: ChatFlowConstructor) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -53,14 +54,19 @@ class ChatFlow {
 
   partialThinkingCallback = (partialThinking: string): void => {
     if (this.currentFlowName !== "answer") return;
-    this.thinking += partialThinking;
-    const maxCharacters = 24 * 6;
-    const tail = this.thinking.slice(maxCharacters);
-    display({
-      status: "thinking",
-      emoji: "🤔",
-      text: tail,
-    });
+    this.partialThinking += partialThinking;
+    const { sentences, remaining } = splitSentences(this.partialThinking);
+    if (sentences.length > 0) {
+      this.thinkingSentences.push(...sentences);
+      const displayText = this.thinkingSentences.join("");
+      display({
+        status: "thinking",
+        emoji: "🤔",
+        text: displayText,
+        RGB: "#ff6800", // yellow
+      });
+    }
+    this.partialThinking = remaining;
   };
 
   setCurrentFlow = (flowName: string): void => {
@@ -146,7 +152,8 @@ class ChatFlow {
           getPlayEndPromise,
           stop: stopPlaying,
         } = this.streamResponser;
-        this.thinking = "";
+        this.partialThinking = "";
+        this.thinkingSentences = [];
         chatWithLLMStream(
           [
             {

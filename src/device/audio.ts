@@ -1,5 +1,6 @@
 import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop } from "lodash";
+import { splitSentences } from "../utils";
 
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
@@ -165,35 +166,6 @@ process.on("SIGINT", () => {
   } catch {}
   process.exit();
 });
-
-function splitSentences(text: string): {
-  sentences: string[];
-  remaining: string;
-} {
-  const regex =
-    /.*?([。！？!?，,]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\.)(?=\s|$)/gs;
-
-  const sentences: string[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(text)) !== null) {
-    const sentence = match[0].trim();
-    // Check if the sentence is just a number followed by punctuation
-    if (!/^\d+[.。！？!?，,]$/.test(sentence)) {
-      sentences.push(sentence);
-      lastIndex = regex.lastIndex;
-    } else {
-      // If it's just a number with punctuation, reset lastIndex to include this in the next match
-      regex.lastIndex = match.index;
-      break;
-    }
-  }
-
-  const remaining = text.slice(lastIndex).trim();
-
-  return { sentences, remaining };
-}
 
 function purifyText(text: string): string {
   // remove unprocessable characters，such as *, #, ~, etc.
