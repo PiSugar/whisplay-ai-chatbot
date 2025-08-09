@@ -9,7 +9,7 @@ import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../type";
-import { ChatWithLLMStreamFunction } from "./type";
+import { ChatWithLLMStreamFunction } from "./interface";
 
 dotenv.config();
 

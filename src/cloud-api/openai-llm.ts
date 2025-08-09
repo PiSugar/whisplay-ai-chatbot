@@ -9,7 +9,7 @@ import { FunctionCall, Message } from "../type";
 import { combineFunction } from "../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../config/llm-tools";
-import { ChatWithLLMStreamFunction } from "./type";
+import { ChatWithLLMStreamFunction } from "./interface";
 
 dotenv.config();
 // OpenAI LLM
