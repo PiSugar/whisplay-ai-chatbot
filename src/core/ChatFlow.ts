@@ -54,10 +54,12 @@ class ChatFlow {
   partialThinkingCallback = (partialThinking: string): void => {
     if (this.currentFlowName !== "answer") return;
     this.thinking += partialThinking;
+    const maxCharacters = 24 * 6;
+    const tail = this.thinking.slice(maxCharacters);
     display({
       status: "thinking",
       emoji: "🤔",
-      text: this.thinking,
+      text: tail,
     });
   };
 
