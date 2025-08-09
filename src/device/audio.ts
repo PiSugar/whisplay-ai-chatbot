@@ -195,6 +195,11 @@ function splitSentences(text: string): {
   return { sentences, remaining };
 }
 
+function purifyText(text: string): string {
+  // remove unprocessable characters，such as *, #, ~, etc.
+  return text.replace(/[*#~]/g, "").trim();
+}
+
 type TTSFunc = (text: string) => Promise<{ data: string; duration: number }>;
 type SentencesCallback = (sentences: string[]) => void;
 type TextCallback = (text: string) => void;
@@ -249,7 +254,7 @@ class StreamResponser {
       this.sentencesCallback?.(this.parsedSentences);
       this.speakArray.push(
         ...sentences.map((item) =>
-          this.ttsFunc(item).finally(() => {
+          this.ttsFunc(purifyText(item)).finally(() => {
             if (!this.isStartSpeak) {
               this.playAudioInOrder();
               this.isStartSpeak = true;
