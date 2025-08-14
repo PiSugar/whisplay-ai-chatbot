@@ -163,6 +163,20 @@ class TextUtils:
         x += char_width
     line_image_cache[cache_key] = img
     return line_image_cache[cache_key]
+  
+  @staticmethod
+  def clean_line_image_cache():
+    """清除行图像缓存。"""
+    global line_image_cache
+    line_image_cache = {}
+
+  @staticmethod
+  def get_text_size(text, font):
+    """获取文本的宽度和高度。"""
+    lines = TextUtils.wrap_text(None, text, font, float('inf'))
+    width = max(TextUtils.get_line_img(line, font).width for line in lines)
+    height = sum(TextUtils.get_line_img(line, font).height for line in lines)
+    return width, height
 
   @staticmethod
   def wrap_text(draw, text, font, max_width):

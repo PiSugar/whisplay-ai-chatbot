@@ -220,20 +220,6 @@ class RenderThread(threading.Thread):
             
     def stop(self):
         self.running = False
-        
-    
-
-
-def is_text_continuation(self, old_text, new_text, threshold=0.7):
-    """判断新文本是否为旧文本的延续"""
-    if not old_text or not new_text:
-        return False
-        
-    # 如果新文本以旧文本开头，很可能是延续
-    if new_text.startswith(old_text):
-        return True
-
-    return False
 
 def update_display_data(status=None, emoji=None, text=None, 
                   scroll_speed=None, battery_level=None, battery_color=None):
@@ -241,8 +227,9 @@ def update_display_data(status=None, emoji=None, text=None,
     global current_battery_color, current_scroll_top, current_scroll_speed
 
     # 若文本不是延续之前的，则重置滚动位置
-    if text is not None and text.startswith(current_text):
+    if text is not None and not text.startswith(current_text):
         current_scroll_top = 0
+        TextUtils.clean_line_image_cache()
     if scroll_speed is not None:
         current_scroll_speed = scroll_speed
     current_status = status if status is not None else current_status
@@ -349,7 +336,7 @@ def handle_client(client_socket, addr, whisplay):
         del clients[addr]
         client_socket.close()
 
-def start_socket_server(host='0.0.0.0', port=12345):
+def start_socket_server(render_thread, host='0.0.0.0', port=12345):
     # 注册按钮事件
     whisplay.on_button_press(on_button_pressed)
     whisplay.on_button_release(on_button_release)
@@ -359,8 +346,6 @@ def start_socket_server(host='0.0.0.0', port=12345):
     server_socket.bind((host, port))
     server_socket.listen(5)  # 允许更多连接
     print(f"[Socket] 正在监听 {host}:{port} ...")
-
-    # 启动显示进程，每秒钟渲染30帧
 
     try:
         while True:
@@ -372,13 +357,15 @@ def start_socket_server(host='0.0.0.0', port=12345):
     except KeyboardInterrupt:
         print("[Socket] 服务器停止")
     finally:
+        render_thread.stop()
         server_socket.close()
 
 
 if __name__ == "__main__":
     whisplay = WhisplayBoard()
     print(f"[LCD] initial finish: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
-    # 启动显示进程
+    # start render thread
     render_thread = RenderThread(whisplay, "NotoSansSC-Bold.ttf", fps=30)
     render_thread.start()
-    start_socket_server()
+    start_socket_server(render_thread, host='0.0.0.0', port=12345)
+
