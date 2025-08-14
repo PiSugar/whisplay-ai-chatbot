@@ -92,7 +92,7 @@ const player: Player = {
 };
 
 setTimeout(() => {
-  player.process = spawn("mpg123", ["-", "--scale", "2"]);
+  player.process = spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
 }, 5000);
 
 const playAudioData = (
