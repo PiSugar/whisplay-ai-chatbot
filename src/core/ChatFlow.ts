@@ -41,6 +41,7 @@ class ChatFlow {
           emoji: extractEmojis(fullText) || "😊",
           text: fullText,
           RGB: "#0000ff",
+          scroll_speed: 3,
         });
       },
       (text: string) => {
@@ -48,6 +49,7 @@ class ChatFlow {
         display({
           status: "answering",
           text: text || undefined,
+          scroll_speed: 3,
         });
       }
     );
@@ -65,7 +67,7 @@ class ChatFlow {
         emoji: "🤔",
         text: displayText,
         RGB: "#ff6800", // yellow
-        scroll_speed: 8,
+        scroll_speed: 6,
       });
     }
     this.partialThinking = remaining;
