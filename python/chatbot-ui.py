@@ -23,8 +23,8 @@ battery_font_size=13
 
 # 全局变量
 current_status = "Hello"
-current_emoji = "😊"
-current_text = "Welcome to AI Whisplay Hat😂! This is a test message to demonstrate the scrolling text feature. As you can see, the text will scroll across the screen, allowing you to read longer messages without any issues. Enjoy! 😊 The quick brown fox jumps over the lazy dog. Besides, this is a test message to demonstrate the scrolling text feature. This is a super long content.Welcome to AI Echo Hat! This is a test message to demonstrate the scrolling text feature. As you can see, the text will scroll across the screen, allowing you to read longer messages without any issues. Enjoy! 😊 The quick brown fox jumps over the lazy dog. Besides, this is a test message to demonstrate the scrolling text feature. This is a super long content.Welcome to AI Echo Hat! This is a test message to demonstrate the scrolling text feature. As you can see, the text will scroll across the screen, allowing you to read longer messages without any issues. Enjoy! 😊 The quick brown fox jumps over the lazy dog. Besides, this is a test message to demonstrate the scrolling text feature. This is a super long content."
+current_emoji = "😄"
+current_text = "Waiting for message..."
 current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
