@@ -9,7 +9,7 @@ const killAllRecordingProcesses = (): void => {
   recordingProcessList.forEach((child) => {
     try {
       child.stdin?.end();
-      child.kill('SIGKILL');
+      child.kill("SIGKILL");
     } catch (e) {}
   });
   recordingProcessList.length = 0;
@@ -22,18 +22,15 @@ const recordAudio = (
   return new Promise((resolve, reject) => {
     const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`开始录音, 最长${duration}秒钟...`);
-    const recordingProcess = exec(
-      cmd,
-      (err, stdout, stderr) => {
-        currentRecordingReject = reject;
-        if (err) {
-          killAllRecordingProcesses();
-          reject(stderr);
-        } else {
-          resolve(outputPath);
-        }
+    const recordingProcess = exec(cmd, (err, stdout, stderr) => {
+      currentRecordingReject = reject;
+      if (err) {
+        killAllRecordingProcesses();
+        reject(stderr);
+      } else {
+        resolve(outputPath);
       }
-    );
+    });
     recordingProcessList.push(recordingProcess);
 
     // Set a timeout to kill the recording process after the specified duration
@@ -213,7 +210,9 @@ class StreamResponser {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         playNext();
       } else {
-        console.log(`Play all audio completed. Total: ${this.speakArray.length}`);
+        console.log(
+          `Play all audio completed. Total: ${this.speakArray.length}`
+        );
         this.playEndResolve();
         this.isStartSpeak = false;
         this.speakArray.length = 0;
@@ -229,8 +228,12 @@ class StreamResponser {
     if (sentences.length > 0) {
       this.parsedSentences.push(...sentences);
       this.sentencesCallback?.(this.parsedSentences);
+      // remove emoji
+      const filteredSentences = sentences
+        .map((item) => item.replace(/[\u{1F600}-\u{1F64F}]/gu, ""))
+        .filter((item) => item.trim() !== "");
       this.speakArray.push(
-        ...sentences.map((item) =>
+        ...filteredSentences.map((item) =>
           this.ttsFunc(item).finally(() => {
             if (!this.isStartSpeak) {
               this.playAudioInOrder();
@@ -247,7 +250,14 @@ class StreamResponser {
     if (this.partialContent) {
       this.parsedSentences.push(this.partialContent);
       this.sentencesCallback?.(this.parsedSentences);
-      this.speakArray.push(this.ttsFunc(this.partialContent));
+      // remove emoji
+      this.partialContent = this.partialContent.replace(
+        /[\u{1F600}-\u{1F64F}]/gu,
+        ""
+      );
+      if (this.partialContent.trim() !== "") {
+        this.speakArray.push(this.ttsFunc(this.partialContent));
+      }
       this.partialContent = "";
     }
     this.textCallback?.(this.parsedSentences.join(" "));
