@@ -366,7 +366,7 @@ def start_socket_server(host='0.0.0.0', port=12345):
         while True:
             client_socket, addr = server_socket.accept()
             client_thread = threading.Thread(target=handle_client, 
-                                           args=(client_socket, addr, whisplay, font_path))
+                                           args=(client_socket, addr, whisplay))
             client_thread.daemon = True
             client_thread.start()
     except KeyboardInterrupt:
