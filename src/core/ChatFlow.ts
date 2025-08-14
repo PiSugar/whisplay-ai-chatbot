@@ -46,7 +46,8 @@ class ChatFlow {
       (text: string) => {
         if (this.currentFlowName !== "answer") return;
         display({
-          text,
+          status: "answering",
+          text: text || undefined,
         });
       }
     );
@@ -64,6 +65,7 @@ class ChatFlow {
         emoji: "🤔",
         text: displayText,
         RGB: "#ff6800", // yellow
+        scroll_speed: 8,
       });
     }
     this.partialThinking = remaining;
