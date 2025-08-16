@@ -224,6 +224,8 @@ class StreamResponser {
 
   partial = (text: string): void => {
     this.partialContent += text;
+    // replace newlines with spaces
+    this.partialContent = this.partialContent.replace(/\n/g, " ");
     const { sentences, remaining } = splitSentences(this.partialContent);
     if (sentences.length > 0) {
       this.parsedSentences.push(...sentences);
