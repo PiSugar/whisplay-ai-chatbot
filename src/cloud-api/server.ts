@@ -18,18 +18,20 @@ import {
   chatWithLLMStream as OllamaLLMStream,
   resetChatHistory as OllamaResetChatHistory,
 } from "./ollama-llm";
+import {
+  chatWithLLMStream as GeminiLLMStream,
+  resetChatHistory as GeminiResetChatHistory,
+} from "./gemini-llm";
 import VolcengineTTS from "./volcengine-tts";
 import OpenAITTS from "./openai-tts";
-import { ChatWithLLMStreamFunction, RecognizeAudioFunction, ResetChatHistoryFunction, TTSProcessorFunction } from "./interface";
+import {
+  ChatWithLLMStreamFunction,
+  RecognizeAudioFunction,
+  ResetChatHistoryFunction,
+  TTSProcessorFunction,
+} from "./interface";
 
 dotenv.config();
-
-interface Message {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  tool_calls?: any[];
-  tool_call_id?: string;
-}
 
 let recognizeAudio: RecognizeAudioFunction = noop as any;
 let chatWithLLMStream: ChatWithLLMStreamFunction = noop as any;
@@ -69,6 +71,10 @@ switch (llmServer) {
   case "OLLAMA":
     chatWithLLMStream = OllamaLLMStream;
     resetChatHistory = OllamaResetChatHistory;
+    break;
+  case "GEMINI":
+    chatWithLLMStream = GeminiLLMStream;
+    resetChatHistory = GeminiResetChatHistory;
     break;
   default:
     console.warn(
