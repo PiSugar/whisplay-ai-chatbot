@@ -85,3 +85,7 @@ bash pisugar-power-manager.sh -c release
 - Add Google Gemini API support
 - RPI cammera support 
 - Support speaker recognition
+
+## License
+
+[GPL-3.0](https://github.com/PiSugar/whisplay-ai-chatbot?tab=GPL-3.0-1-ov-file#readme)
