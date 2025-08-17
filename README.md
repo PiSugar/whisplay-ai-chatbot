@@ -45,16 +45,18 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
 
 ## Build After Code Changes
 
-If you make changes to the code, you need to rebuild the project. You can do this by running:
+If you make changes to the node code, you need to rebuild the project. You can do this by running:
 
 ```bash
 yarn
 yarn build
 ```
 
+If you add new third-party libraries to the python code, make sure to install them in global environment with `--break-system-packages`.
+
 ## Update Environment Variables
 
-If you need to update the environment variables, you can edit the `.env` file directly. After making changes, please run `yarn copy-env` to copy the updated environment variables to `dist/.env`. Then, restart the chatbot service with:
+If you need to update the environment variables, you can edit the `.env` file directly. After making changes, please restart the chatbot service with:
 
 ```bash
 systemctl restart whisplay-ai-chatbot.service
