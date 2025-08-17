@@ -4,7 +4,7 @@
 
 This is a pocket-sized AI chatbot device built using a Raspberry Pi Zero 2w. Just press the button, speak, and it talks back—like a futuristic walkie-talkie with a mind of its own.
 
-Test Video:
+Test Video Playlist:
 [https://www.youtube.com/watch?v=lOVA0Gui-4Q](https://www.youtube.com/playlist?list=PLpTS9YM-tG_mW5H7Xs2EO0qvlAI-Jm1e_)
 
 ## Hardware
@@ -45,16 +45,18 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
 
 ## Build After Code Changes
 
-If you make changes to the code, you need to rebuild the project. You can do this by running:
+If you make changes to the node code, you need to rebuild the project. You can do this by running:
 
 ```bash
 yarn
 yarn build
 ```
 
+If you add new third-party libraries to the python code, make sure to install them in global environment with `--break-system-packages`.
+
 ## Update Environment Variables
 
-If you need to update the environment variables, you can edit the `.env` file directly. After making changes, please run `yarn copy-env` to copy the updated environment variables to `dist/.env`. Then, restart the chatbot service with:
+If you need to update the environment variables, you can edit the `.env` file directly. After making changes, please restart the chatbot service with:
 
 ```bash
 systemctl restart whisplay-ai-chatbot.service
@@ -77,7 +79,15 @@ bash pisugar-power-manager.sh -c release
 
 ## Goals
 
-- Integrate the tool with the API
-- Enable the AI assistant to adjust the volume autonomously
-- Reset the conversation history if there is no speech for five minutes
+- Integrate the tool with the API ✅
+- Enable the AI assistant to adjust the volume autonomously ✅
+- Reset the conversation history if there is no speech for five minutes ✅
+- Support local llm server ✅
+- Refactor python render thread, better performance ✅
+- Add Google Gemini API support
+- RPI cammera support 
 - Support speaker recognition
+
+## License
+
+[GPL-3.0](https://github.com/PiSugar/whisplay-ai-chatbot?tab=GPL-3.0-1-ov-file#readme)
