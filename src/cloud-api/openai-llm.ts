@@ -77,7 +77,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   messages.push({
     role: "assistant",
     content: answer,
-    tool_calls: functionCalls,
+    tool_calls: isEmpty(functionCalls) ? undefined : functionCalls,
   });
   if (!isEmpty(functionCalls)) {
     const results = await Promise.all(
