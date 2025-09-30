@@ -1,12 +1,15 @@
 // 输入 [[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]]
 // 输出 [{"function":{"arguments":" {\"volume\": 21}","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}]
 
-import { get } from "lodash";
+import { get, isArray } from "lodash";
 import { FunctionCall } from "../type";
 import moment from "moment";
 
 export const combineFunction = (packages: FunctionCall[][]): FunctionCall[] => {
   return packages.reduce((callFunctions: FunctionCall[], itemArray) => {
+    if (!isArray(itemArray)) {
+      itemArray = [itemArray];
+    }
     itemArray.forEach((call) => {
       const index = call.index;
       if (callFunctions[index]) {
