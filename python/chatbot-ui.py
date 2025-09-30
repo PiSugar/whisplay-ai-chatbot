@@ -11,6 +11,7 @@ import json
 import sys
 import threading
 
+# from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
 from utils import ColorUtils, ImageUtils, TextUtils
 

@@ -53,7 +53,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     model: openaiLLMModel,
     messages: messages as any,
     stream: true,
-    tools: llmTools as any,
+    tools: llmTools,
   });
   let partialAnswer = "";
   let partialThinking = "";

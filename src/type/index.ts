@@ -21,12 +21,12 @@ export type LLMFunc = (params: Record<string, any>) => Promise<string>
 
 export interface LLMTool {
   id?: string;
-  type: string;
+  type: "function";
   function: {
     name: string
     description: string
     parameters: {
-      type: string
+      type?: string
       properties?: {
         [key: string]: {
           type: string

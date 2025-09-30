@@ -1,11 +1,11 @@
 import { LLMTool } from "../type";
-import { readdirSync, readFileSync } from "fs"
-import {  resolve } from "path";
+import { readdirSync, readFileSync } from "fs";
+import { resolve } from "path";
 import { execSync } from "child_process";
 import { setVolumeByAmixer, getCurrentLogPercent } from "../utils/volume";
 
 const defaultTools: LLMTool[] = [
-   {
+  {
     type: "function",
     function: {
       name: "setVolume",
@@ -38,10 +38,7 @@ const defaultTools: LLMTool[] = [
     function: {
       name: "increaseVolume",
       description: "increase the volume level by a specified amount",
-      parameters: {
-        type: "object",
-        required: [],
-      },
+      parameters: {},
     },
     func: async (params) => {
       const currentLogPercent = getCurrentLogPercent();
@@ -50,7 +47,9 @@ const defaultTools: LLMTool[] = [
       }
       const newAmixerValue = Math.min(currentLogPercent + 10, 100);
       setVolumeByAmixer(newAmixerValue);
-      console.log(`Current volume: ${currentLogPercent}%, New volume: ${newAmixerValue}%`);
+      console.log(
+        `Current volume: ${currentLogPercent}%, New volume: ${newAmixerValue}%`
+      );
       return `Volume increased by 10%, now at ${newAmixerValue}%`;
     },
   },
@@ -60,10 +59,7 @@ const defaultTools: LLMTool[] = [
     function: {
       name: "decreaseVolume",
       description: "decrease the volume level by a specified amount",
-      parameters: {
-        type: "object",
-        required: [],
-      },
+      parameters: {},
     },
     func: async (params) => {
       const currentLogPercent = getCurrentLogPercent();
@@ -72,11 +68,13 @@ const defaultTools: LLMTool[] = [
       }
       const newAmixerValue = Math.max(currentLogPercent - 10, 0);
       setVolumeByAmixer(newAmixerValue);
-      console.log(`Current volume: ${currentLogPercent}%, New volume: ${newAmixerValue}%`);
+      console.log(
+        `Current volume: ${currentLogPercent}%, New volume: ${newAmixerValue}%`
+      );
       return `Volume decreased by 10%, now at ${newAmixerValue}%`;
     },
   },
-]
+];
 
 // 如果有custom-tools文件夹，收集custom-tools文件夹中的文件导出的所有tools
 const customTools: LLMTool[] = [];
@@ -104,10 +102,7 @@ try {
   console.error("Error loading custom tools:", error);
 }
 
-export const llmTools: LLMTool[] = [
-  ...defaultTools,
-  ...customTools,
-];
+export const llmTools: LLMTool[] = [...defaultTools, ...customTools];
 
 export const llmFuncMap = llmTools.reduce((acc, tool) => {
   acc[tool.function.name] = tool.func;
