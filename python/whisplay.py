@@ -4,38 +4,38 @@ import time
 
 
 class WhisplayBoard:
-    # LCD 参数
+    # LCD parameters
     LCD_WIDTH = 240
     LCD_HEIGHT = 280
-    CornerHeight = 20  # 圆角高度占的像素
+    CornerHeight = 20  # Corner height in pixels
     DC_PIN = 13
     RST_PIN = 7
     LED_PIN = 15
 
-    # RGB LED 引脚
+    # RGB LED pins
     RED_PIN = 22
     GREEN_PIN = 18
     BLUE_PIN = 16
 
-    # 按键引脚
+    # Button pin
     BUTTON_PIN = 11
 
     def __init__(self):
         GPIO.setmode(GPIO.BOARD)
         GPIO.setwarnings(False)
 
-        # 初始化 LCD 引脚
+        # Initialize LCD pins
         GPIO.setup([self.DC_PIN, self.RST_PIN, self.LED_PIN], GPIO.OUT)
 
-        GPIO.output(self.LED_PIN, GPIO.LOW)  # 使能背光
+        GPIO.output(self.LED_PIN, GPIO.LOW)  # Enable backlight
 
-        # 初始化背光 PWM
+        # Initialize backlight PWM
         self.backlight_pwm = GPIO.PWM(
             self.LED_PIN, 1000
-        )  # 1000Hz 的 PWM 频率可能是一个合理的起点
+        )  # 1000Hz PWM frequency is a reasonable starting point
         self.backlight_pwm.start(100)
 
-        # 初始化 RGB LED 引脚
+        # Initialize RGB LED pins
         GPIO.setup([self.RED_PIN, self.GREEN_PIN, self.BLUE_PIN], GPIO.OUT)
         self.red_pwm = GPIO.PWM(self.RED_PIN, 100)
         self.green_pwm = GPIO.PWM(self.GREEN_PIN, 100)
@@ -47,7 +47,7 @@ class WhisplayBoard:
         self.green_pwm.start(0)
         self.blue_pwm.start(0)
 
-        # 初始化按键
+        # Initialize button
         GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         self.button_press_callback = None
         self.button_release_callback = None
@@ -55,7 +55,7 @@ class WhisplayBoard:
             self.BUTTON_PIN, GPIO.BOTH, callback=self._button_event, bouncetime=50
         )
 
-        # 初始化 SPI
+        # Initialize SPI
         self.spi = spidev.SpiDev()
         self.spi.open(0, 0)
         self.spi.max_speed_hz = 100_000_000
@@ -66,9 +66,9 @@ class WhisplayBoard:
         self._init_display()
         self.fill_screen(0)
 
-    # ========== LCD 显示功能 ==========
+    # ========== LCD Display Functions ==========
 
-    # ========== 背光控制 ==========
+    # ========== Backlight Control ==========
     def set_backlight(self, brightness):
         if 0 <= brightness <= 100:
             duty_cycle = 100 - brightness
@@ -196,11 +196,11 @@ class WhisplayBoard:
 
     def draw_image(self, x, y, width, height, pixel_data):
         if (x + width > self.LCD_WIDTH) or (y + height > self.LCD_HEIGHT):
-            raise ValueError("图像尺寸超出屏幕范围")
+            raise ValueError("Image size exceeds screen bounds")
         self.set_window(x, y, x + width - 1, y + height - 1)
         self._send_data(pixel_data)
 
-    # ========== RGB 与按键 ==========
+    # ========== RGB and Button Functions ==========
     def set_rgb(self, r, g, b):
         self.red_pwm.ChangeDutyCycle(100 - (r / 255 * 100))
         self.green_pwm.ChangeDutyCycle(100 - (g / 255 * 100))
@@ -210,7 +210,7 @@ class WhisplayBoard:
         self._current_b = b
 
     def set_rgb_fade(self, r_target, g_target, b_target, duration_ms=100):
-        steps = 20  # 可以调整步数来控制渐变的平滑度
+        steps = 20  # Adjust steps to control fade smoothness
         delay_ms = duration_ms / steps
 
         r_step = (r_target - self._current_r) / steps
@@ -247,14 +247,14 @@ class WhisplayBoard:
 
     def _button_event(self, channel):
         if GPIO.input(channel):
-            # Falling edge (按钮按下)
+            # Falling edge (button pressed)
             self._button_press_event(channel)
 
         else:
-            # Rising edge (按钮释放)
+            # Rising edge (button released)
             self._button_release_event(channel)
 
-    # ========== 清理 ==========
+    # ========== Cleanup ==========
     def cleanup(self):
         self.spi.close()
         self.red_pwm.stop()

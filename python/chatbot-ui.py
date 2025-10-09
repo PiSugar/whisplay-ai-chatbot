@@ -22,7 +22,7 @@ status_font_size=28
 emoji_font_size=40
 battery_font_size=13
 
-# 全局变量
+# Global variables
 current_status = "Hello"
 current_emoji = "😄"
 current_text = "Waiting for message..."
@@ -39,7 +39,7 @@ class RenderThread(threading.Thread):
         self.font_path = font_path
         self.fps = fps
         self.render_init_screen()
-        # 5秒钟后清除logo，开始running为True的循环
+        # Clear logo after 1 second and start running loop
         time.sleep(1)
         self.running = True
         self.main_text_font = ImageFont.truetype(self.font_path, 20)
@@ -48,7 +48,7 @@ class RenderThread(threading.Thread):
         self.current_render_text = ""
 
     def render_init_screen(self):
-        # 启动时先显示logo
+        # Display logo on startup
         logo_path = os.path.join("img", "logo.png")
         if os.path.exists(logo_path):
             logo_image = Image.open(logo_path).convert("RGBA")
@@ -85,17 +85,17 @@ class RenderThread(threading.Thread):
 
     def render_main_text(self, main_text_image, area_height, draw, text, scroll_speed=2):
         global current_scroll_top
-        """渲染主文本内容，根据屏幕宽度分行，只显示当前可见部分"""
+        """Render main text content, wrap lines according to screen width, only display currently visible part"""
         if not text:
             return
-        # 使用主文本字体
+        # Use main text font
         font = ImageFont.truetype(self.font_path, 20)
         lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
 
-        # 行高
+        # Line height
         line_height = self.main_text_line_height
 
-        # 计算当前可见行
+        # Calculate currently visible lines
         display_lines = []
         render_y = 0
         fin_show_lines = False
@@ -117,12 +117,12 @@ class RenderThread(threading.Thread):
             for line in display_lines:
                 TextUtils.draw_mixed_text(show_text_draw, show_text_image, line, font, (10, render_y))
                 render_y += line_height
-            # 更新缓存图像
+            # Update cache image
             self.text_cache_image = show_text_image
-        # 将text_cache_image绘制到main_text_image
+        # Draw text_cache_image to main_text_image
         main_text_image.paste(self.text_cache_image, (0, -current_scroll_top), self.text_cache_image)
 
-        # 更新滚动位置
+        # Update scroll position
         if scroll_speed > 0 and current_scroll_top < (len(lines) + 1) * line_height - area_height:
             current_scroll_top += scroll_speed
                 
@@ -206,7 +206,7 @@ class RenderThread(threading.Thread):
         text_x = battery_x + (battery_width - text_w) // 2
         
         luminance = ColorUtils.calculate_luminance(fill_color)
-        brightness_threshold = 128 # 你可以根据需要调整这个阈值
+        brightness_threshold = 128 # You can adjust this threshold as needed
         if luminance > brightness_threshold:
             text_fill_color = "black"
         else:
@@ -227,7 +227,7 @@ def update_display_data(status=None, emoji=None, text=None,
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed
 
-    # 若文本不是延续之前的，则重置滚动位置
+    # If text is not continuation of previous, reset scroll position
     if text is not None and not text.startswith(current_text):
         current_scroll_top = 0
         TextUtils.clean_line_image_cache()
@@ -241,34 +241,34 @@ def update_display_data(status=None, emoji=None, text=None,
 
 
 def send_to_all_clients(message):
-    """向所有连接的客户端发送消息"""
+    """Send message to all connected clients"""
     message_json = json.dumps(message).encode("utf-8") + b"\n"
     for addr, client_socket in clients.items():
         try:
             client_socket.sendall(message_json)
-            # message 太长中间使用省略号
+            # Use ellipsis for long messages
             if len(message_json) > 100:
                 display_message = message_json[:50] + b"..." + message_json[-50:]
             else:
                 display_message = message_json
-            print(f"[Server] 向客户端 {addr} 发送通知: {display_message}")
+            print(f"[Server] Sent notification to client {addr}: {display_message}")
         except Exception as e:
-            print(f"[Server] 向客户端 {addr} 发送通知失败: {e}")
+            print(f"[Server] Failed to send notification to client {addr}: {e}")
 
 def on_button_pressed():
-    """按钮按下时执行的函数"""
-    print("[Server] 按钮被按下")
+    """Function executed when button is pressed"""
+    print("[Server] Button pressed")
     notification = {"event": "button_pressed"}
     send_to_all_clients(notification)
 
 def on_button_release():
-    """按钮释放时执行的函数"""
-    print("[Server] 按钮被释放")
+    """Function executed when button is released"""
+    print("[Server] Button released")
     notification = {"event": "button_released"}
     send_to_all_clients(notification)
 
 def handle_client(client_socket, addr, whisplay):
-    print(f"[Socket] 客户端 {addr} 已连接")
+    print(f"[Socket] Client {addr} connected")
     clients[addr] = client_socket
     try:
         buffer = ""
@@ -283,7 +283,7 @@ def handle_client(client_socket, addr, whisplay):
                 if not line.strip():
                     continue
                         
-                print(f"[Socket - {addr}] 接收到数据: {line}")
+                print(f"[Socket - {addr}] Received data: {line}")
                 try:
                     content = json.loads(line)
                     transaction_id = content.get("transaction_id", None)
@@ -320,33 +320,33 @@ def handle_client(client_socket, addr, whisplay):
                         try:
                             response_bytes = json.dumps({"response": response_to_client}).encode("utf-8") + b"\n"
                             client_socket.send(response_bytes)
-                            print(f"[Socket - {addr}] 发送响应: {response_to_client}")
+                            print(f"[Socket - {addr}] Sent response: {response_to_client}")
                         except Exception as e:
-                            print(f"[Socket - {addr}] 发送响应错误: {e}")
+                            print(f"[Socket - {addr}] Response sending error: {e}")
                             
                 except json.JSONDecodeError:
                     client_socket.send(b"ERROR: invalid JSON\n")
                 except Exception as e:
-                    print(f"[Socket - {addr}] 处理数据错误: {e}")
+                    print(f"[Socket - {addr}] Data processing error: {e}")
                     client_socket.send(f"ERROR: {e}\n".encode("utf-8"))
 
     except Exception as e:
-        print(f"[Socket - {addr}] 连接错误: {e}")
+        print(f"[Socket - {addr}] Connection error: {e}")
     finally:
-        print(f"[Socket] 客户端 {addr} 断开连接")
+        print(f"[Socket] Client {addr} disconnected")
         del clients[addr]
         client_socket.close()
 
 def start_socket_server(render_thread, host='0.0.0.0', port=12345):
-    # 注册按钮事件
+    # Register button events
     whisplay.on_button_press(on_button_pressed)
     whisplay.on_button_release(on_button_release)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((host, port))
-    server_socket.listen(5)  # 允许更多连接
-    print(f"[Socket] 正在监听 {host}:{port} ...")
+    server_socket.listen(5)  # Allow more connections
+    print(f"[Socket] Listening on {host}:{port} ...")
 
     try:
         while True:
@@ -356,7 +356,7 @@ def start_socket_server(render_thread, host='0.0.0.0', port=12345):
             client_thread.daemon = True
             client_thread.start()
     except KeyboardInterrupt:
-        print("[Socket] 服务器停止")
+        print("[Socket] Server stopped")
     finally:
         render_thread.stop()
         server_socket.close()
@@ -364,9 +364,8 @@ def start_socket_server(render_thread, host='0.0.0.0', port=12345):
 
 if __name__ == "__main__":
     whisplay = WhisplayBoard()
-    print(f"[LCD] initial finish: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
+    print(f"[LCD] Initialization finished: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
     # start render thread
     render_thread = RenderThread(whisplay, "NotoSansSC-Bold.ttf", fps=30)
     render_thread.start()
     start_socket_server(render_thread, host='0.0.0.0', port=12345)
-
