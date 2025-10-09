@@ -7,8 +7,6 @@ dotenv.config();
 const openAiAPIKey = process.env.OPENAI_API_KEY;
 const openAiBaseURL = process.env.OPENAI_API_BASE_URL;
 
-const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-
 const openAiOptions: ClientOptions = {
   apiKey: openAiAPIKey,
   fetch: proxyFetch as any,
