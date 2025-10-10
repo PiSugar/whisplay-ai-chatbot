@@ -2,9 +2,6 @@ import fetch, { RequestInit, Response } from "node-fetch";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { Agent } from "http";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 /**
  * Automatically creates a proxy-enabled version of node-fetch
