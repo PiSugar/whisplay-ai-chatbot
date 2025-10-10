@@ -21,8 +21,8 @@ const recordAudio = (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
-    console.log(`开始录音, 最长${duration}秒钟...`);
-    const recordingProcess = exec(cmd, (err, stdout, stderr) => {
+    console.log(`Recording started, maximum ${duration} seconds...`);
+    const recordingProcess = exec(cmd, (err, _stdout, stderr) => {
       currentRecordingReject = reject;
       if (err) {
         killAllRecordingProcesses();
@@ -49,9 +49,9 @@ const recordAudioManually = (
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
-    const recordingProcess = exec(
+    const _recordingProcess = exec(
       `sox -t alsa default -t mp3 ${outputPath}`,
-      (err, stdout, stderr) => {
+      (err, _stdout, stderr) => {
         if (err) {
           killAllRecordingProcesses();
           reject(stderr);
@@ -75,9 +75,9 @@ const stopRecording = (): void => {
     try {
       currentRecordingReject();
     } catch (e) {}
-    console.log("录音已停止");
+    console.log("Recording stopped");
   } else {
-    console.log("没有正在录音的进程");
+    console.log("No recording process is running");
   }
 };
 
@@ -101,12 +101,12 @@ const playAudioData = (
 ): Promise<void> => {
   const audioBuffer = Buffer.from(resAudioData, "base64");
   return new Promise((resolve, reject) => {
-    console.log("播放时长:", audioDuration);
+    console.log("Playing duration:", audioDuration);
     player.isPlaying = true;
     setTimeout(() => {
       resolve();
       player.isPlaying = false;
-      console.log("音频播放完成");
+      console.log("Audio playback completed");
     }, audioDuration); // 加1秒缓冲
 
     const process = player.process;
@@ -123,10 +123,10 @@ const playAudioData = (
     process.on("exit", (code) => {
       player.isPlaying = false;
       if (code !== 0) {
-        console.error(`播放音频错误: ${code}`);
+        console.error(`Audio playback error: ${code}`);
         reject(code);
       } else {
-        console.log("音频播放完成");
+        console.log("Audio playback completed");
         resolve();
       }
     });
@@ -136,7 +136,7 @@ const playAudioData = (
 const stopPlaying = (): void => {
   if (player.isPlaying) {
     try {
-      console.log("中止播放音频");
+      console.log("Stopping audio playback");
       const process = player.process;
       if (process) {
         process.stdin?.end();
@@ -149,7 +149,7 @@ const stopPlaying = (): void => {
       player.process = spawn("mpg123", ["-", "--scale", "2"]);
     }, 500);
   } else {
-    console.log("没有正在播放的音频");
+    console.log("No audio is currently playing");
   }
 };
 
@@ -199,10 +199,10 @@ class StreamResponser {
       if (currentIndex < this.speakArray.length) {
         try {
           const { data: audio, duration } = await this.speakArray[currentIndex];
-          console.log(`播放音频 ${currentIndex + 1}/${this.speakArray.length}`);
+          console.log(`Playing audio ${currentIndex + 1}/${this.speakArray.length}`);
           await playAudioData(audio, duration);
         } catch (error) {
-          console.error("播放音频错误:", error);
+          console.error("Audio playback error:", error);
         }
         currentIndex++;
         playNext();
