@@ -10,6 +10,7 @@ import socket
 import json
 import sys
 import threading
+import signal
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -369,3 +370,17 @@ if __name__ == "__main__":
     render_thread = RenderThread(whisplay, "NotoSansSC-Bold.ttf", fps=30)
     render_thread.start()
     start_socket_server(render_thread, host='0.0.0.0', port=12345)
+    
+    def cleanup_and_exit(signum, frame):
+        print("[System] Exiting...")
+        whisplay.cleanup()
+        sys.exit(0)
+        
+    signal.signal(signal.SIGTERM, cleanup_and_exit)
+    try:
+        # Keep the main thread alive
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        cleanup_and_exit(None, None)
+    
