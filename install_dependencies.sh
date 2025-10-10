@@ -2,7 +2,7 @@
 NVM_VERSION="0.39.3"
 NVM_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/nvm/v$NVM_VERSION.tar.gz"
 NPM_REGISTRY="https://registry.npmmirror.com"
-NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v18.19.1.sh"
+NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v20.19.5.sh"
 
 # Function to check if a command exists
 command_exists() {
@@ -41,9 +41,9 @@ cd ..
 #     fi
 # fi
 
-# Function to install nvm and Node.js 18
+# Function to install nvm and Node.js 20
 install_node_nvm() {
-    echo "Installing Node.js 18 using nvm..."
+    echo "Installing Node.js 20 using nvm..."
     
     # Install nvm if it's not already installed
     if [ ! -d "$HOME/.nvm" ]; then
@@ -71,33 +71,34 @@ install_node_nvm() {
         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
     fi
 
-    # Install and use Node.js 18
-    echo "Swith to Node.js 18"
-    nvm install 18
-    nvm use 18
+    # Install and use Node.js 20
+    echo "Switch to Node.js 20"
+    nvm install 20
+    nvm use 20
+    nvm alias default 20
 
     # Verify installation
-    if command_exists node && [[ "$(node -v)" =~ ^v18 ]]; then
-        echo "Node.js 18 installed successfully."
+    if command_exists node && [[ "$(node -v)" =~ ^v20 ]]; then
+        echo "Node.js 20 installed successfully."
     else
-        echo "Failed to install Node.js 18."
+        echo "Failed to install Node.js 20."
         exit 1
     fi
 }
 
 install_node_binary() {
-    echo "Installing Node.js 18 for pi zero..."
+    echo "Installing Node.js 20 for pi zero..."
     TEMP_DIR=$(mktemp -d)
-    curl -o $TEMP_DIR/install-node-v18.19.1.sh -L $NODE_BINARY_INSTALL_URL
-    chmod +x $TEMP_DIR/install-node-v18.19.1.sh
-    sudo bash $TEMP_DIR/install-node-v18.19.1.sh
+    curl -o $TEMP_DIR/install-node-v20.19.5.sh -L $NODE_BINARY_INSTALL_URL
+    chmod +x $TEMP_DIR/install-node-v20.19.5.sh
+    sudo bash $TEMP_DIR/install-node-v20.19.5.sh
     rm -rf $TEMP_DIR
 
     # Verify installation
-    if command_exists node && [[ "$(node -v)" =~ ^v18 ]]; then
-        echo "Node.js 18 installed successfully."
+    if command_exists node && [[ "$(node -v)" =~ ^v20 ]]; then
+        echo "Node.js 20 installed successfully."
     else
-        echo "Failed to install Node.js 18."
+        echo "Failed to install Node.js 20."
         exit 1
     fi
 }
@@ -110,11 +111,11 @@ install_node() {
     fi
 }
 
-# Check if Node.js is installed and is version 18
+# Check if Node.js is installed and is version 20
 if command_exists node; then
     NODE_VERSION=$(node -v)
-    if [[ "$NODE_VERSION" =~ ^v18 ]]; then
-        echo "Node.js 18 is already installed."
+    if [[ "$NODE_VERSION" =~ ^v20 ]]; then
+        echo "Node.js 20 is already installed."
     else
         echo "Different version of Node.js detected: $NODE_VERSION"
         install_node
@@ -160,6 +161,3 @@ fi
 
 echo "Installing Node.js dependencies..."
 yarn
-
-
-
