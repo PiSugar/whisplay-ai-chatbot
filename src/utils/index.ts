@@ -64,12 +64,12 @@ export function splitSentences(text: string): {
 
   while ((match = regex.exec(text)) !== null) {
     const sentence = match[0].trim();
-    // Check if the sentence is just a number followed by punctuation
-    if (!/^\d+[.。！？!?，,]$/.test(sentence)) {
+    // Check if the sentence is just numbers and punctuations
+    if (/[0-9\.。！？!?，,]/.test(sentence)) {
       sentences.push(sentence);
       lastIndex = regex.lastIndex;
     } else {
-      // If it's just a number with punctuation, reset lastIndex to include this in the next match
+      // If it's just numbers and punctuations, reset lastIndex to include this in the next match
       regex.lastIndex = match.index;
       break;
     }
