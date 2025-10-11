@@ -27,7 +27,9 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
 2. Install dependencies:
    ```bash
    bash install_dependencies.sh
+   source ~/.bashrc
    ```
+   Running `source ~/.bashrc` is necessary to load the new environment variables.
 3. Create a `.env` file based on the `.env.template` file and fill in the necessary environment variables.
 4. Build the project:
    ```bash
@@ -42,6 +44,7 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    sudo bash startup.sh
    ```
    Please note that this will disable the graphical interface and set the system to multi-user mode, which is suitable for headless operation.
+   You can find the output logs at `chatbot.log`. Running `tail -f chatbot.log` will also display the logs in real-time.
 
 ## Build After Code Changes
 
