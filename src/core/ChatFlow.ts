@@ -134,7 +134,7 @@ class ChatFlow {
             this.setCurrentFlow("listening");
           } else {
             if (result) {
-              console.log("识别结果:", result);
+              console.log("Audio recognized result:", result);
               this.asrText = result;
               display({ status: "recognizing", text: result });
               this.setCurrentFlow("answer");
