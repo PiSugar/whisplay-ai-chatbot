@@ -7,6 +7,9 @@ This is a pocket-sized AI chatbot device built using a Raspberry Pi Zero 2w. Jus
 Test Video Playlist:
 [https://www.youtube.com/watch?v=lOVA0Gui-4Q](https://www.youtube.com/playlist?list=PLpTS9YM-tG_mW5H7Xs2EO0qvlAI-Jm1e_)
 
+Tutorial:
+[https://www.youtube.com/watch?v=Nwu2DruSuyI](https://www.youtube.com/watch?v=Nwu2DruSuyI)
+
 ## Hardware
 
 - Raspberry Pi zero 2w
