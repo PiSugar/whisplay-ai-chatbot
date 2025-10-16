@@ -11,6 +11,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google-cloud/text-to-speech": "^6.3.1",
+    "@google/genai": "^1.25.0",
     "axios": "^1.8.4",
     "crypto": "^1.0.1",
     "dotenv": "^16.5.0",

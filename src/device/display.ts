@@ -246,3 +246,8 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
   displayInstance.killPythonProcess();
 });
+process.on("keyboardInterrupt", () => {
+  console.log("Keyboard Interrupt received, killing Python process...");
+  displayInstance.killPythonProcess();
+  process.exit(0);
+});
