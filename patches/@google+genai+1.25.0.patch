@@ -21,7 +21,7 @@ index 3e72754..7385590 100644
          if (opts.httpOptions) {
              this.clientOptions.httpOptions = this.patchHttpOptions(initHttpOptions, opts.httpOptions);
          }
-+        this.fetch = this.fetch;
++        this.fetch = fetch;
 +        if (opts.fetch) {
 +            this.fetch = opts.fetch;
 +        }
