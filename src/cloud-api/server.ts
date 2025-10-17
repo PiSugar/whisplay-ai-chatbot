@@ -6,6 +6,7 @@ import {
   synthesizeSpeech as TencentTTS,
 } from "./tencent-cloud";
 import { recognizeAudio as OpenAIASR } from "./openai-asr";
+import { recognizeAudio as GeminiASR } from "./gemini-asr";
 import {
   chatWithLLMStream as VolcengineLLMStream,
   resetChatHistory as VolcengineResetChatHistory,
@@ -24,6 +25,7 @@ import {
 } from "./gemini-llm";
 import VolcengineTTS from "./volcengine-tts";
 import OpenAITTS from "./openai-tts";
+import geminiTTS from "./gemini-tts";
 import {
   ChatWithLLMStreamFunction,
   RecognizeAudioFunction,
@@ -51,6 +53,9 @@ switch (asrServer) {
     break;
   case "OPENAI":
     recognizeAudio = OpenAIASR;
+    break;
+  case "GEMINI":
+    recognizeAudio = GeminiASR;
     break;
   default:
     console.warn(
@@ -92,6 +97,9 @@ switch (ttsServer) {
     break;
   case "TENCENT":
     ttsProcessor = TencentTTS;
+    break;
+  case "GEMINI":
+    ttsProcessor = geminiTTS;
     break;
   default:
     console.warn(
