@@ -16,7 +16,7 @@
   dependencies:
     google-gax "^5.0.0"
 
-"@google/genai@^1.25.0":
+"@google/genai@1.25.0":
   version "1.25.0"
   resolved "https://registry.npmmirror.com/@google/genai/-/genai-1.25.0.tgz#4a0566445b39a13ac39879cd6aebcde6f04beda7"
   integrity sha512-IBNyel/umavam98SQUfvQSvh/Rp6Ql2fysQLqPyWZr5K8d768X9AO+JZU4o+3qvFDUBA0dVYUSkxyYonVcICvA==
