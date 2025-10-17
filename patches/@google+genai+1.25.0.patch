@@ -13,6 +13,30 @@ index 7c7be1a..4e2a5e3 100644
  }
  
  /** Tool to support Google Maps in Model. */
+diff --git a/node_modules/@google/genai/dist/node/index.cjs b/node_modules/@google/genai/dist/node/index.cjs
+index 3e72754..7385590 100644
+--- a/node_modules/@google/genai/dist/node/index.cjs
++++ b/node_modules/@google/genai/dist/node/index.cjs
+@@ -10626,6 +10626,10 @@ class ApiClient {
+         if (opts.httpOptions) {
+             this.clientOptions.httpOptions = this.patchHttpOptions(initHttpOptions, opts.httpOptions);
+         }
++        this.fetch = this.fetch;
++        if (opts.fetch) {
++            this.fetch = opts.fetch;
++        }
+     }
+     /**
+      * Determines the base URL for Vertex AI based on project and location.
+@@ -10946,7 +10950,7 @@ class ApiClient {
+         });
+     }
+     async apiCall(url, requestInit) {
+-        return fetch(url, requestInit).catch((e) => {
++        return this.fetch(url, requestInit).catch((e) => {
+             throw new Error(`exception ${e} sending request`);
+         });
+     }
 diff --git a/node_modules/@google/genai/dist/node/index.mjs b/node_modules/@google/genai/dist/node/index.mjs
 index 4a0ef41..130d424 100644
 --- a/node_modules/@google/genai/dist/node/index.mjs
