@@ -1,0 +1,39 @@
+diff --git a/node_modules/@google/genai/dist/genai.d.ts b/node_modules/@google/genai/dist/genai.d.ts
+index 7c7be1a..4e2a5e3 100644
+--- a/node_modules/@google/genai/dist/genai.d.ts
++++ b/node_modules/@google/genai/dist/genai.d.ts
+@@ -3416,6 +3416,10 @@ export declare interface GoogleGenAIOptions {
+      * Optional. A set of customizable configuration for HTTP requests.
+      */
+     httpOptions?: HttpOptions;
++    /**
++     * Optional. Custom fetch implementation.
++     */
++    fetch?: typeof fetch;
+ }
+ 
+ /** Tool to support Google Maps in Model. */
+diff --git a/node_modules/@google/genai/dist/node/index.mjs b/node_modules/@google/genai/dist/node/index.mjs
+index 4a0ef41..130d424 100644
+--- a/node_modules/@google/genai/dist/node/index.mjs
++++ b/node_modules/@google/genai/dist/node/index.mjs
+@@ -10604,6 +10604,10 @@ class ApiClient {
+         if (opts.httpOptions) {
+             this.clientOptions.httpOptions = this.patchHttpOptions(initHttpOptions, opts.httpOptions);
+         }
++        this.fetch = fetch;
++        if (opts.fetch) {
++            this.fetch = opts.fetch;
++        }
+     }
+     /**
+      * Determines the base URL for Vertex AI based on project and location.
+@@ -10924,7 +10928,7 @@ class ApiClient {
+         });
+     }
+     async apiCall(url, requestInit) {
+-        return fetch(url, requestInit).catch((e) => {
++        return this.fetch(url, requestInit).catch((e) => {
+             throw new Error(`exception ${e} sending request`);
+         });
+     }

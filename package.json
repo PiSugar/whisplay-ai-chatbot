@@ -5,6 +5,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc",
     "start": "node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/index.js",
+    "postinstall": "patch-package",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -12,7 +13,7 @@
   "description": "",
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.3.1",
-    "@google/genai": "^1.25.0",
+    "@google/genai": "1.25.0",
     "axios": "^1.8.4",
     "crypto": "^1.0.1",
     "dotenv": "^16.5.0",
@@ -32,6 +33,7 @@
     "@types/lodash": "^4.17.17",
     "@types/node": "^22.15.21",
     "@types/ws": "^8.18.1",
+    "patch-package": "^8.0.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
