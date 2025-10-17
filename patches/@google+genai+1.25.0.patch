@@ -14,7 +14,7 @@ index 7c7be1a..d6de3ee 100644
  
  /** Tool to support Google Maps in Model. */
 diff --git a/node_modules/@google/genai/dist/node/index.cjs b/node_modules/@google/genai/dist/node/index.cjs
-index 3e72754..06ced26 100644
+index 3e72754..0d8af94 100644
 --- a/node_modules/@google/genai/dist/node/index.cjs
 +++ b/node_modules/@google/genai/dist/node/index.cjs
 @@ -10626,6 +10626,11 @@ class ApiClient {
@@ -38,8 +38,16 @@ index 3e72754..06ced26 100644
              throw new Error(`exception ${e} sending request`);
          });
      }
+@@ -15819,6 +15824,7 @@ class GoogleGenAI {
+             userAgentExtra: LANGUAGE_LABEL_PREFIX + process.version,
+             uploader: new NodeUploader(),
+             downloader: new NodeDownloader(),
++            fetch: options.fetch,
+         });
+         this.models = new Models(this.apiClient);
+         this.live = new Live(this.apiClient, auth, new NodeWebSocketFactory());
 diff --git a/node_modules/@google/genai/dist/node/index.mjs b/node_modules/@google/genai/dist/node/index.mjs
-index 4a0ef41..5fb27c3 100644
+index 4a0ef41..d74333d 100644
 --- a/node_modules/@google/genai/dist/node/index.mjs
 +++ b/node_modules/@google/genai/dist/node/index.mjs
 @@ -10604,6 +10604,11 @@ class ApiClient {
@@ -63,3 +71,11 @@ index 4a0ef41..5fb27c3 100644
              throw new Error(`exception ${e} sending request`);
          });
      }
+@@ -15797,6 +15802,7 @@ class GoogleGenAI {
+             userAgentExtra: LANGUAGE_LABEL_PREFIX + process.version,
+             uploader: new NodeUploader(),
+             downloader: new NodeDownloader(),
++            fetch: options.fetch,
+         });
+         this.models = new Models(this.apiClient);
+         this.live = new Live(this.apiClient, auth, new NodeWebSocketFactory());
