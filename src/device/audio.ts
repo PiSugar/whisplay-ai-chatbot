@@ -7,6 +7,22 @@ dotenv.config();
 
 const useWavPlayer = process.env.TTS_SERVER === "GEMINI";
 
+function startPlayerProcess() {
+  if (useWavPlayer) {
+    return spawn("aplay", [
+      "-f",
+      "S16_LE", // 16-bit PCM
+      "-r",
+      "24000", // rate
+      "-c",
+      "1", // channels
+      "-", // read from stdin
+    ]);
+  } else {
+    return spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
+  }
+}
+
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
 
@@ -97,19 +113,7 @@ const player: Player = {
 };
 
 setTimeout(() => {
-  if (useWavPlayer) {
-    player.process = spawn("aplay", [
-      "-f",
-      "S16_LE", // 16-bit PCM
-      "-r",
-      "24000", // rate
-      "-c",
-      "1", // channels
-      "-", // read from stdin
-    ]);
-  } else {
-    player.process = spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
-  }
+  player.process = startPlayerProcess();
 }, 5000);
 
 const playAudioData = (
@@ -163,7 +167,7 @@ const stopPlaying = (): void => {
     player.isPlaying = false;
     // Recreate process
     setTimeout(() => {
-      player.process = spawn("mpg123", ["-", "--scale", "2"]);
+      player.process = startPlayerProcess();
     }, 500);
   } else {
     console.log("No audio currently playing");
