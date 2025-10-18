@@ -93,8 +93,10 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       message: geminiPart,
     });
 
-    for await (const chunk of response) {
-      const chunkText = chunk.text;
+    // Handle streaming response from node-fetch
+    // @ts-ignore
+    for await (const chunk of response.stream) {
+      const chunkText = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
       if (chunkText) {
         partialCallback(chunkText);
         partialAnswer += chunkText;
