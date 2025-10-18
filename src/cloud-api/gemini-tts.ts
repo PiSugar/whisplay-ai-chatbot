@@ -11,7 +11,7 @@ dotenv.config();
 
 const geminiTTS = async (
   text: string
-): Promise<{ data: Buffer; duration: number; format?: string }> => {
+): Promise<{ data: Buffer; duration: number; }> => {
   try {
     if (!gemini) {
       console.error("Google Gemini API key is not set.");
@@ -45,7 +45,6 @@ const geminiTTS = async (
     return {
       data: buffer,
       duration: getPcmWavDurationMs(buffer),
-      format: "wav",
     };
   } catch (error) {
     console.error("Gemini TTS error:", error);

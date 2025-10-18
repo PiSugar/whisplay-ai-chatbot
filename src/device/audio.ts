@@ -100,15 +100,17 @@ setTimeout(() => {
   if (useWavPlayer) {
     player.process = spawn("sox", [
       "-t",
-      "wav",
+      "raw", // PCM
+      "-r",
+      "24000", // rate
+      "-c",
+      "1", // channels
+      "-e",
+      "signed", // PCM encoding
+      "-b",
+      "16", // bit depth
       "-",
       "-d",
-      "rate",
-      "24000",
-      "channels",
-      "1",
-      "vol",
-      "2.0",
     ]);
   } else {
     player.process = spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
@@ -117,7 +119,7 @@ setTimeout(() => {
 
 const playAudioData = (
   resAudioData: string,
-  audioDuration: number,
+  audioDuration: number
 ): Promise<void> => {
   const audioBuffer = Buffer.from(resAudioData, "base64");
   return new Promise((resolve, reject) => {
@@ -221,10 +223,7 @@ class StreamResponser {
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
         try {
-          const {
-            data: audio,
-            duration,
-          } = await this.speakArray[currentIndex];
+          const { data: audio, duration } = await this.speakArray[currentIndex];
           console.log(
             `Playing audio ${currentIndex + 1}/${this.speakArray.length}`
           );
