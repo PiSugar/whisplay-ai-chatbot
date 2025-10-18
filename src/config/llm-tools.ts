@@ -107,7 +107,7 @@ try {
 // remove geminiType from parameters for OpenAI compatibility
 export const llmTools: LLMTool[] = [...defaultTools, ...customTools];
 
-export const llmToolsForGemini: LLMTool[] = [...defaultTools, ...customTools].map(tool => {
+export const llmToolsForGemini = (): LLMTool[] => [...defaultTools, ...customTools].map(tool => {
   const newTool = { ...tool };
   if (newTool.function && newTool.function.parameters) {
     const addGeminiType = (obj: any) => {
