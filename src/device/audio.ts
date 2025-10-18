@@ -1,6 +1,11 @@
 import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop } from "lodash";
 import { splitSentences } from "../utils";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const useWavPlayer = process.env.TTS_SERVER === "GEMINI";
 
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
@@ -92,12 +97,27 @@ const player: Player = {
 };
 
 setTimeout(() => {
-  player.process = spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
+  if (useWavPlayer) {
+    player.process = spawn("sox", [
+      "-t",
+      "wav",
+      "-",
+      "-d",
+      "rate",
+      "24000",
+      "channels",
+      "1",
+      "vol",
+      "2.0",
+    ]);
+  } else {
+    player.process = spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
+  }
 }, 5000);
 
 const playAudioData = (
   resAudioData: string,
-  audioDuration: number
+  audioDuration: number,
 ): Promise<void> => {
   const audioBuffer = Buffer.from(resAudioData, "base64");
   return new Promise((resolve, reject) => {
@@ -180,7 +200,10 @@ class StreamResponser {
   private partialContent: string = "";
   private isStartSpeak: boolean = false;
   private playEndResolve: () => void = () => {};
-  private speakArray: Promise<{ data: string; duration: number }>[] = [];
+  private speakArray: Promise<{
+    data: string;
+    duration: number;
+  }>[] = [];
   private parsedSentences: string[] = [];
 
   constructor(
@@ -198,8 +221,13 @@ class StreamResponser {
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
         try {
-          const { data: audio, duration } = await this.speakArray[currentIndex];
-          console.log(`Playing audio ${currentIndex + 1}/${this.speakArray.length}`);
+          const {
+            data: audio,
+            duration,
+          } = await this.speakArray[currentIndex];
+          console.log(
+            `Playing audio ${currentIndex + 1}/${this.speakArray.length}`
+          );
           await playAudioData(audio, duration);
         } catch (error) {
           console.error("Audio playback error:", error);

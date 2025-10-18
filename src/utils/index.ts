@@ -50,7 +50,6 @@ export const getCurrentTimeTag = (): string => {
   return moment().format("YYYY-MM-DD HH:mm:ss");
 };
 
-
 export function splitSentences(text: string): {
   sentences: string[];
   remaining: string;
@@ -78,4 +77,15 @@ export function splitSentences(text: string): {
   const remaining = text.slice(lastIndex).trim();
 
   return { sentences, remaining };
+}
+
+export function getPcmWavDurationMs(buffer: Buffer<ArrayBuffer>): number {
+  const dataLength = buffer.length;
+
+  const channels = 1;
+  const sampleRate = 24000;
+  const sampleWidth = 2; // 每个采样字节数（16-bit）
+
+  const durationSeconds = dataLength / (sampleRate * channels * sampleWidth);
+  return Math.round(durationSeconds * 1000);
 }

@@ -1,43 +1,52 @@
-import { geminiTTSSpeaker, geminiTTSModel, GEMINI_API_KEY, geminiTTSLanguageCode } from "./gemini";
-import mp3Duration from "mp3-duration";
+import { getPcmWavDurationMs } from "../utils";
+import {
+  geminiTTSSpeaker,
+  geminiTTSModel,
+  geminiTTSLanguageCode,
+  gemini,
+} from "./gemini";
 import dotenv from "dotenv";
-import axios from "axios";
 
 dotenv.config();
 
-const url = `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${GEMINI_API_KEY}`;
-
 const geminiTTS = async (
   text: string
-): Promise<{ data: Buffer; duration: number }> => {
+): Promise<{ data: Buffer; duration: number; format?: string }> => {
   try {
-    const request = {
-      input: { text },
-      voice: {
-        languageCode: geminiTTSLanguageCode, // e.g., "en-US"
-        name: geminiTTSSpeaker, // Gemini TTS voice
-        modelName: geminiTTSModel, // Gemini TTS model
-      },
-      audioConfig: {
-        audioEncoding: "MP3" as const,
-      },
-    };
+    if (!gemini) {
+      console.error("Google Gemini API key is not set.");
+      return { data: Buffer.from([]), duration: 0 };
+    }
 
-    const response = await axios.post<
-      any,
-      {
-        audioContent: string;
-      }
-    >(url, request);
+    const response = await gemini.models.generateContent({
+      model: geminiTTSModel,
+      contents: [{ parts: [{ text }] }],
+      config: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: geminiTTSSpeaker },
+          },
+          languageCode: geminiTTSLanguageCode,
+        },
+      },
+    });
 
-    if (!response.audioContent) {
+    const audioData =
+      response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+    if (!audioData) {
       console.error("No audio content received from Gemini TTS");
       return { data: Buffer.from([]), duration: 0 };
     }
 
-    const buffer = Buffer.from(response.audioContent);
-    const duration = await mp3Duration(buffer);
-    return { data: buffer, duration: duration * 1000 };
+    const buffer = Buffer.from(audioData, "base64");
+
+    return {
+      data: buffer,
+      duration: getPcmWavDurationMs(buffer),
+      format: "wav",
+    };
   } catch (error) {
     console.error("Gemini TTS error:", error);
     return { data: Buffer.from([]), duration: 0 };
