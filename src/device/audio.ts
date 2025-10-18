@@ -98,19 +98,14 @@ const player: Player = {
 
 setTimeout(() => {
   if (useWavPlayer) {
-    player.process = spawn("sox", [
-      "-t",
-      "raw", // PCM
+    player.process = spawn("aplay", [
+      "-f",
+      "S16_LE", // 16-bit PCM
       "-r",
       "24000", // rate
       "-c",
       "1", // channels
-      "-e",
-      "signed", // PCM encoding
-      "-b",
-      "16", // bit depth
-      "-",
-      "-d",
+      "-", // read from stdin
     ]);
   } else {
     player.process = spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
