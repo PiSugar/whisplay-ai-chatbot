@@ -24,7 +24,7 @@ export const recognizeAudio = async (
     const mimeType = getMimeType(fileExtension);
 
     const contents = [
-      { text: "Generate a transcript of the speech." },
+      { text: "Generate a transcript of the speech. Do not include noise, silence, or any non-speech sounds. Only write the words that are actually spoken." },
       {
         inlineData: {
           mimeType: mimeType,
