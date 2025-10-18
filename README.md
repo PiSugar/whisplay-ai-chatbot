@@ -90,8 +90,8 @@ bash pisugar-power-manager.sh -c release
 - Reset the conversation history if there is no speech for five minutes ✅
 - Support local llm server ✅
 - Refactor python render thread, better performance ✅
-- Add Google Gemini API support
-- RPI cammera support 
+- Add Google Gemini API support ✅
+- RPI camera support
 - Support speaker recognition
 
 ## License
