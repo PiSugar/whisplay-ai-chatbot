@@ -38,7 +38,7 @@ const convertToolsToGeminiFormat = (tools: LLMTool[]): ToolListUnion => {
 const chat = gemini?.chats.create({
   model: geminiModel,
   config: {
-    // tools: convertToolsToGeminiFormat(llmToolsForGemini), // TODO
+    // tools: convertToolsToGeminiFormat(llmToolsForGemini),
     systemInstruction: {
       parts: [{ text: systemPrompt }],
       role: "system",
@@ -93,10 +93,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       message: geminiPart,
     });
 
-    // Handle streaming response from node-fetch
-    // @ts-ignore
-    for await (const chunk of response.stream) {
-      const chunkText = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    for await (const chunk of response) {
+      const chunkText = chunk.text;
       if (chunkText) {
         partialCallback(chunkText);
         partialAnswer += chunkText;

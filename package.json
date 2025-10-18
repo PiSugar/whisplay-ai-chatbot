@@ -25,6 +25,7 @@
     "openai": "^5.12.2",
     "socks-proxy-agent": "^8.0.5",
     "tencentcloud-sdk-nodejs": "^4.1.16",
+    "undici": "^7.16.0",
     "uuid": "^11.1.0",
     "ws": "^8.18.1",
     "zlib": "^1.0.5"

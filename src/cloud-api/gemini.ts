@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { proxyFetch } from "./proxy-fetch";
+import { undiciProxyFetch } from "./proxy-fetch";
 
 
 dotenv.config();
@@ -14,6 +14,6 @@ export const geminiTTSLanguageCode = process.env.GEMINI_TTS_LANGUAGE_CODE || "en
 export const gemini = GEMINI_API_KEY
   ? new GoogleGenAI({
       apiKey: GEMINI_API_KEY,
-      fetch: proxyFetch as any,
+      fetch: undiciProxyFetch as any,
     })
   : null;
