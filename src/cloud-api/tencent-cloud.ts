@@ -71,12 +71,12 @@ const getAuthorization = (payload: string, service: "asr" | "tts"): Authorizatio
 
 const recognizeAudio = async (audioPath: string): Promise<string | undefined> => {
   if (!isTencentASRConfigValid()) {
-    console.error("腾讯云 ASR 配置不正确");
+    console.error("Tencent Cloud ASR configuration is incorrect");
     return '';
   }
-  console.time("识别音频");
+  console.time("Audio recognition");
   if (!fs.existsSync(audioPath)) {
-    console.error("音频文件不存在");
+    console.error("Audio file does not exist");
     return '';
   }
   const audioData = fs.readFileSync(audioPath).toString("base64");
@@ -102,17 +102,16 @@ const recognizeAudio = async (audioPath: string): Promise<string | undefined> =>
 
   try {
     const res = await axios.post(`https://${ASR_ENDPOINT}`, payload, { headers });
-    console.timeEnd("识别音频");
-    console.log("识别结果：", res.data.Response.Result);
+    console.log("Audio recognized result:", res.data.Response.Result);
     return res.data.Response.Result;
   } catch (err: any) {
-    console.error("识别失败：", err.response?.data || err.message);
+    console.error("Audio recognition failed:", err.response?.data || err.message);
   }
 };
 
 const synthesizeSpeech = async (text: string): Promise<{ data: Buffer; duration: number } | undefined> => {
   if (!isTencentTTSConfigValid()) {
-    console.error("腾讯云 TTS 配置不正确");
+    console.error("Tencent Cloud TTS configuration is incorrect");
     return;
   }
   const payload = JSON.stringify({
@@ -141,12 +140,12 @@ const synthesizeSpeech = async (text: string): Promise<{ data: Buffer; duration:
 
   try {
     const res = await axios.post(`https://${TTS_ENDPOINT}`, payload, { headers });
-    console.log("合成语音完成");
+    console.log("Speech synthesis completed");
     const buffer = Buffer.from(await res.data.Response.Audio.arrayBuffer());
     const duration = 0; // Replace with actual duration calculation if needed
     return { data: buffer, duration: duration * 1000 };
   } catch (err: any) {
-    console.error("合成语音失败：", err.response?.data || err.message);
+    console.error("Speech synthesis failed:", err.response?.data || err.message);
   }
 };
 

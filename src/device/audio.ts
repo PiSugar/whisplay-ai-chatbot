@@ -26,8 +26,8 @@ const recordAudio = (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
-    console.log(`Recording started, maximum ${duration} seconds...`);
-    const recordingProcess = exec(cmd, (err, _stdout, stderr) => {
+    console.log(`Starting recording, maximum ${duration} seconds...`);
+    const recordingProcess = exec(cmd, (err, stdout, stderr) => {
       currentRecordingReject = reject;
       if (err) {
         killAllRecordingProcesses();
@@ -54,9 +54,9 @@ const recordAudioManually = (
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
-    const _recordingProcess = exec(
+    const recordingProcess = exec(
       `sox -t alsa default -t mp3 ${outputPath}`,
-      (err, _stdout, stderr) => {
+      (err, stdout, stderr) => {
         if (err) {
           killAllRecordingProcesses();
           reject(stderr);
@@ -82,7 +82,7 @@ const stopRecording = (): void => {
     } catch (e) {}
     console.log("Recording stopped");
   } else {
-    console.log("No recording process is running");
+    console.log("No recording process running");
   }
 };
 
@@ -118,13 +118,13 @@ const playAudioData = (
 ): Promise<void> => {
   const audioBuffer = Buffer.from(resAudioData, "base64");
   return new Promise((resolve, reject) => {
-    console.log("Playing duration:", audioDuration);
+    console.log("Playback duration:", audioDuration);
     player.isPlaying = true;
     setTimeout(() => {
       resolve();
       player.isPlaying = false;
       console.log("Audio playback completed");
-    }, audioDuration); // 加1秒缓冲
+    }, audioDuration); // Add 1 second buffer
 
     const process = player.process;
 
@@ -161,16 +161,16 @@ const stopPlaying = (): void => {
       }
     } catch {}
     player.isPlaying = false;
-    // 重新创建进程
+    // Recreate process
     setTimeout(() => {
       player.process = spawn("mpg123", ["-", "--scale", "2"]);
     }, 500);
   } else {
-    console.log("No audio is currently playing");
+    console.log("No audio currently playing");
   }
 };
 
-// 退出程序时关闭音频播放器
+// Close audio player when exiting program
 process.on("SIGINT", () => {
   try {
     if (player.process) {
