@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import { resolve } from "path";
 import { Socket } from "net";
-import { getCurrentTimeTag, splitSentences } from "../utils";
+import { getCurrentTimeTag } from "../utils";
 
 interface Status {
   status: string;

@@ -55,7 +55,7 @@ export function splitSentences(text: string): {
   remaining: string;
 } {
   const regex =
-    /.*?([。！？!?，,]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\.)(?=\s|$)/gs;
+    /.*?([。！？!?，,]|\.)(?=\s|$)/gs;
 
   const sentences: string[] = [];
   let lastIndex = 0;
@@ -76,7 +76,24 @@ export function splitSentences(text: string): {
 
   const remaining = text.slice(lastIndex).trim();
 
-  return { sentences, remaining };
+  // merge short sentences
+  const newSentences: string[] = [];
+  let buffer = "";
+  sentences.forEach((sentence) => {
+    if ((buffer + `${sentence} `).length <= 60) {
+      buffer += `${sentence} `;
+    } else {
+      if (buffer) {
+        newSentences.push(buffer);
+      }
+      buffer = `${sentence} `;
+    }
+  });
+  if (buffer) {
+    newSentences.push(buffer);
+  }
+
+  return { sentences: newSentences, remaining };
 }
 
 export function getPcmWavDurationMs(buffer: Buffer<ArrayBuffer>): number {
