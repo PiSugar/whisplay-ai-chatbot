@@ -1,5 +1,5 @@
 import { OpenAI, ClientOptions } from "openai";
-import { undiciProxyFetch } from "./proxy-fetch";
+import { proxyFetch } from "./proxy-fetch";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -9,7 +9,7 @@ const openAiBaseURL = process.env.OPENAI_API_BASE_URL;
 
 const openAiOptions: ClientOptions = {
   apiKey: openAiAPIKey,
-  fetch: undiciProxyFetch as any,
+  fetch: proxyFetch as any,
 };
 
 if (openAiBaseURL) {
