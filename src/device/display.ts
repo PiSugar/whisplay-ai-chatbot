@@ -81,6 +81,7 @@ export class WhisplayDisplay {
     if (this.pythonProcess) {
       console.log("Killing Python process...");
       this.pythonProcess.kill();
+      process.kill(this.pythonProcess.pid, "SIGKILL");
       this.pythonProcess = null;
     }
   }
