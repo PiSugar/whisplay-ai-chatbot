@@ -227,27 +227,33 @@ export const onButtonPressed =
 export const onButtonReleased =
   displayInstance.onButtonReleased.bind(displayInstance);
 
-// kill the Python process on exit signals
-process.on("SIGINT", () => {
-  console.log("SIGINT received, killing Python process...");
+function cleanup() {
+  console.log("Cleaning up display process before exit...");
   displayInstance.killPythonProcess();
+}
+
+// kill the Python process on exit signals
+process.on("exit", cleanup);
+process.on("SIGINT", () => {
+  cleanup();
   process.exit(0);
 });
 process.on("SIGTERM", () => {
-  console.log("SIGTERM received, killing Python process...");
-  displayInstance.killPythonProcess();
+  cleanup();
   process.exit(0);
 });
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
-  displayInstance.killPythonProcess();
+  cleanup();
+  process.exit(1);
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  displayInstance.killPythonProcess();
+  cleanup();
+  process.exit(1);
 });
 process.on("keyboardInterrupt", () => {
   console.log("Keyboard Interrupt received, killing Python process...");
-  displayInstance.killPythonProcess();
+  cleanup();
   process.exit(0);
 });
