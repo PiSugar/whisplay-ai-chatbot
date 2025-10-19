@@ -46,8 +46,6 @@ export class WhisplayDisplay {
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
 
-  
-
   constructor() {
     this.startPythonProcess();
     this.isReady = new Promise<void>((resolve) => {
@@ -79,7 +77,7 @@ export class WhisplayDisplay {
 
   killPythonProcess(): void {
     if (this.pythonProcess) {
-      console.log("Killing Python process...");
+      console.log("Killing Python process...", this.pythonProcess.pid);
       this.pythonProcess.kill();
       process.kill(this.pythonProcess.pid, "SIGKILL");
       this.pythonProcess = null;
@@ -235,13 +233,12 @@ function cleanup() {
 
 // kill the Python process on exit signals
 process.on("exit", cleanup);
-process.on("SIGINT", () => {
-  cleanup();
-  process.exit(0);
-});
-process.on("SIGTERM", () => {
-  cleanup();
-  process.exit(0);
+["SIGINT", "SIGTERM"].forEach((signal) => {
+  process.on(signal, () => {
+    console.log(`Received ${signal}, exiting...`);
+    cleanup();
+    process.exit(0);
+  });
 });
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
