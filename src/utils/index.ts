@@ -96,13 +96,28 @@ export function splitSentences(text: string): {
   return { sentences: newSentences, remaining };
 }
 
-export function getPcmWavDurationMs(buffer: Buffer<ArrayBuffer>): number {
+export function getPcmWavDurationMs(buffer: Buffer<ArrayBuffer>, params: {
+  channels?: number;
+  sampleRate?: number;
+  sampleWidth?: number;
+}): number {
   const dataLength = buffer.length;
 
-  const channels = 1;
-  const sampleRate = 24000;
-  const sampleWidth = 2; // 每个采样字节数（16-bit）
+  const channels = params.channels || 1;
+  const sampleRate = params.sampleRate || 16000;
+  const sampleWidth = params.sampleWidth || 2; // 每个采样字节数（16-bit）
 
   const durationSeconds = dataLength / (sampleRate * channels * sampleWidth);
+  return Math.round(durationSeconds * 1000);
+}
+
+export function getWavFileDurationMs(buffer: Buffer<ArrayBuffer>): number {
+  // WAV 文件头部信息在前 44 字节
+  const header = buffer.subarray(0, 44);
+  // const channels = header.readUInt16LE(22); // 通道数
+  // const sampleRate = header.readUInt32LE(24); // 采样率
+  const byteRate = header.readUInt32LE(28); // 字节率
+  const dataLength = buffer.length - 44; // 音频数据长度
+  const durationSeconds = dataLength / byteRate;
   return Math.round(durationSeconds * 1000);
 }

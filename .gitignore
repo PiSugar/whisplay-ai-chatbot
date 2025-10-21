@@ -1,5 +1,6 @@
 node_modules
 data
+tts_temp
 .env
 emoji_svg
 NotoSansSC-Bold.ttf

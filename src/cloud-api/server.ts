@@ -32,78 +32,104 @@ import {
   ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
+import piperTTS from "./piper-tts";
 
 dotenv.config();
+
+export enum ASRServer {
+  volcengine = "volcengine",
+  tencent = "tencent",
+  openai = "openai",
+  gemini = "gemini",
+}
+
+export enum LLMServer {
+  volcengine = "volcengine",
+  openai = "openai",
+  ollama = "ollama",
+  gemini = "gemini",
+}
+
+export enum TTSServer {
+  volcengine = "volcengine",
+  openai = "openai",
+  tencent = "tencent",
+  gemini = "gemini",
+  piper = "piper",
+}
 
 let recognizeAudio: RecognizeAudioFunction = noop as any;
 let chatWithLLMStream: ChatWithLLMStreamFunction = noop as any;
 let ttsProcessor: TTSProcessorFunction = noop as any;
 let resetChatHistory: ResetChatHistoryFunction = noop as any;
 
-const asrServer = process.env.ASR_SERVER || "TENCENT";
-const llmServer = process.env.LLM_SERVER || "VOLCENGINE";
-const ttsServer = process.env.TTS_SERVER || "VOLCENGINE";
+export const asrServer: ASRServer = (process.env.ASR_SERVER || ASRServer.tencent).toLowerCase() as ASRServer;
+export const llmServer: LLMServer = (process.env.LLM_SERVER || LLMServer.volcengine).toLowerCase() as LLMServer;
+export const ttsServer: TTSServer = (process.env.TTS_SERVER || TTSServer.volcengine).toLowerCase() as TTSServer;
 
 switch (asrServer) {
-  case "VOLCENGINE":
+  case ASRServer.volcengine:
     recognizeAudio = VolcengineASR;
     break;
-  case "TENCENT":
+  case ASRServer.tencent:
     recognizeAudio = TencentASR;
     break;
-  case "OPENAI":
+  case ASRServer.openai:
     recognizeAudio = OpenAIASR;
     break;
-  case "GEMINI":
+  case ASRServer.gemini:
     recognizeAudio = GeminiASR;
     break;
   default:
     console.warn(
-      `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI`
+      `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI`
     );
     break;
 }
 
 switch (llmServer) {
-  case "VOLCENGINE":
+  case LLMServer.volcengine:
     chatWithLLMStream = VolcengineLLMStream;
     resetChatHistory = VolcengineResetChatHistory;
     break;
-  case "OPENAI":
+  case LLMServer.openai:
     chatWithLLMStream = OpenAILLMStream;
     resetChatHistory = OpenAIResetChatHistory;
     break;
-  case "OLLAMA":
+  case LLMServer.ollama:
     chatWithLLMStream = OllamaLLMStream;
     resetChatHistory = OllamaResetChatHistory;
     break;
-  case "GEMINI":
+  case LLMServer.gemini:
     chatWithLLMStream = GeminiLLMStream;
     resetChatHistory = GeminiResetChatHistory;
     break;
   default:
     console.warn(
-      `unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI`
+      `unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI/GEMINI/OLLAMA`
     );
     break;
 }
 
 switch (ttsServer) {
-  case "VOLCENGINE":
+  case TTSServer.volcengine:
     ttsProcessor = VolcengineTTS;
     break;
-  case "OPENAI":
+  case TTSServer.openai:
     ttsProcessor = OpenAITTS;
     break;
-  case "TENCENT":
+  case TTSServer.tencent:
     ttsProcessor = TencentTTS;
     break;
-  case "GEMINI":
+  case TTSServer.gemini:
     ttsProcessor = geminiTTS;
+    break;
+  case TTSServer.piper:
+    ttsProcessor = piperTTS;
     break;
   default:
     console.warn(
-      `unknown tts server: ${ttsServer}, should be VOLCENGINE/TENCENT/OPENAI`
+      `unknown tts server: ${ttsServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI/PIPER`
     );
     break;
 }

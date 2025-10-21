@@ -44,7 +44,11 @@ const geminiTTS = async (
 
     return {
       data: buffer,
-      duration: getPcmWavDurationMs(buffer),
+      duration: getPcmWavDurationMs(buffer, {
+        channels: 1,
+        sampleRate: 16000,
+        sampleWidth: 2,
+      }),
     };
   } catch (error) {
     console.error("Gemini TTS error:", error);
