@@ -1,8 +1,8 @@
+import * as fs from "fs";
+import * as path from "path";
+import { spawn } from "child_process";
 import { getWavFileDurationMs } from "../utils";
 import dotenv from "dotenv";
-const { spawn } = require("child_process");
-const fs = require("fs").promises;
-const path = require("path");
 
 dotenv.config();
 
@@ -46,11 +46,11 @@ const piperTTS = async (
       }
 
       try {
-        const buffer = await fs.readFile(tempWavFile);
+        const buffer = await fs.readFileSync(tempWavFile);
         const duration = await getWavFileDurationMs(buffer);
 
         // Clean up temp file
-        await fs.unlink(tempWavFile);
+        await fs.unlinkSync(tempWavFile);
 
         resolve({ data: buffer, duration });
       } catch (error) {
