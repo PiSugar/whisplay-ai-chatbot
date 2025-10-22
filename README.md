@@ -92,6 +92,8 @@ bash pisugar-power-manager.sh -c release
 - Enable the AI assistant to adjust the volume autonomously ✅
 - Reset the conversation history if there is no speech for five minutes ✅
 - Support local llm server ✅
+- Support local asr (vosk) ✅
+- Support local tts (piper) ✅
 - Refactor python render thread, better performance ✅
 - Add Google Gemini API support ✅
 - RPI camera support
