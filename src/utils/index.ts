@@ -4,6 +4,7 @@
 import { get, isArray } from "lodash";
 import { FunctionCall } from "../type";
 import moment from "moment";
+import { exec } from "child_process";
 
 export const combineFunction = (packages: FunctionCall[][]): FunctionCall[] => {
   return packages.reduce((callFunctions: FunctionCall[], itemArray) => {
@@ -121,3 +122,26 @@ export function getWavFileDurationMs(buffer: Buffer<ArrayBuffer>): number {
   const durationSeconds = dataLength / byteRate;
   return Math.round(durationSeconds * 1000);
 }
+
+export const killAllProcesses = (pid: number) => {
+  exec(`ps --ppid ${pid} -o pid=`, (err, stdout, stderr) => {
+    if (err) {
+      console.error("Error getting child processes:", stderr);
+      return;
+    }
+    // 子进程 PID 输出在 stdout 中
+    const childPids = stdout.trim().split("\n");
+
+    // 给父进程和所有子进程发送 kill 信号
+    const allPids = [pid, ...childPids];
+    allPids.forEach((childPid) => {
+      exec(`kill -9 ${childPid}`, (err, stdout, stderr) => {
+        if (err) {
+          console.error(`Error killing process ${childPid}:`, stderr);
+        } else {
+          console.log(`Killed process ${childPid}`);
+        }
+      });
+    });
+  });
+};

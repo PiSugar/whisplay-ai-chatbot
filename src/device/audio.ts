@@ -1,6 +1,6 @@
 import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop } from "lodash";
-import { splitSentences } from "../utils";
+import { killAllProcesses, splitSentences } from "../utils";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
 import { ASRServer, TTSServer } from "../type";
@@ -36,7 +36,7 @@ const killAllRecordingProcesses = (): void => {
     console.log("Killing recording process", child.pid);
     try {
       child.stdin?.end();
-      child.kill("SIGKILL");
+      killAllProcesses(child.pid!);
     } catch (e) {}
   });
   recordingProcessList.length = 0;
