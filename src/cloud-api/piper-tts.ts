@@ -50,8 +50,9 @@ const piperTTS = async (
         const duration = await getWavFileDurationMs(buffer);
 
         // Clean up temp file
-        // await fs.unlinkSync(tempWavFile);
+        await fs.unlinkSync(tempWavFile);
 
+        // remove wav header, otherwise playback process will stop automatically
         const headerSize = 44;
         const trimmedBuffer = buffer.subarray(headerSize);
         resolve({ data: trimmedBuffer, duration });
