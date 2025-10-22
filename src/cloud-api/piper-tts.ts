@@ -15,10 +15,7 @@ const dataDir = path.join(__dirname, "tts_temp");
 
 let checkedDir = false;
 
-// piper cannot handle concurrent requests, so we queue them
-const piperQueue: Array<() => Promise<void>> = [];
-
-const piperTTSConverter = async (
+const piperTTS = async (
   text: string
 ): Promise<{ data: Buffer; duration: number }> => {
   if (!checkedDir) {
@@ -53,7 +50,7 @@ const piperTTSConverter = async (
         const duration = await getWavFileDurationMs(buffer);
 
         // Clean up temp file
-        await fs.unlinkSync(tempWavFile);
+        // await fs.unlinkSync(tempWavFile);
 
         resolve({ data: buffer, duration });
       } catch (error) {
@@ -64,28 +61,6 @@ const piperTTSConverter = async (
     piperProcess.on("error", (error: any) => {
       reject(error);
     });
-  });
-};
-
-const piperTTS = async (text: string): Promise<{ data: Buffer; duration: number }> => {
-  return new Promise((resolve, reject) => {
-    piperQueue.push(async () => {
-      try {
-        const result = await piperTTSConverter(text);
-        resolve(result);
-      } catch (error) {
-        reject(error);
-      } finally {
-        piperQueue.shift();
-        if (piperQueue.length > 0) {
-          piperQueue[0]();
-        }
-      }
-    });
-
-    if (piperQueue.length === 1) {
-      piperQueue[0]();
-    }
   });
 };
 
