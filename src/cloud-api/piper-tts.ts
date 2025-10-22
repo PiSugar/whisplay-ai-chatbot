@@ -52,7 +52,9 @@ const piperTTS = async (
         // Clean up temp file
         // await fs.unlinkSync(tempWavFile);
 
-        resolve({ data: buffer, duration });
+        const headerSize = 44;
+        const trimmedBuffer = buffer.subarray(headerSize);
+        resolve({ data: trimmedBuffer, duration });
       } catch (error) {
         reject(error);
       }
