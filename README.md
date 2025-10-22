@@ -51,14 +51,17 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
 
 ## Build After Code Changes
 
-If you make changes to the node code, you need to rebuild the project. You can do this by running:
+If you make changes to the node code or just pull the new code from this repository, you need to rebuild the project. You can do this by running:
 
 ```bash
-yarn
-yarn build
+bash build.sh
 ```
 
-If you add new third-party libraries to the python code, make sure to install them in global environment with `--break-system-packages`.
+If there's new third-party libraries to the python code, make sure to install them in global environment with `--break-system-packages`.
+```
+cd python
+pip install -r requirements.txt --break-system-packages
+```
 
 ## Update Environment Variables
 
