@@ -2,12 +2,13 @@ import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop } from "lodash";
 import { splitSentences } from "../utils";
 import dotenv from "dotenv";
-import { ttsServer } from "../cloud-api/server";
-import { TTSServer } from "../type";
+import { ttsServer, asrServer } from "../cloud-api/server";
+import { ASRServer, TTSServer } from "../type";
 
 dotenv.config();
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
+export const recordFileFormat = [ASRServer.vosk].includes(asrServer) ? "wav" : "mp3";
 
 function startPlayerProcess() {
   if (useWavPlayer) {

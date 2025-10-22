@@ -11,6 +11,7 @@ export enum ASRServer {
   tencent = "tencent",
   openai = "openai",
   gemini = "gemini",
+  vosk = "vosk",
 }
 
 export enum LLMServer {

@@ -6,7 +6,11 @@ import {
   display,
   getCurrentStatus,
 } from "../device/display";
-import { recordAudioManually, StreamResponser } from "../device/audio";
+import {
+  recordAudioManually,
+  StreamResponser,
+  recordFileFormat,
+} from "../device/audio";
 import {
   recognizeAudio,
   chatWithLLMStream,
@@ -95,7 +99,9 @@ class ChatFlow {
         break;
       case "listening":
         this.currentFlowName = "listening";
-        this.currentRecordFilePath = `${this.dataDir}/user-${Date.now()}.mp3`;
+        this.currentRecordFilePath = `${
+          this.dataDir
+        }/user-${Date.now()}.${recordFileFormat}`;
         onButtonPressed(noop);
         const { result, stop } = recordAudioManually(
           this.currentRecordFilePath
@@ -167,7 +173,7 @@ class ChatFlow {
           ],
           partial,
           endPartial,
-          this.partialThinkingCallback,
+          this.partialThinkingCallback
         );
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {
