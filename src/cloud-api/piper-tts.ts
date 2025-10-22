@@ -6,16 +6,19 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const openAiVoiceModel =
+const piperBinaryPath =
   process.env.PIPER_BINARY_PATH || "/home/pi/piper/piper"; // Default to tts-1
-const openAiVoiceType =
+const piperModelPath =
   process.env.PIPER_MODEL_PATH || "/home/pi/piper/voices/en_US-amy-medium.onnx";
 
 const dataDir = path.join(__dirname, "tts_temp");
 
 let checkedDir = false;
 
-const piperTTS = async (
+// piper cannot handle concurrent requests, so we queue them
+const piperQueue: Array<() => Promise<void>> = [];
+
+const piperTTSConverter = async (
   text: string
 ): Promise<{ data: Buffer; duration: number }> => {
   if (!checkedDir) {
@@ -29,9 +32,9 @@ const piperTTS = async (
   }
   return new Promise((resolve, reject) => {
     const tempWavFile = path.join(dataDir, `piper_${Date.now()}.wav`);
-    const piperProcess = spawn(openAiVoiceModel, [
+    const piperProcess = spawn(piperBinaryPath, [
       "--model",
-      openAiVoiceType,
+      piperModelPath,
       "--output_file",
       tempWavFile,
     ]);
@@ -61,6 +64,28 @@ const piperTTS = async (
     piperProcess.on("error", (error: any) => {
       reject(error);
     });
+  });
+};
+
+const piperTTS = async (text: string): Promise<{ data: Buffer; duration: number }> => {
+  return new Promise((resolve, reject) => {
+    piperQueue.push(async () => {
+      try {
+        const result = await piperTTSConverter(text);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      } finally {
+        piperQueue.shift();
+        if (piperQueue.length > 0) {
+          piperQueue[0]();
+        }
+      }
+    });
+
+    if (piperQueue.length === 1) {
+      piperQueue[0]();
+    }
   });
 };
 

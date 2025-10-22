@@ -6,6 +6,28 @@ export interface Message {
   tool_call_id?: string;
 }
 
+export enum ASRServer {
+  volcengine = "volcengine",
+  tencent = "tencent",
+  openai = "openai",
+  gemini = "gemini",
+}
+
+export enum LLMServer {
+  volcengine = "volcengine",
+  openai = "openai",
+  ollama = "ollama",
+  gemini = "gemini",
+}
+
+export enum TTSServer {
+  volcengine = "volcengine",
+  openai = "openai",
+  tencent = "tencent",
+  gemini = "gemini",
+  piper = "piper",
+}
+
 export interface FunctionCall {
   function: {
     arguments: string;

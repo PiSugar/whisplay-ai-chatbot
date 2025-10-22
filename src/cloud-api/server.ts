@@ -1,5 +1,6 @@
 import { noop } from "lodash";
 import dotenv from "dotenv";
+import { ASRServer, LLMServer, TTSServer } from "../type";
 import { recognizeAudio as VolcengineASR } from "./volcengine-asr";
 import {
   recognizeAudio as TencentASR,
@@ -36,36 +37,20 @@ import piperTTS from "./piper-tts";
 
 dotenv.config();
 
-export enum ASRServer {
-  volcengine = "volcengine",
-  tencent = "tencent",
-  openai = "openai",
-  gemini = "gemini",
-}
-
-export enum LLMServer {
-  volcengine = "volcengine",
-  openai = "openai",
-  ollama = "ollama",
-  gemini = "gemini",
-}
-
-export enum TTSServer {
-  volcengine = "volcengine",
-  openai = "openai",
-  tencent = "tencent",
-  gemini = "gemini",
-  piper = "piper",
-}
-
 let recognizeAudio: RecognizeAudioFunction = noop as any;
 let chatWithLLMStream: ChatWithLLMStreamFunction = noop as any;
 let ttsProcessor: TTSProcessorFunction = noop as any;
 let resetChatHistory: ResetChatHistoryFunction = noop as any;
 
-export const asrServer: ASRServer = (process.env.ASR_SERVER || ASRServer.tencent).toLowerCase() as ASRServer;
-export const llmServer: LLMServer = (process.env.LLM_SERVER || LLMServer.volcengine).toLowerCase() as LLMServer;
-export const ttsServer: TTSServer = (process.env.TTS_SERVER || TTSServer.volcengine).toLowerCase() as TTSServer;
+export const asrServer: ASRServer = (
+  process.env.ASR_SERVER || ASRServer.tencent
+).toLowerCase() as ASRServer;
+export const llmServer: LLMServer = (
+  process.env.LLM_SERVER || LLMServer.volcengine
+).toLowerCase() as LLMServer;
+export const ttsServer: TTSServer = (
+  process.env.TTS_SERVER || TTSServer.volcengine
+).toLowerCase() as TTSServer;
 
 switch (asrServer) {
   case ASRServer.volcengine:

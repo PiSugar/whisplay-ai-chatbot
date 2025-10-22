@@ -2,7 +2,8 @@ import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop } from "lodash";
 import { splitSentences } from "../utils";
 import dotenv from "dotenv";
-import { TTSServer, ttsServer } from "../cloud-api/server";
+import { ttsServer } from "../cloud-api/server";
+import { TTSServer } from "../type";
 
 dotenv.config();
 
