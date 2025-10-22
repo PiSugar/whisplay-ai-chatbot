@@ -8,7 +8,9 @@ import { ASRServer, TTSServer } from "../type";
 dotenv.config();
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
-export const recordFileFormat = [ASRServer.vosk].includes(asrServer) ? "wav" : "mp3";
+export const recordFileFormat = [ASRServer.vosk].includes(asrServer)
+  ? "wav"
+  : "mp3";
 
 function startPlayerProcess() {
   if (useWavPlayer) {
@@ -44,7 +46,7 @@ const recordAudio = (
   duration: number = 10
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const cmd = `sox -t alsa default -t mp3 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
+    const cmd = `sox -t alsa default -t ${recordFileFormat} ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`Starting recording, maximum ${duration} seconds...`);
     const recordingProcess = exec(cmd, (err, stdout, stderr) => {
       currentRecordingReject = reject;
