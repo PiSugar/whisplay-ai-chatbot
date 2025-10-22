@@ -33,6 +33,7 @@ let currentRecordingReject: (reason?: any) => void = noop;
 
 const killAllRecordingProcesses = (): void => {
   recordingProcessList.forEach((child) => {
+    console.log("Killing recording process", child.pid);
     try {
       child.stdin?.end();
       child.kill("SIGKILL");
@@ -77,7 +78,7 @@ const recordAudioManually = (
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
     const recordingProcess = exec(
-      `sox -t alsa default -t mp3 ${outputPath}`,
+      `sox -t alsa default -t ${recordFileFormat} ${outputPath}`,
       (err, stdout, stderr) => {
         if (err) {
           killAllRecordingProcesses();
@@ -85,6 +86,7 @@ const recordAudioManually = (
         }
       }
     );
+    recordingProcessList.push(recordingProcess);
     stopFunc = () => {
       killAllRecordingProcesses();
       resolve(outputPath);
