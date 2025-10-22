@@ -55,6 +55,7 @@ const recordAudio = (
         reject(stderr);
       } else {
         resolve(outputPath);
+        killAllRecordingProcesses();
       }
     });
     recordingProcessList.push(recordingProcess);
