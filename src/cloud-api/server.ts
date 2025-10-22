@@ -8,6 +8,7 @@ import {
 } from "./tencent-cloud";
 import { recognizeAudio as OpenAIASR } from "./openai-asr";
 import { recognizeAudio as GeminiASR } from "./gemini-asr";
+import { recognizeAudio as VoskASR } from "./vosk-asr";
 import {
   chatWithLLMStream as VolcengineLLMStream,
   resetChatHistory as VolcengineResetChatHistory,
@@ -64,6 +65,9 @@ switch (asrServer) {
     break;
   case ASRServer.gemini:
     recognizeAudio = GeminiASR;
+    break;
+  case ASRServer.vosk:
+    recognizeAudio = VoskASR;
     break;
   default:
     console.warn(
