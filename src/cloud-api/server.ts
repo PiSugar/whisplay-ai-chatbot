@@ -53,6 +53,10 @@ export const ttsServer: TTSServer = (
   process.env.TTS_SERVER || TTSServer.volcengine
 ).toLowerCase() as TTSServer;
 
+console.log(`Current ASR Server: ${asrServer}`);
+console.log(`Current LLM Server: ${llmServer}`);
+console.log(`Current TTS Server: ${ttsServer}`);
+
 switch (asrServer) {
   case ASRServer.volcengine:
     recognizeAudio = VolcengineASR;

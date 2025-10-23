@@ -1,11 +1,11 @@
-// 输入 [[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]]
-// 输出 [{"function":{"arguments":" {\"volume\": 21}","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}]
-
+import { Type as GeminiType } from "@google/genai";
 import { get, isArray } from "lodash";
 import { FunctionCall } from "../type";
 import moment from "moment";
 import { exec } from "child_process";
 
+// 输入 [[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]]
+// 输出 [{"function":{"arguments":" {\"volume\": 21}","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}]
 export const combineFunction = (packages: FunctionCall[][]): FunctionCall[] => {
   return packages.reduce((callFunctions: FunctionCall[], itemArray) => {
     if (!isArray(itemArray)) {
@@ -55,8 +55,7 @@ export function splitSentences(text: string): {
   sentences: string[];
   remaining: string;
 } {
-  const regex =
-    /.*?([。！？!?，,]|\.)(?=\s|$)/gs;
+  const regex = /.*?([。！？!?，,]|\.)(?=\s|$)/gs;
 
   const sentences: string[] = [];
   let lastIndex = 0;
@@ -97,11 +96,14 @@ export function splitSentences(text: string): {
   return { sentences: newSentences, remaining };
 }
 
-export function getPcmWavDurationMs(buffer: Buffer<ArrayBuffer>, params: {
-  channels?: number;
-  sampleRate?: number;
-  sampleWidth?: number;
-}): number {
+export function getPcmWavDurationMs(
+  buffer: Buffer<ArrayBuffer>,
+  params: {
+    channels?: number;
+    sampleRate?: number;
+    sampleWidth?: number;
+  }
+): number {
   const dataLength = buffer.length;
 
   const channels = params.channels || 1;
@@ -144,4 +146,31 @@ export const killAllProcesses = (pid: number) => {
       });
     });
   });
+};
+
+export const transformToGeminiType = (parameters: Object) => {
+  // 遍历 parameters 对象，将所有key为type字段值转换为geminiType的类型
+  const jsonString = JSON.stringify(parameters);
+  const newObject = JSON.parse(jsonString, (key, value) => {
+    if (key === "type") {
+      switch (value) {
+        case "string":
+          return GeminiType.STRING;
+        case "number":
+          return GeminiType.NUMBER;
+        case "integer":
+          return GeminiType.INTEGER;
+        case "boolean":
+          return GeminiType.BOOLEAN;
+        case "array":
+          return GeminiType.ARRAY;
+        case "object":
+          return GeminiType.OBJECT;
+        default:
+          return value;
+      }
+    }
+    return value;
+  });
+  return newObject;
 };

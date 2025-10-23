@@ -3,8 +3,8 @@ import { readdirSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { setVolumeByAmixer, getCurrentLogPercent } from "../utils/volume";
-import { Type as GeminiType, ToolListUnion } from "@google/genai";
 import { cloneDeep } from "lodash";
+import { transformToGeminiType } from "../utils";
 
 const defaultTools: LLMTool[] = [
   {
@@ -113,37 +113,9 @@ export const llmToolsForGemini: LLMTool[] = [
 ].map((tool) => {
   const newTool = cloneDeep(tool);
   if (newTool.function && newTool.function.parameters) {
-    const addGeminiType = (obj: any) => {
-      if (obj && typeof obj === "object") {
-        if (!obj.type) {
-          switch (obj.type) {
-            case "string":
-              obj.type = GeminiType.STRING;
-              break;
-            case "number":
-              obj.type = GeminiType.NUMBER;
-              break;
-            case "boolean":
-              obj.type = GeminiType.BOOLEAN;
-              break;
-            case "object":
-              obj.type = GeminiType.OBJECT;
-              break;
-            case "array":
-              obj.type = GeminiType.ARRAY;
-              break;
-            default:
-              obj.type = GeminiType.STRING; // default to STRING if type is unknown
-          }
-        }
-        for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
-            addGeminiType(obj[key]);
-          }
-        }
-      }
-    };
-    addGeminiType(newTool.function.parameters);
+    newTool.function.parameters = transformToGeminiType(
+      newTool.function.parameters
+    );
   }
   return newTool;
 });
