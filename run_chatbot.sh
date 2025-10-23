@@ -12,10 +12,21 @@ if [ -z "$card_index" ]; then
 fi
 echo "Using sound card index: $card_index"
 
+use_ollama=false
+# if use_ollama file exists, set environment variable
+if [ -f "use_ollama" ]; then
+  use_ollama=true
+fi
+
+if [ "$use_ollama" = true ]; then
+  ollama serve &
+fi
+
 # Output current environment information (for debugging)
 echo "===== Start time: $(date) =====" 
 echo "Current user: $(whoami)" 
 echo "Working directory: $(pwd)" 
+working_dir=$(pwd)
 echo "PATH: $PATH" 
 echo "Python version: $(python3 --version)" 
 echo "Node version: $(node --version)"
@@ -24,7 +35,14 @@ sleep 5
 amixer -c $card_index set Speaker 114
 # Start the service
 echo "Starting Node.js application..."
-cd /home/pi/whisplay-ai-chatbot
+cd $working_dir
+
 SOUND_CARD_INDEX=$card_index yarn start
+
+if [ "$use_ollama" = true ]; then
+  echo "Stopping Ollama server..."
+  pkill ollama
+fi
+
 # Record end status
 echo "===== Service ended: $(date) ====="

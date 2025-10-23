@@ -9,3 +9,4 @@ python/emoji_svg.zip
 dist
 python/__pycache__/
 chatbot.log
+use_ollama
