@@ -138,7 +138,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           }
           const func = llmFuncMap[name! as string];
           if (func) {
-            return [id, await func(args)];
+            return [
+              id,
+              await func(args).catch((err) => {
+                console.error(`Error executing function ${name}:`, err);
+                return `Error executing function ${name}: ${err.message}`;
+              }),
+            ];
           } else {
             console.error(`Function ${name} not found`);
             return [id, `Function ${name} not found`];

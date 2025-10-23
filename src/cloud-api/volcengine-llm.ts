@@ -15,7 +15,8 @@ dotenv.config();
 
 // Doubao LLM
 const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN || "";
-const doubaoLLMModel = process.env.VOLCENGINE_DOUBAO_LLM_MODEL || "doubao-1-5-lite-32k-250115"; // Default model
+const doubaoLLMModel =
+  process.env.VOLCENGINE_DOUBAO_LLM_MODEL || "doubao-1-5-lite-32k-250115"; // Default model
 const enableThinking = process.env.ENABLE_THINKING === "true";
 
 const messages: Message[] = [
@@ -111,7 +112,6 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           partialCallback(answer);
           partialAnswer += answer;
         }
-
       } catch (error) {
         console.error("Error parsing data:", error, data);
       }
@@ -145,7 +145,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             }
             const func = llmFuncMap[name! as string];
             if (func) {
-              return [id, await func(args)];
+              return [
+                id,
+                await func(args).catch((err) => {
+                  console.error(`Error executing function ${name}:`, err);
+                  return `Error executing function ${name}: ${err.message}`;
+                }),
+              ];
             } else {
               console.error(`Function ${name} not found`);
               return [id, `Function ${name} not found`];
