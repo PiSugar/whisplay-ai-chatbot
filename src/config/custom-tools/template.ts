@@ -26,14 +26,14 @@ const demoTools: LLMTool[] = [
       ) {
         return "Invalid action. Please specify 'start' or 'stop'.";
       }
-      await new Promise((resolve, reject) => {
+      const result = await new Promise((resolve, reject) => {
         const client = new net.Socket();
         client.connect(8888, "192.168.100.98", () => {
           client.write(
             JSON.stringify({ action: params.action, effect: "rainbow" })
           );
           client.end();
-          resolve(true);
+          resolve(`Light switched ${params.action}`);
         });
         client.on("error", (err: any) => {
           console.error("Light Socket error:", err);
@@ -42,8 +42,7 @@ const demoTools: LLMTool[] = [
       }).catch((err) => {
         return `Failed to switch light: ${err.message}`;
       });
-      // Implement the logic to switch the light
-      return `Light switched ${params.action}`;
+      return result as string;
     },
   },
 ];
