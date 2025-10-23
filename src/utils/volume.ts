@@ -8,6 +8,9 @@ import { execSync } from "child_process";
 // Front Left: Playback 121 [95%] [0.00dB]
 // Front Right: Playback 121 [95%] [0.00dB]
 
+const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
+console.log(`Using sound card index: ${soundCardIndex}`);
+
 // curve
 const percentToAmixerValueMap = [
   [0, 0],
@@ -24,7 +27,7 @@ const percentToAmixerValueMap = [
 ];
 
 const getVolumeValueFromAmixer = (): number => {
-  const output = execSync("amixer -c 1 get Speaker").toString();
+  const output = execSync(`amixer -c ${soundCardIndex} get Speaker`).toString();
   const regex = /Front Left: Playback (\d+) \[(\d+)%\] \[([-\d.]+)dB\]/;
   const match = output.match(regex);
   if (match && match[1]) {
@@ -74,5 +77,5 @@ export const getCurrentLogPercent = (): number => {
 
 export const setVolumeByAmixer = (logPercent: number): void => {
   const value = logPercentToAmixerValue(logPercent);
-  execSync(`amixer -c 1 set Speaker ${value}`);
+  execSync(`amixer -c ${soundCardIndex} set Speaker ${value}`);
 };
