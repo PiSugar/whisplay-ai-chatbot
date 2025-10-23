@@ -128,6 +128,10 @@ const playAudioData = (
   resAudioData: string,
   audioDuration: number
 ): Promise<void> => {
+  if (isEmpty(resAudioData) || audioDuration <= 0) {
+    console.log("No audio data to play, skipping playback.");
+    return Promise.resolve();
+  }
   const audioBuffer = Buffer.from(resAudioData, "base64");
   return new Promise((resolve, reject) => {
     console.log("Playback duration:", audioDuration);

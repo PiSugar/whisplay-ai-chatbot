@@ -41,8 +41,9 @@ const piperTTS = async (
 
     piperProcess.on("close", async (code: number) => {
       if (code !== 0) {
-        reject(new Error(`Piper process exited with code ${code}`));
-        return;
+        // reject(new Error(`Piper process exited with code ${code}`));
+        console.error(`Piper process exited with code ${code}`);
+        return { data: Buffer.from([]), duration: 0 };
       }
 
       try {
@@ -57,12 +58,15 @@ const piperTTS = async (
         const trimmedBuffer = buffer.subarray(headerSize);
         resolve({ data: trimmedBuffer, duration });
       } catch (error) {
-        reject(error);
+        // reject(error);
+        console.error("Error processing Piper output:", error);
+        resolve({ data: Buffer.from([]), duration: 0 });
       }
     });
 
     piperProcess.on("error", (error: any) => {
-      reject(error);
+      console.error("Piper process error:", error);
+      resolve({ data: Buffer.from([]), duration: 0 });
     });
   });
 };
