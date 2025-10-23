@@ -193,14 +193,6 @@ process.on("SIGINT", () => {
   process.exit();
 });
 
-function purifyText(text: string): string {
-  // emoji [\p{Emoji_Presentation}\u200d\ufe0f]
-  // remove unprocessable characters, such as *, #, ~, emoji, etc.
-  return text
-    .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
-    .trim();
-}
-
 type TTSFunc = (text: string) => Promise<{ data: string; duration: number }>;
 type SentencesCallback = (sentences: string[]) => void;
 type TextCallback = (text: string) => void;
@@ -223,7 +215,7 @@ class StreamResponser {
     sentencesCallback?: SentencesCallback,
     textCallback?: TextCallback
   ) {
-    this.ttsFunc = (text) => ttsFunc(purifyText(text));
+    this.ttsFunc = (text) => ttsFunc(text);
     this.sentencesCallback = sentencesCallback;
     this.textCallback = textCallback;
   }
@@ -269,7 +261,11 @@ class StreamResponser {
       this.sentencesCallback?.(this.parsedSentences);
       // remove emoji
       const filteredSentences = sentences
-        .map((item) => item.replace(/[\u{1F600}-\u{1F64F}]/gu, ""))
+        .map((item) =>
+          item
+            .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
+            .trim()
+        )
         .filter((item) => item.trim() !== "");
       this.speakArray.push(
         ...filteredSentences.map((item) =>
