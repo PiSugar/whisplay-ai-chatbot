@@ -46,6 +46,12 @@ const piperTTS = async (
         return { data: Buffer.from([]), duration: 0 };
       }
 
+      if (fs.existsSync(tempWavFile) === false) {
+        console.log("Piper output file not found:", tempWavFile);
+        resolve({ data: Buffer.from([]), duration: 0 });
+        return;
+      }
+
       try {
         const buffer = await fs.readFileSync(tempWavFile);
         const duration = await getWavFileDurationMs(buffer);
