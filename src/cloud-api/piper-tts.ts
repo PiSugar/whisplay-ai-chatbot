@@ -59,13 +59,13 @@ const piperTTS = async (
         resolve({ data: trimmedBuffer, duration });
       } catch (error) {
         // reject(error);
-        console.error("Error processing Piper output:", error);
+        console.log("Error processing Piper output:", `"${text}"`, error);
         resolve({ data: Buffer.from([]), duration: 0 });
       }
     });
 
     piperProcess.on("error", (error: any) => {
-      console.error("Piper process error:", error);
+      console.log("Piper process error:", `"${text}"`, error);
       resolve({ data: Buffer.from([]), duration: 0 });
     });
   });
