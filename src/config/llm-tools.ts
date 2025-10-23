@@ -4,7 +4,7 @@ import { resolve } from "path";
 import { execSync } from "child_process";
 import { setVolumeByAmixer, getCurrentLogPercent } from "../utils/volume";
 import { Type as GeminiType, ToolListUnion } from "@google/genai";
-
+import { cloneDeep } from "lodash";
 
 const defaultTools: LLMTool[] = [
   {
@@ -107,26 +107,29 @@ try {
 // remove geminiType from parameters for OpenAI compatibility
 export const llmTools: LLMTool[] = [...defaultTools, ...customTools];
 
-export const llmToolsForGemini = (): LLMTool[] => [...defaultTools, ...customTools].map(tool => {
-  const newTool = { ...tool };
+export const llmToolsForGemini: LLMTool[] = [
+  ...defaultTools,
+  ...customTools,
+].map((tool) => {
+  const newTool = cloneDeep(tool);
   if (newTool.function && newTool.function.parameters) {
     const addGeminiType = (obj: any) => {
-      if (obj && typeof obj === 'object') {
+      if (obj && typeof obj === "object") {
         if (!obj.type) {
           switch (obj.type) {
-            case 'string':
+            case "string":
               obj.type = GeminiType.STRING;
               break;
-            case 'number':
+            case "number":
               obj.type = GeminiType.NUMBER;
               break;
-            case 'boolean':
+            case "boolean":
               obj.type = GeminiType.BOOLEAN;
               break;
-            case 'object':
+            case "object":
               obj.type = GeminiType.OBJECT;
               break;
-            case 'array':
+            case "array":
               obj.type = GeminiType.ARRAY;
               break;
             default:
@@ -149,4 +152,3 @@ export const llmFuncMap = llmTools.reduce((acc, tool) => {
   acc[tool.function.name] = tool.func;
   return acc;
 }, {} as Record<string, (params: any) => Promise<string>>);
-

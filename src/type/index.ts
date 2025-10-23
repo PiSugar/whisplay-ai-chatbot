@@ -1,4 +1,3 @@
-import { Type as GeminiType } from "@google/genai";
 export interface Message {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
@@ -50,16 +49,13 @@ export interface LLMTool {
     description: string
     parameters: {
       type?: string
-      geminiType?: GeminiType
       properties?: {
         [key: string]: {
           type: string
-          geminiType?: GeminiType
           description: string
           enum?: string[]
           items?: {
             type: string
-            geminiType?: GeminiType
             description?: string
             properties?: {
               [key: string]: {
@@ -73,7 +69,6 @@ export interface LLMTool {
       }
       items?: {
         type: string
-        geminiType?: GeminiType
         description: string
       }
       required?: string[]

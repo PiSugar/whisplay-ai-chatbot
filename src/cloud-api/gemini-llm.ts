@@ -38,7 +38,7 @@ const convertToolsToGeminiFormat = (tools: LLMTool[]): ToolListUnion => {
 const chat = gemini?.chats.create({
   model: geminiModel,
   config: {
-    // tools: convertToolsToGeminiFormat(llmToolsForGemini),
+    tools: convertToolsToGeminiFormat(llmToolsForGemini),
     systemInstruction: {
       parts: [{ text: systemPrompt }],
       role: "system",
