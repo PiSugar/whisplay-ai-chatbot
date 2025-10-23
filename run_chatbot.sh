@@ -10,7 +10,7 @@ card_index=$(awk '/wm8960soundcard/ {print $1}' /proc/asound/cards | head -n1)
 if [ -z "$card_index" ]; then
   card_index=1
 fi
-echo "$card_index"
+echo "Using sound card index: $card_index"
 
 # Output current environment information (for debugging)
 echo "===== Start time: $(date) =====" 
