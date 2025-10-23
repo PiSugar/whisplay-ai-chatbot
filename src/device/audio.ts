@@ -197,6 +197,13 @@ type TTSFunc = (text: string) => Promise<{ data: string; duration: number }>;
 type SentencesCallback = (sentences: string[]) => void;
 type TextCallback = (text: string) => void;
 
+const purifyTextForTTS = (text: string): string => {
+  // Remove emojis and special characters
+  return text
+    .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
+    .trim();
+};
+
 class StreamResponser {
   private ttsFunc: TTSFunc;
   private sentencesCallback?: SentencesCallback;
@@ -261,12 +268,8 @@ class StreamResponser {
       this.sentencesCallback?.(this.parsedSentences);
       // remove emoji
       const filteredSentences = sentences
-        .map((item) =>
-          item
-            .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
-            .trim()
-        )
-        .filter((item) => item.trim() !== "");
+        .map(purifyTextForTTS)
+        .filter((item) => item !== "");
       this.speakArray.push(
         ...filteredSentences.map((item) =>
           this.ttsFunc(item).finally(() => {
@@ -291,7 +294,8 @@ class StreamResponser {
         ""
       );
       if (this.partialContent.trim() !== "") {
-        this.speakArray.push(this.ttsFunc(this.partialContent));
+        const text = purifyTextForTTS(this.partialContent);
+        this.speakArray.push(this.ttsFunc(text));
       }
       this.partialContent = "";
     }
