@@ -7,6 +7,8 @@ sudo systemctl set-default multi-user.target
 echo "Setting up the chatbot service..."
 
 sudo bash -c 'cat > /etc/systemd/system/chatbot.service <<EOF
+[Service]
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/home/pi/.local/bin"
 [Unit]
 Description=Chatbot Service
 After=network.target
