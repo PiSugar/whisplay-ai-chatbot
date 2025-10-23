@@ -2,7 +2,7 @@ import { LLMTool } from "../../type";
 import net from "net";
 
 const demoTools: LLMTool[] = [
-   {
+  {
     type: "function",
     function: {
       name: "switchLight",
@@ -20,17 +20,32 @@ const demoTools: LLMTool[] = [
       },
     },
     func: async (params) => {
-      if (!params.action || (params.action !== "start" && params.action !== "stop")) {
+      if (
+        !params.action ||
+        (params.action !== "start" && params.action !== "stop")
+      ) {
         return "Invalid action. Please specify 'start' or 'stop'.";
       }
-      const client = new net.Socket();
-      client.connect(8888, "192.168.100.98", () => {
-        client.write(JSON.stringify({ action: params.action, effect: "rainbow" }));
+      await new Promise((resolve, reject) => {
+        const client = new net.Socket();
+        client.connect(8888, "192.168.100.98", () => {
+          client.write(
+            JSON.stringify({ action: params.action, effect: "rainbow" })
+          );
+          client.end();
+          resolve(true);
+        });
+        client.on("error", (err: any) => {
+          console.error("Light Socket error:", err);
+          reject(err);
+        });
+      }).catch((err) => {
+        return `Failed to switch light: ${err.message}`;
       });
       // Implement the logic to switch the light
       return `Light switched ${params.action}`;
     },
   },
-]
+];
 
 export default demoTools;
