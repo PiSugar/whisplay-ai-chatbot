@@ -194,8 +194,11 @@ process.on("SIGINT", () => {
 });
 
 function purifyText(text: string): string {
+  // emoji [\p{Emoji_Presentation}\u200d\ufe0f]
   // remove unprocessable characters, such as *, #, ~, emoji, etc.
-  return text.replace(/[*#~]|[\u{1F600}-\u{1F64F}]/gu, "").trim();
+  return text
+    .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
+    .trim();
 }
 
 type TTSFunc = (text: string) => Promise<{ data: string; duration: number }>;
