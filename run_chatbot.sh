@@ -31,6 +31,8 @@ use_ollama=false
 # start ollama if use_ollama file exists, set environment variable
 if [ -f "use_ollama" ]; then
   use_ollama=true
+else 
+  echo "Ollama will not start since use_ollama file is not found."
 fi
 
 if [ "$use_ollama" = true ]; then
