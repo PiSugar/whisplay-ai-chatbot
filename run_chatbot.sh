@@ -12,16 +12,6 @@ if [ -z "$card_index" ]; then
 fi
 echo "Using sound card index: $card_index"
 
-use_ollama=false
-# if use_ollama file exists, set environment variable
-if [ -f "use_ollama" ]; then
-  use_ollama=true
-fi
-
-if [ "$use_ollama" = true ]; then
-  ollama serve &
-fi
-
 # Output current environment information (for debugging)
 echo "===== Start time: $(date) =====" 
 echo "Current user: $(whoami)" 
@@ -37,7 +27,20 @@ amixer -c $card_index set Speaker 114
 echo "Starting Node.js application..."
 cd $working_dir
 
+use_ollama=false
+# start ollama if use_ollama file exists, set environment variable
+if [ -f "use_ollama" ]; then
+  use_ollama=true
+fi
+
+if [ "$use_ollama" = true ]; then
+  ollama serve &
+fi
+
 SOUND_CARD_INDEX=$card_index yarn start
+
+# After the service ends, perform cleanup
+echo "Cleaning up after service..."
 
 if [ "$use_ollama" = true ]; then
   echo "Stopping Ollama server..."
