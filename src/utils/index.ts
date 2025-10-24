@@ -174,3 +174,10 @@ export const transformToGeminiType = (parameters: Object) => {
   });
   return newObject;
 };
+
+export const purifyTextForTTS = (text: string): string => {
+  // Remove emojis and special characters
+  return text
+    .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
+    .trim();
+};

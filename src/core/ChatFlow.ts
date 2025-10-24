@@ -6,17 +6,14 @@ import {
   display,
   getCurrentStatus,
 } from "../device/display";
-import {
-  recordAudioManually,
-  StreamResponser,
-  recordFileFormat,
-} from "../device/audio";
+import { recordAudioManually, recordFileFormat } from "../device/audio";
 import {
   recognizeAudio,
   chatWithLLMStream,
   ttsProcessor,
 } from "../cloud-api/server";
 import { extractEmojis } from "../utils";
+import { StreamResponser } from "./StreamResponsor";
 
 interface ChatFlowConstructor {
   dataDir: string;
@@ -30,6 +27,7 @@ class ChatFlow {
   streamResponser: StreamResponser;
   partialThinking: string = "";
   thinkingSentences: string[] = [];
+  answerId: number = 0;
 
   constructor({ dataDir }: ChatFlowConstructor) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -59,8 +57,11 @@ class ChatFlow {
     );
   }
 
-  partialThinkingCallback = (partialThinking: string): void => {
-    if (this.currentFlowName !== "answer") return;
+  partialThinkingCallback = (
+    partialThinking: string,
+    answerId: number
+  ): void => {
+    if (this.currentFlowName !== "answer" || answerId < this.answerId) return;
     this.partialThinking += partialThinking;
     const { sentences, remaining } = splitSentences(this.partialThinking);
     if (sentences.length > 0) {
@@ -152,6 +153,8 @@ class ChatFlow {
         break;
       case "answer":
         this.currentFlowName = "answer";
+        this.answerId += 1;
+        const currentAnswerId = this.answerId;
         onButtonPressed(() => {
           this.setCurrentFlow("listening");
         });
@@ -171,9 +174,10 @@ class ChatFlow {
               content: this.asrText,
             },
           ],
-          partial,
-          endPartial,
-          this.partialThinkingCallback
+          (text) => partial(text, currentAnswerId),
+          () => endPartial(currentAnswerId),
+          (partialThinking) =>
+            this.partialThinkingCallback(partialThinking, currentAnswerId)
         );
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {

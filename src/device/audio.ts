@@ -1,6 +1,6 @@
 import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop } from "lodash";
-import { killAllProcesses, splitSentences } from "../utils";
+import { killAllProcesses } from "../utils";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
 import { ASRServer, TTSServer } from "../type";
@@ -197,137 +197,10 @@ process.on("SIGINT", () => {
   process.exit();
 });
 
-type TTSFunc = (text: string) => Promise<{ data: string; duration: number }>;
-type SentencesCallback = (sentences: string[]) => void;
-type TextCallback = (text: string) => void;
-
-const purifyTextForTTS = (text: string): string => {
-  // Remove emojis and special characters
-  return text
-    .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
-    .trim();
-};
-
-class StreamResponser {
-  private ttsFunc: TTSFunc;
-  private sentencesCallback?: SentencesCallback;
-  private textCallback?: TextCallback;
-  private partialContent: string = "";
-  private isStartSpeak: boolean = false;
-  private playEndResolve: () => void = () => {};
-  private speakArray: Promise<{
-    data: string;
-    duration: number;
-  }>[] = [];
-  private parsedSentences: string[] = [];
-
-  constructor(
-    ttsFunc: TTSFunc,
-    sentencesCallback?: SentencesCallback,
-    textCallback?: TextCallback
-  ) {
-    this.ttsFunc = (text) => ttsFunc(text);
-    this.sentencesCallback = sentencesCallback;
-    this.textCallback = textCallback;
-  }
-
-  private playAudioInOrder = async (): Promise<void> => {
-    let currentIndex = 0;
-    const playNext = async () => {
-      if (currentIndex < this.speakArray.length) {
-        try {
-          const { data: audio, duration } = await this.speakArray[currentIndex];
-          console.log(
-            `Playing audio ${currentIndex + 1}/${this.speakArray.length}`
-          );
-          await playAudioData(audio, duration);
-        } catch (error) {
-          console.error("Audio playback error:", error);
-        }
-        currentIndex++;
-        playNext();
-      } else if (this.partialContent) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        playNext();
-      } else {
-        console.log(
-          `Play all audio completed. Total: ${this.speakArray.length}`
-        );
-        this.playEndResolve();
-        this.isStartSpeak = false;
-        this.speakArray.length = 0;
-        this.speakArray = [];
-      }
-    };
-    playNext();
-  };
-
-  partial = (text: string): void => {
-    this.partialContent += text;
-    // replace newlines with spaces
-    this.partialContent = this.partialContent.replace(/\n/g, " ");
-    const { sentences, remaining } = splitSentences(this.partialContent);
-    if (sentences.length > 0) {
-      this.parsedSentences.push(...sentences);
-      this.sentencesCallback?.(this.parsedSentences);
-      // remove emoji
-      const filteredSentences = sentences
-        .map(purifyTextForTTS)
-        .filter((item) => item !== "");
-      this.speakArray.push(
-        ...filteredSentences.map((item) =>
-          this.ttsFunc(item).finally(() => {
-            if (!this.isStartSpeak) {
-              this.playAudioInOrder();
-              this.isStartSpeak = true;
-            }
-          })
-        )
-      );
-    }
-    this.partialContent = remaining;
-  };
-
-  endPartial = (): void => {
-    if (this.partialContent) {
-      this.parsedSentences.push(this.partialContent);
-      this.sentencesCallback?.(this.parsedSentences);
-      // remove emoji
-      this.partialContent = this.partialContent.replace(
-        /[\u{1F600}-\u{1F64F}]/gu,
-        ""
-      );
-      if (this.partialContent.trim() !== "") {
-        const text = purifyTextForTTS(this.partialContent);
-        this.speakArray.push(this.ttsFunc(text));
-      }
-      this.partialContent = "";
-    }
-    this.textCallback?.(this.parsedSentences.join(" "));
-    this.parsedSentences.length = 0;
-  };
-
-  getPlayEndPromise = (): Promise<void> => {
-    return new Promise((resolve) => {
-      this.playEndResolve = resolve;
-    });
-  };
-
-  stop = (): void => {
-    this.speakArray = [];
-    this.speakArray.length = 0;
-    this.isStartSpeak = false;
-    this.partialContent = "";
-    this.parsedSentences.length = 0;
-    this.playEndResolve();
-    stopPlaying();
-  };
-}
-
 export {
   recordAudio,
   recordAudioManually,
   stopRecording,
   playAudioData,
-  StreamResponser,
+  stopPlaying,
 };
