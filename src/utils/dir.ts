@@ -4,7 +4,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const cleanDataFolderOnStart = process.env.CLEAN_DATA_FOLDER_ON_START === "true";
+const cleanDataFolderOnStart =
+  process.env.CLEAN_DATA_FOLDER_ON_START === "true";
 
 function ensureDirExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
@@ -15,7 +16,7 @@ function ensureDirExists(dirPath: string): void {
   }
 }
 
-export const dataDir = path.join(__dirname, "data");
+export const dataDir = path.join(__dirname, "../..", "data");
 function cleanupDataDir(): void {
   fs.rmSync(dataDir, { recursive: true, force: true });
   console.log(`cleaned up directory: ${dataDir}`);
@@ -35,5 +36,3 @@ ensureDirExists(recordingsDir);
 
 export const chatHistoryDir = path.join(dataDir, "chat_history");
 ensureDirExists(chatHistoryDir);
-
-
