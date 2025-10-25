@@ -49,7 +49,7 @@ export const recognizeAudio = async (
       "--task",
       "transcribe",
       "--output_format",
-      "none",
+      "txt",
       audioFilePath,
     ];
     if (language) {
