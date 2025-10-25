@@ -9,6 +9,7 @@ import {
 import { recognizeAudio as OpenAIASR } from "./openai-asr";
 import { recognizeAudio as GeminiASR } from "./gemini-asr";
 import { recognizeAudio as VoskASR } from "./vosk-asr";
+import { recognizeAudio as WisperASR } from "./whisper-asr";
 import {
   chatWithLLMStream as VolcengineLLMStream,
   resetChatHistory as VolcengineResetChatHistory,
@@ -73,6 +74,8 @@ switch (asrServer) {
   case ASRServer.vosk:
     recognizeAudio = VoskASR;
     break;
+  case ASRServer.whisper:
+    recognizeAudio = WisperASR;
   default:
     console.warn(
       `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI`

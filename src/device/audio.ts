@@ -8,7 +8,7 @@ import { ASRServer, TTSServer } from "../type";
 dotenv.config();
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
-export const recordFileFormat = [ASRServer.vosk].includes(asrServer)
+export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(asrServer)
   ? "wav"
   : "mp3";
 
