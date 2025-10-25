@@ -87,9 +87,23 @@ export const recognizeAudio = async (
       }
 
       const stdoutTrim = stdout ? stdout.trim() : "";
-      if (stdoutTrim) {
-        // cleaneup 
-        resolve(stdoutTrim);
+      // Detecting language using up to the first 30 seconds. Use `--language` to specify the language\nDetected language: English\n[00:00.000 --> 00:03.000]  Hello, what's your name?
+      // extract the transcription part only
+      const lines = stdoutTrim.split("\n");
+      let finalTranscription = "";
+      for (const line of lines) {
+        if (line.startsWith("[") && line.includes(" --> ")) {
+          const parts = line.split("] ");
+          if (parts.length > 1) {
+            finalTranscription += parts[1] + " ";
+          }
+        }
+      }
+      const finalTrim = finalTranscription.trim();
+
+      if (finalTrim) {
+        // cleanup
+        resolve(finalTrim);
         return;
       }
 
