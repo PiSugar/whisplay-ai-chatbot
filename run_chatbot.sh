@@ -27,15 +27,23 @@ amixer -c $card_index set Speaker 114
 echo "Starting Node.js application..."
 cd $working_dir
 
-use_ollama=false
-# start ollama if use_ollama file exists, set environment variable
-if [ -f "use_ollama" ]; then
-  use_ollama=true
-else 
-  echo "Ollama will not start since use_ollama file is not found."
+# load .env variables, exclude comments and empty lines
+# check if .env file exists
+serve_ollama=false
+if [ -f ".env" ]; then
+  export $(grep -v '^#' .env | xargs)
+  echo ".env variables loaded."
+  # check if SERVE_OLLAMA is set to true
+  if [ "$SERVE_OLLAMA" = "true" ]; then
+    serve_ollama=true
+  fi
+else
+  echo ".env file not found, please create one based on .env.template."
+  exit 1
 fi
 
-if [ "$use_ollama" = true ]; then
+if [ "$serve_ollama" = true ]; then
+  echo "Starting Ollama server..."
   ollama serve &
 fi
 
@@ -44,7 +52,7 @@ SOUND_CARD_INDEX=$card_index yarn start
 # After the service ends, perform cleanup
 echo "Cleaning up after service..."
 
-if [ "$use_ollama" = true ]; then
+if [ "$serve_ollama" = true ]; then
   echo "Stopping Ollama server..."
   pkill ollama
 fi
