@@ -3,32 +3,19 @@ import * as path from "path";
 import { spawn } from "child_process";
 import { getWavFileDurationMs } from "../utils";
 import dotenv from "dotenv";
+import { ttsDir } from "../utils/dir";
 
 dotenv.config();
 
-const piperBinaryPath =
-  process.env.PIPER_BINARY_PATH || "/home/pi/piper/piper"; // Default to tts-1
+const piperBinaryPath = process.env.PIPER_BINARY_PATH || "/home/pi/piper/piper"; // Default to tts-1
 const piperModelPath =
   process.env.PIPER_MODEL_PATH || "/home/pi/piper/voices/en_US-amy-medium.onnx";
-
-const dataDir = path.join(__dirname, "tts_temp");
-
-let checkedDir = false;
 
 const piperTTS = async (
   text: string
 ): Promise<{ data: Buffer; duration: number }> => {
-  if (!checkedDir) {
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir);
-      console.log("created tts directory:", dataDir);
-    } else {
-      console.log("ttsDir exists:", dataDir);
-    }
-    checkedDir = true;
-  }
   return new Promise((resolve, reject) => {
-    const tempWavFile = path.join(dataDir, `piper_${Date.now()}.wav`);
+    const tempWavFile = path.join(ttsDir, `piper_${Date.now()}.wav`);
     const piperProcess = spawn(piperBinaryPath, [
       "--model",
       piperModelPath,

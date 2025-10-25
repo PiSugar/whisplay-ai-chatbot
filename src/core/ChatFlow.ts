@@ -14,14 +14,11 @@ import {
 } from "../cloud-api/server";
 import { extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
-
-interface ChatFlowConstructor {
-  dataDir: string;
-}
+import { recordingsDir } from "../utils/dir";
 
 class ChatFlow {
   currentFlowName: string = "";
-  dataDir: string = "";
+  recordingsDir: string = "";
   currentRecordFilePath: string = "";
   asrText: string = "";
   streamResponser: StreamResponser;
@@ -29,9 +26,9 @@ class ChatFlow {
   thinkingSentences: string[] = [];
   answerId: number = 0;
 
-  constructor({ dataDir }: ChatFlowConstructor) {
+  constructor() {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
-    this.dataDir = dataDir;
+    this.recordingsDir = recordingsDir;
     this.setCurrentFlow("sleep");
     this.streamResponser = new StreamResponser(
       ttsProcessor,
@@ -101,7 +98,7 @@ class ChatFlow {
       case "listening":
         this.currentFlowName = "listening";
         this.currentRecordFilePath = `${
-          this.dataDir
+          this.recordingsDir
         }/user-${Date.now()}.${recordFileFormat}`;
         onButtonPressed(noop);
         const { result, stop } = recordAudioManually(

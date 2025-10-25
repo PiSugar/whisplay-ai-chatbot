@@ -1,5 +1,8 @@
 import dotenv from "dotenv";
+import * as fs from "fs";
+import * as path from "path";
 import { isEmpty } from "lodash";
+import moment from "moment";
 import {
   shouldResetChatHistory,
   systemPrompt,
@@ -10,10 +13,15 @@ import { combineFunction } from "../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../config/llm-tools";
 import { ChatWithLLMStreamFunction } from "./interface";
+import { chatHistoryDir } from "../utils/dir";
 
 dotenv.config();
 // OpenAI LLM
 const openaiLLMModel = process.env.OPENAI_LLM_MODEL || "gpt-4o"; // Default model
+
+const chatHistoryFileName = `openai_chat_history_${moment().format(
+  "YYYYMMDD_HHmmss"
+)}.json`;
 
 const messages: Message[] = [
   {
@@ -47,6 +55,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
+  }).finally(() => {
+    fs.writeFileSync(
+      path.join(chatHistoryDir, chatHistoryFileName),
+      JSON.stringify(messages, null, 2)
+    );
   });
   messages.push(...inputMessages);
   const chatCompletion = await openai.chat.completions.create({

@@ -1,5 +1,7 @@
-import { LLMTool } from "../type";
 import { isEmpty } from "lodash";
+import * as fs from "fs";
+import * as path from "path";
+import { LLMTool } from "../type";
 import {
   shouldResetChatHistory,
   systemPrompt,
@@ -11,8 +13,14 @@ import dotenv from "dotenv";
 import { FunctionCall, Message } from "../type";
 import { ChatWithLLMStreamFunction } from "./interface";
 import { ToolListUnion, ToolUnion, Part } from "@google/genai";
+import moment from "moment";
+import { chatHistoryDir } from "../utils/dir";
 
 dotenv.config();
+
+const chatHistoryFileName = `gemini_chat_history_${moment().format(
+  "YYYYMMDD_HHmmss"
+)}.json`;
 
 const resetChatHistory = (): void => {
   // messages.length = 0;
@@ -65,6 +73,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
+  }).finally(() => {
+    // save chat history to file
+    fs.writeFileSync(
+      path.join(chatHistoryDir, chatHistoryFileName),
+      JSON.stringify(chat.getHistory(), null, 2)
+    );
   });
 
   let partialAnswer = "";

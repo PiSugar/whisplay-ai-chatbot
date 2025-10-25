@@ -1,4 +1,6 @@
 import axios from "axios";
+import * as fs from "fs";
+import * as path from "path";
 import { get, isEmpty, partial } from "lodash";
 import {
   shouldResetChatHistory,
@@ -10,6 +12,8 @@ import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../type";
 import { ChatWithLLMStreamFunction } from "./interface";
+import { chatHistoryDir } from "../utils/dir";
+import moment from "moment";
 
 dotenv.config();
 
@@ -18,6 +22,10 @@ const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
 const enableThinking = process.env.ENABLE_THINKING === "true";
+
+const chatHistoryFileName = `ollama_chat_history_${moment().format(
+  "YYYYMMDD_HHmmss"
+)}.json`;
 
 const messages: Message[] = [
   {
@@ -48,6 +56,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
+  }).finally(() => {
+    // save chat history to file
+    fs.writeFileSync(
+      path.join(chatHistoryDir, chatHistoryFileName),
+      JSON.stringify(messages, null, 2)
+    );
   });
   let partialAnswer = "";
   let partialThinking = "";

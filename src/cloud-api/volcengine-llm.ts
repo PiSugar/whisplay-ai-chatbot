@@ -1,4 +1,7 @@
 import axios from "axios";
+import * as fs from "fs";
+import * as path from "path";
+import moment from "moment";
 import { get, isEmpty } from "lodash";
 import {
   shouldResetChatHistory,
@@ -10,6 +13,7 @@ import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../type";
 import { ChatWithLLMStreamFunction } from "./interface";
+import { chatHistoryDir } from "../utils/dir";
 
 dotenv.config();
 
@@ -18,6 +22,10 @@ const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN || "";
 const doubaoLLMModel =
   process.env.VOLCENGINE_DOUBAO_LLM_MODEL || "doubao-1-5-lite-32k-250115"; // Default model
 const enableThinking = process.env.ENABLE_THINKING === "true";
+
+const chatHistoryFileName = `doubao_chat_history_${moment().format(
+  "YYYYMMDD_HHmmss"
+)}.json`;
 
 const messages: Message[] = [
   {
@@ -52,6 +60,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
+  }).finally(() => {
+    fs.writeFileSync(
+      path.join(chatHistoryDir, chatHistoryFileName),
+      JSON.stringify(messages, null, 2)
+    );
   });
   let partialAnswer = "";
   let partialThinking = "";
