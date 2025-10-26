@@ -1,10 +1,18 @@
 import { LLMTool } from "../type";
-import { readdirSync, readFileSync } from "fs";
-import { resolve } from "path";
-import { execSync } from "child_process";
+import { readdirSync, writeFileSync } from "fs";
+import path, { resolve } from "path";
 import { setVolumeByAmixer, getCurrentLogPercent } from "../utils/volume";
 import { cloneDeep } from "lodash";
 import { transformToGeminiType } from "../utils";
+import { gemini } from "../cloud-api/gemini";
+import { GenerateContentResponse } from "@google/genai";
+import { imageDir } from "../utils/dir";
+import dotenv from "dotenv";
+import { setLatestGenImg } from "../utils/image";
+
+dotenv.config();
+
+const geminiImageModel = process.env.GEMINI_IMAGE_MODEL;
 
 const defaultTools: LLMTool[] = [
   {
@@ -77,6 +85,64 @@ const defaultTools: LLMTool[] = [
     },
   },
 ];
+
+if (gemini && geminiImageModel) {
+  defaultTools.push({
+    type: "function",
+    function: {
+      name: "generateImage",
+      description: "Generate an image from a text prompt",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description: "The text prompt to generate the image from",
+          },
+        },
+        required: ["prompt"],
+      },
+    },
+    func: async (params) => {
+      const { prompt } = params;
+      const response = (await gemini!.models
+        .generateContent({
+          model: geminiImageModel!,
+          contents: prompt as string,
+          config: {
+            imageConfig: {
+              aspectRatio: "1:1",
+            },
+          },
+        })
+        .catch((err) => {
+          console.error(`Error generating image:`, err);
+        })) as GenerateContentResponse;
+      const fileName = `gemini-image-${Date.now()}.png`;
+      const imagePath = path.join(imageDir, fileName);
+      let isSuccess = false;
+      try {
+        for (const part of response.candidates![0].content!.parts!) {
+          if (part.text) {
+            console.log(part.text);
+          } else if (part.inlineData) {
+            const imageData = part.inlineData.data!;
+            const buffer = Buffer.from(imageData, "base64");
+            writeFileSync(imagePath, buffer);
+            setLatestGenImg(imagePath);
+            isSuccess = true;
+            console.log(`Image saved as ${imagePath}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error saving image:", error);
+      }
+      return isSuccess
+        ? `[success](${imagePath})`
+        : "[error]Image generation failed";
+    },
+  });
+}
 
 // 如果有custom-tools文件夹，收集custom-tools文件夹中的文件导出的所有tools
 const customTools: LLMTool[] = [];

@@ -31,6 +31,8 @@ current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
 current_scroll_speed = 6
+current_image_path = ""
+current_image = None
 clients = {}
 
 class RenderThread(threading.Thread):
@@ -59,28 +61,58 @@ class RenderThread(threading.Thread):
             whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, rgb565_data)
 
     def render_frame(self, status, emoji, text, scroll_top, battery_level, battery_color):
-        global current_scroll_speed
-        header_height = 88 + 10  # header + margin
-        # create a black background image for header
-        image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, header_height), (0, 0, 0, 255))
-        draw = ImageDraw.Draw(image)
-        
-        clock_font_size = 24
-        clock_font = ImageFont.truetype(self.font_path, clock_font_size)
+        global current_scroll_speed, current_image_path, current_image
+        if current_image_path not in [None, ""]:
+            # Try to load image from path
+            if current_image is not None:
+                rgb565_data = ImageUtils.image_to_rgb565(current_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
+                self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, rgb565_data)
+            elif os.path.exists(current_image_path):
+                try:
+                    image = Image.open(current_image_path).convert("RGBA") # 1024x1024
+                    # crop center and resize to fit screen ratio
+                    img_w, img_h = image.size
+                    screen_ratio = self.whisplay.LCD_WIDTH / self.whisplay.LCD_HEIGHT
+                    img_ratio = img_w / img_h
+                    if img_ratio > screen_ratio:
+                        # crop width
+                        new_w = int(img_h * screen_ratio)
+                        left = (img_w - new_w) // 2
+                        image = image.crop((left, 0, left + new_w, img_h))
+                    else:
+                        # crop height
+                        new_h = int(img_w / screen_ratio)
+                        top = (img_h - new_h) // 2
+                        image = image.crop((0, top, img_w, top + new_h))
+                    image = image.resize((self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT), Image.LANCZOS)
+                    current_image = image
+                    rgb565_data = ImageUtils.image_to_rgb565(image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
+                    self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, rgb565_data)
+                except Exception as e:
+                    print(f"[Render] Failed to load image {current_image_path}: {e}")
+        else:
+            current_image = None
+            header_height = 88 + 10  # header + margin
+            # create a black background image for header
+            image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, header_height), (0, 0, 0, 255))
+            draw = ImageDraw.Draw(image)
+            
+            clock_font_size = 24
+            clock_font = ImageFont.truetype(self.font_path, clock_font_size)
 
-        # current_time = time.strftime("%H:%M:%S")
-        # draw.text((self.whisplay.LCD_WIDTH // 2, self.whisplay.LCD_HEIGHT // 2), current_time, font=clock_font, fill=(255, 255, 255, 255))
-        
-        # render header
-        self.render_header(image, draw, status, emoji, battery_level, battery_color)
-        self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, header_height, ImageUtils.image_to_rgb565(image, self.whisplay.LCD_WIDTH, header_height))
+            # current_time = time.strftime("%H:%M:%S")
+            # draw.text((self.whisplay.LCD_WIDTH // 2, self.whisplay.LCD_HEIGHT // 2), current_time, font=clock_font, fill=(255, 255, 255, 255))
+            
+            # render header
+            self.render_header(image, draw, status, emoji, battery_level, battery_color)
+            self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, header_height, ImageUtils.image_to_rgb565(image, self.whisplay.LCD_WIDTH, header_height))
 
-        # render main text area
-        text_area_height = self.whisplay.LCD_HEIGHT - header_height
-        text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
-        text_draw = ImageDraw.Draw(text_bg_image)
-        self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
-        self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
+            # render main text area
+            text_area_height = self.whisplay.LCD_HEIGHT - header_height
+            text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
+            text_draw = ImageDraw.Draw(text_bg_image)
+            self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
+            self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
 
         
 
@@ -224,9 +256,9 @@ class RenderThread(threading.Thread):
         self.running = False
 
 def update_display_data(status=None, emoji=None, text=None, 
-                  scroll_speed=None, battery_level=None, battery_color=None):
+                  scroll_speed=None, battery_level=None, battery_color=None, image_path=None):
     global current_status, current_emoji, current_text, current_battery_level
-    global current_battery_color, current_scroll_top, current_scroll_speed
+    global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
 
     # If text is not continuation of previous, reset scroll position
     if text is not None and not text.startswith(current_text):
@@ -239,6 +271,7 @@ def update_display_data(status=None, emoji=None, text=None,
     current_text = text if text is not None else current_text
     current_battery_level = battery_level if battery_level is not None else current_battery_level
     current_battery_color = battery_color if battery_color is not None else current_battery_color
+    current_image_path = image_path if image_path is not None else current_image_path
 
 
 def send_to_all_clients(message):
@@ -297,6 +330,7 @@ def handle_client(client_socket, addr, whisplay):
                     response_to_client = content.get("response", None)
                     battery_level = content.get("battery_level", None)
                     battery_color = content.get("battery_color", None)
+                    image_path = content.get("image", None)
 
                     if rgbled:
                         rgb255_tuple = ColorUtils.get_rgb255_from_any(rgbled)
@@ -311,10 +345,12 @@ def handle_client(client_socket, addr, whisplay):
                         whisplay.set_backlight(brightness)
                         
                     if (text is not None) or (status is not None) or (emoji is not None) or \
-                       (battery_level is not None) or (battery_color is not None):
-                        update_display_data(status=status, emoji=emoji, 
+                       (battery_level is not None) or (battery_color is not None) or \
+                       (image_path is not None):
+                        update_display_data(status=status, emoji=emoji,
                                      text=text, scroll_speed=scroll_speed,
-                                     battery_level=battery_level, battery_color=battery_tuple)
+                                     battery_level=battery_level, battery_color=battery_tuple,
+                                     image_path=image_path)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:

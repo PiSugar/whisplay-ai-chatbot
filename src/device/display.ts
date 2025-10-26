@@ -12,6 +12,7 @@ interface Status {
   RGB: string;
   battery_color: string;
   battery_level: number;
+  image: string;
 }
 
 const MAX_CHARACTERS = 25 * 6; // 25 characters per line, 6 lines
@@ -38,6 +39,7 @@ export class WhisplayDisplay {
     RGB: "#00FF30",
     battery_color: "#000000",
     battery_level: 100, // 0-100
+    image: "",
   };
 
   private client = null as Socket | null;
@@ -188,6 +190,7 @@ export class WhisplayDisplay {
       brightness,
       battery_level,
       battery_color,
+      image,
     } = {
       ...this.currentStatus,
       ...newStatus,
@@ -206,6 +209,7 @@ export class WhisplayDisplay {
     this.currentStatus.brightness = brightness;
     this.currentStatus.battery_level = battery_level;
     this.currentStatus.battery_color = battery_color;
+    this.currentStatus.image = image;
 
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;

@@ -36,3 +36,6 @@ ensureDirExists(recordingsDir);
 
 export const chatHistoryDir = path.join(dataDir, "chat_history");
 ensureDirExists(chatHistoryDir);
+
+export const imageDir = path.join(dataDir, "images");
+ensureDirExists(imageDir);

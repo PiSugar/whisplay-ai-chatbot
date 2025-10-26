@@ -15,6 +15,7 @@ import {
 import { extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
 import { recordingsDir } from "../utils/dir";
+import { getLatestGenImg } from "../utils/image";
 
 class ChatFlow {
   currentFlowName: string = "";
@@ -178,11 +179,25 @@ class ChatFlow {
         );
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {
-            this.setCurrentFlow("sleep");
+            const img = getLatestGenImg();
+            if (img) {
+              display({
+                image: img,
+              });
+            } else {
+              this.setCurrentFlow("sleep");
+            }
           }
         });
         onButtonPressed(() => {
           stopPlaying();
+          this.setCurrentFlow("listening");
+        });
+        onButtonReleased(noop);
+        break;
+      case "image":
+        onButtonPressed(() => {
+          display({ image: "" });
           this.setCurrentFlow("listening");
         });
         onButtonReleased(noop);
