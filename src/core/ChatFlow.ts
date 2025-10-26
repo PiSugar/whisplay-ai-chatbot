@@ -151,7 +151,7 @@ class ChatFlow {
         break;
       case "answer":
         display({
-          status: "answering",
+          RGB: "#00c8a3",
         });
         this.currentFlowName = "answer";
         this.answerId += 1;
