@@ -150,6 +150,9 @@ class ChatFlow {
         });
         break;
       case "answer":
+        display({
+          status: "answering",
+        });
         this.currentFlowName = "answer";
         this.answerId += 1;
         const currentAnswerId = this.answerId;
