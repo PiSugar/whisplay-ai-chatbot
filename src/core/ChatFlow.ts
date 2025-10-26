@@ -184,6 +184,7 @@ class ChatFlow {
               display({
                 image: img,
               });
+              this.setCurrentFlow("image");
             } else {
               this.setCurrentFlow("sleep");
             }

@@ -138,8 +138,8 @@ if (gemini && geminiImageModel) {
         console.error("Error saving image:", error);
       }
       return isSuccess
-        ? `[success](${imagePath})`
-        : "[error]Image generation failed";
+        ? `[success]Image file saved.`
+        : "[error]Image generation failed.";
     },
   });
 }
