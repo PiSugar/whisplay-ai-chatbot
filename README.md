@@ -71,6 +71,14 @@ If you need to update the environment variables, you can edit the `.env` file di
 systemctl restart whisplay-ai-chatbot.service
 ```
 
+## Image Generation
+
+You can enable image generation by setting the `IMAGE_GENERATION_SERVER` variable in the `.env` file. Options include: OPENAI, GEMINI, VOLCENGINE.
+
+Then you can use prompts like "A children's book drawing of a veterinarian using a stethoscope to listen to the heartbeat of a baby otter." to generate images.
+
+The generated images will be displayed on the screen and saved in the `data/images` folder.
+
 ## Display Battery Level
 
 The battery level display depends on the pisugar-power-manager. If you are using PiSugar2 or PiSugar3, you need to install the pisugar-power-manager first. You can find the installation instructions in the [PiSugar Power Manager repository](https://github.com/PiSugar/pisugar-power-manager-rs).
@@ -81,6 +89,10 @@ Or use the following command to install it:
 wget https://cdn.pisugar.com/release/pisugar-power-manager.sh
 bash pisugar-power-manager.sh -c release
 ```
+
+## Data Folder
+
+The chatbot saves conversation history and generated images in the `data` folder. It's a temporal folder and can be deleted if you want to clear the history.
 
 ## Enclosure
 
@@ -94,6 +106,7 @@ bash pisugar-power-manager.sh -c release
 - Support local llm server ✅
 - Support local asr (vosk) ✅
 - Support local tts (piper) ✅
+- Support image generation (openai/gemini/volcengine) ✅
 - Refactor python render thread, better performance ✅
 - Add Google Gemini API support ✅
 - RPI camera support
