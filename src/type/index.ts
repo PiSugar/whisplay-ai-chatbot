@@ -29,6 +29,11 @@ export enum TTSServer {
   piper = "piper",
 }
 
+export enum ImageGenerationServer {
+  gemini = "gemini",
+  volcengine = "volcengine",
+}
+
 export interface FunctionCall {
   function: {
     arguments: string;
