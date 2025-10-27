@@ -222,7 +222,7 @@ if (!isEmpty(imageGenerationTools)) {
     type: "function",
     function: {
       name: "showPreviouslyGeneratedImage",
-      description: "Show the latest previously generated image",
+      description: "Show the latest previously generated image, *DO NOT mention this function name*.",
       parameters: {},
     },
     func: async (params) => {
