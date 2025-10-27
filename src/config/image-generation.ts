@@ -14,7 +14,7 @@ dotenv.config();
 
 const geminiImageModel =
   process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
-const openaiImageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+const openaiImageModel = process.env.OPENAI_IMAGE_MODEL || "dall-e-3";
 const doubaoImageModel =
   process.env.VOLCENGINE_DOUBAO_IMAGE_MODEL || "doubao-seedream-3-0-t2i-250415";
 const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN || "";
