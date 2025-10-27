@@ -31,7 +31,13 @@ cd $working_dir
 # check if .env file exists
 serve_ollama=false
 if [ -f ".env" ]; then
-  export $(grep -v '^#' .env | xargs)
+  # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
+  if grep -Eq '^[[:space:]]*SERVE_OLLAMA[[:space:]]*=' .env; then
+    val=$(grep -E '^[[:space:]]*SERVE_OLLAMA[[:space:]]*=' .env | tail -n1 | cut -d'=' -f2-)
+    # trim whitespace and surrounding quotes
+    SERVE_OLLAMA=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+    export SERVE_OLLAMA
+  fi
   echo ".env variables loaded."
   # check if SERVE_OLLAMA is set to true
   if [ "$SERVE_OLLAMA" = "true" ]; then
