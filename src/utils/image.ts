@@ -27,7 +27,7 @@ export const getLatestGenImg = () => {
 }
 
 export const showLatestGenImg = () => {
-  if (genImgList.length === 0) {
+  if (genImgList.length !== 0) {
     latestGenImg = genImgList[genImgList.length - 1] || ''
     return true
   } else {
