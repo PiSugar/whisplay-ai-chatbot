@@ -221,15 +221,15 @@ if (!isEmpty(imageGenerationTools)) {
   imageGenerationTools.push({
     type: "function",
     function: {
-      name: "showLatestGeneratedImage",
-      description: "Show the latest generated image",
+      name: "showPreviouslyGeneratedImage",
+      description: "Show the latest previously generated image",
       parameters: {},
     },
     func: async (params) => {
       const isShow = showLatestGenImg();
       return isShow
         ? `[success]Ready to show.`
-        : `[error]No generated image found.`;
+        : `[error]No previously generated image found.`;
     },
   });
 }
