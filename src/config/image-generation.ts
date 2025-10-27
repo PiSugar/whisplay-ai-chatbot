@@ -8,6 +8,7 @@ import path from "path";
 import { imageDir } from "../utils/dir";
 import { writeFileSync } from "fs";
 import { openai } from "../cloud-api/openai";
+import { ImageGenerateParamsNonStreaming } from "openai/resources/images";
 
 dotenv.config();
 
@@ -46,7 +47,7 @@ if (
       },
     },
     func: async (params) => {
-      console.log(`Generating image with gemini model: ${geminiImageModel}`)
+      console.log(`Generating image with gemini model: ${geminiImageModel}`);
       const { prompt } = params;
       const response = (await gemini!.models
         .generateContent({
@@ -121,7 +122,7 @@ if (
       },
     },
     func: async (params) => {
-      console.log(`Generating image with doubao model: ${doubaoImageModel}`)
+      console.log(`Generating image with doubao model: ${doubaoImageModel}`);
       const { prompt } = params;
       try {
         const response = await axios.post(
@@ -181,16 +182,19 @@ if (openai && imageGenerationServer === ImageGenerationServer.openai) {
       },
     },
     func: async (params) => {
-      console.log(`Generating image with openai model: ${openaiImageModel}`)
+      console.log(`Generating image with openai model: ${openaiImageModel}`);
       const { prompt } = params;
+      const requestParams: ImageGenerateParamsNonStreaming = {
+        model: openaiImageModel,
+        prompt: prompt as string,
+        size: "1024x1024",
+        n: 1,
+      };
+      if (["dall-e-2", "dall-e-3"].includes(openaiImageModel)) {
+        requestParams.response_format = "b64_json";
+      }
       try {
-        const response = await openai!.images.generate({
-          model: openaiImageModel,
-          prompt: prompt as string,
-          size: "1024x1024",
-          response_format: "b64_json",
-          n: 1,
-        });
+        const response = await openai!.images.generate(requestParams);
         if (response.data && response.data.length > 0) {
           const imageData = response.data[0].b64_json;
           const buffer = Buffer.from(imageData!, "base64");
