@@ -7,11 +7,13 @@ import { GenerateContentResponse } from "@google/genai";
 import path from "path";
 import { imageDir } from "../utils/dir";
 import { writeFileSync } from "fs";
+import { openai } from "../cloud-api/openai";
 
 dotenv.config();
 
 const geminiImageModel =
   process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const openaiImageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
 const doubaoImageModel =
   process.env.VOLCENGINE_DOUBAO_IMAGE_MODEL || "doubao-seedream-3-0-t2i-250415";
 const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN || "";
@@ -31,7 +33,7 @@ if (
     type: "function",
     function: {
       name: "generateImage",
-      description: "Generate an image from a text prompt",
+      description: "Generate or draw an image from a text prompt",
       parameters: {
         type: "object",
         properties: {
@@ -44,6 +46,7 @@ if (
       },
     },
     func: async (params) => {
+      console.log(`Generating image with gemini model: ${geminiImageModel}`)
       const { prompt } = params;
       const response = (await gemini!.models
         .generateContent({
@@ -105,7 +108,7 @@ if (
     type: "function",
     function: {
       name: "generateImage",
-      description: "Generate an image from a text prompt",
+      description: "Generate or draw an image from a text prompt",
       parameters: {
         type: "object",
         properties: {
@@ -118,6 +121,7 @@ if (
       },
     },
     func: async (params) => {
+      console.log(`Generating image with doubao model: ${doubaoImageModel}`)
       const { prompt } = params;
       try {
         const response = await axios.post(
@@ -153,6 +157,55 @@ if (
         }
       } catch (error) {
         console.error("Error generating image with Volcengine:", error);
+        return "[error]Image generation failed.";
+      }
+    },
+  });
+}
+
+if (openai && imageGenerationServer === ImageGenerationServer.openai) {
+  imageGenerationTools.push({
+    type: "function",
+    function: {
+      name: "generateImage",
+      description: "Generate or draw an image from a text prompt",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description: "The text prompt to generate the image from",
+          },
+        },
+        required: ["prompt"],
+      },
+    },
+    func: async (params) => {
+      console.log(`Generating image with openai model: ${openaiImageModel}`)
+      const { prompt } = params;
+      try {
+        const response = await openai!.images.generate({
+          model: openaiImageModel,
+          prompt: prompt as string,
+          size: "1024x1024",
+          response_format: "b64_json",
+          n: 1,
+        });
+        if (response.data && response.data.length > 0) {
+          const imageData = response.data[0].b64_json;
+          const buffer = Buffer.from(imageData!, "base64");
+          const fileName = `openai-image-${Date.now()}.jpg`;
+          const imagePath = path.join(imageDir, fileName);
+          writeFileSync(imagePath, buffer);
+          setLatestGenImg(imagePath);
+          console.log(`Image saved as ${imagePath}`);
+          return `[success]Image file saved.`;
+        } else {
+          console.error("No image data received from OpenAI.");
+          return "[error]Image generation failed.";
+        }
+      } catch (error) {
+        console.error("Error generating image with OpenAI:", error);
         return "[error]Image generation failed.";
       }
     },

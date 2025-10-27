@@ -30,6 +30,7 @@ export enum TTSServer {
 }
 
 export enum ImageGenerationServer {
+  openai = "openai",
   gemini = "gemini",
   volcengine = "volcengine",
 }
