@@ -108,7 +108,14 @@ export class StreamResponser {
       );
       if (this.partialContent.trim() !== "") {
         const text = purifyTextForTTS(this.partialContent);
-        this.speakArray.push(this.ttsFunc(text));
+        this.speakArray.push(
+          this.ttsFunc(text).finally(() => {
+            if (!this.isStartSpeak) {
+              this.playAudioInOrder();
+              this.isStartSpeak = true;
+            }
+          })
+        );
       }
       this.partialContent = "";
     }
