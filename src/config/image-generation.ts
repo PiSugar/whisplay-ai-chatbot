@@ -1,7 +1,7 @@
 import { ImageGenerationServer, LLMTool } from "../type";
 import axios from "axios";
 import dotenv from "dotenv";
-import { setLatestGenImg } from "../utils/image";
+import { setLatestGenImg, showLatestGenImg } from "../utils/image";
 import { gemini } from "../cloud-api/gemini";
 import { GenerateContentResponse } from "@google/genai";
 import path from "path";
@@ -9,6 +9,7 @@ import { imageDir } from "../utils/dir";
 import { writeFileSync } from "fs";
 import { openai } from "../cloud-api/openai";
 import { ImageGenerateParamsNonStreaming } from "openai/resources/images";
+import { isEmpty } from "lodash";
 
 dotenv.config();
 
@@ -212,6 +213,23 @@ if (openai && imageGenerationServer === ImageGenerationServer.openai) {
         console.error("Error generating image with OpenAI:", error);
         return "[error]Image generation failed.";
       }
+    },
+  });
+}
+
+if (!isEmpty(imageGenerationTools)) {
+  imageGenerationTools.push({
+    type: "function",
+    function: {
+      name: "showLatestGeneratedImage",
+      description: "Show the latest generated image",
+      parameters: {},
+    },
+    func: async (params) => {
+      const isShow = showLatestGenImg();
+      return isShow
+        ? `[success]Ready to show.`
+        : `[error]No generated image found.`;
     },
   });
 }
