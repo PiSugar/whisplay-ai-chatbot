@@ -135,7 +135,6 @@ if (
               "Content-Type": "application/json",
               Authorization: `Bearer ${doubaoAccessToken}`,
             },
-            responseType: "stream",
           }
         );
         const data = response.data;
