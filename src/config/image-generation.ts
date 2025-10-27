@@ -131,7 +131,7 @@ if (
           {
             model: doubaoImageModel,
             prompt: prompt,
-            response_format: "base64",
+            response_format: "b64_json",
             size: "1024x1024",
             guidance_scale: 3,
             watermark: false,
