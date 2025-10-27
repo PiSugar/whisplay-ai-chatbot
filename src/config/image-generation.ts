@@ -1,5 +1,5 @@
 import { ImageGenerationServer, LLMTool } from "../type";
-import { Axios } from "axios";
+import axios from "axios";
 import dotenv from "dotenv";
 import { setLatestGenImg } from "../utils/image";
 import { gemini } from "../cloud-api/gemini";
@@ -120,12 +120,6 @@ if (
     func: async (params) => {
       const { prompt } = params;
       try {
-        const axios = new Axios({
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${doubaoAccessToken}`,
-          },
-        });
         const response = await axios.post(
           "https://ark.cn-beijing.volces.com/api/v3/images/generations",
           {
@@ -135,6 +129,13 @@ if (
             size: "1024x1024",
             guidance_scale: 3,
             watermark: false,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${doubaoAccessToken}`,
+            },
+            responseType: "stream",
           }
         );
         const data = response.data;
@@ -162,4 +163,3 @@ if (
 export const addImageGenerationTools = (tools: LLMTool[]) => {
   tools.push(...imageGenerationTools);
 };
-  

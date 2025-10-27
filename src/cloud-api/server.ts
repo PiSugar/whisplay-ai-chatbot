@@ -1,6 +1,6 @@
 import { noop } from "lodash";
 import dotenv from "dotenv";
-import { ASRServer, LLMServer, TTSServer } from "../type";
+import { ASRServer, ImageGenerationServer, LLMServer, TTSServer } from "../type";
 import { recognizeAudio as VolcengineASR } from "./volcengine-asr";
 import {
   recognizeAudio as TencentASR,
@@ -53,10 +53,14 @@ export const llmServer: LLMServer = (
 export const ttsServer: TTSServer = (
   process.env.TTS_SERVER || TTSServer.volcengine
 ).toLowerCase() as TTSServer;
+export const imageGenerationServer: ImageGenerationServer = (
+  process.env.IMAGE_GENERATION_SERVER || ""
+).toLowerCase() as ImageGenerationServer;
 
 console.log(`Current ASR Server: ${asrServer}`);
 console.log(`Current LLM Server: ${llmServer}`);
 console.log(`Current TTS Server: ${ttsServer}`);
+if (imageGenerationServer) console.log(`Current Image Generation Server: ${imageGenerationServer}`);
 
 switch (asrServer) {
   case ASRServer.volcengine:
