@@ -30,7 +30,8 @@ const piperTTS = async (
       if (code !== 0) {
         // reject(new Error(`Piper process exited with code ${code}`));
         console.error(`Piper process exited with code ${code}`);
-        return { data: Buffer.from([]), duration: 0 };
+        resolve({ data: Buffer.from([]), duration: 0 });
+        return;
       }
 
       if (fs.existsSync(tempWavFile) === false) {

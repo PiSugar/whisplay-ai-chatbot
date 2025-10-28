@@ -135,6 +135,7 @@ class ChatFlow {
             onButtonReleased(noop);
           }),
         ]).then((result) => {
+          if (this.currentFlowName !== "asr") return;
           if (result === "[UserPress]") {
             this.setCurrentFlow("listening");
           } else {
