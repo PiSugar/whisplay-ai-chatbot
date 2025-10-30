@@ -10,7 +10,7 @@ Test Video Playlist:
 Tutorial:
 [https://www.youtube.com/watch?v=Nwu2DruSuyI](https://www.youtube.com/watch?v=Nwu2DruSuyI)
 
-Tutorial2 (Offline version build on RPi 5B)
+Tutorial 2 (offline version build on RPi 5B):
 [https://www.youtube.com/watch?v=kFmhSTh167U](https://www.youtube.com/watch?v=kFmhSTh167U)
 
 ## Hardware
