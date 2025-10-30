@@ -10,9 +10,12 @@ Test Video Playlist:
 Tutorial:
 [https://www.youtube.com/watch?v=Nwu2DruSuyI](https://www.youtube.com/watch?v=Nwu2DruSuyI)
 
+Tutorial2 (Offline version build on RPi 5B)
+[https://www.youtube.com/watch?v=kFmhSTh167U](https://www.youtube.com/watch?v=kFmhSTh167U)
+
 ## Hardware
 
-- Raspberry Pi zero 2w
+- Raspberry Pi zero 2w (Recommand)
 - PiSugar Whisplay HAT (including LCD screen, on-board speaker and microphone)
 - PiSugar 3 1200mAh
 
