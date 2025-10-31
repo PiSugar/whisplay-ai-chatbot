@@ -15,7 +15,7 @@ Tutorial 2 (offline version build on RPi 5B):
 
 ## Hardware
 
-- Raspberry Pi zero 2w (Recommand)
+- Raspberry Pi zero 2w (or 5B for offline version)
 - PiSugar Whisplay HAT (including LCD screen, on-board speaker and microphone)
 - PiSugar 3 1200mAh
 
@@ -76,7 +76,7 @@ systemctl restart whisplay-ai-chatbot.service
 
 ## Image Generation
 
-You can enable image generation by setting the `IMAGE_GENERATION_SERVER` variable in the `.env` file. Options include: OPENAI, GEMINI, VOLCENGINE.
+Enable image generation by setting the `IMAGE_GENERATION_SERVER` variable in the `.env` file. Options include: OPENAI, GEMINI, VOLCENGINE.
 
 Then you can use prompts like "A children's book drawing of a veterinarian using a stethoscope to listen to the heartbeat of a baby otter." to generate images.
 
@@ -107,7 +107,7 @@ The chatbot saves conversation history and generated images in the `data` folder
 - Enable the AI assistant to adjust the volume autonomously ✅
 - Reset the conversation history if there is no speech for five minutes ✅
 - Support local llm server ✅
-- Support local asr (vosk) ✅
+- Support local asr (whisper/vosk) ✅
 - Support local tts (piper) ✅
 - Support image generation (openai/gemini/volcengine) ✅
 - Refactor python render thread, better performance ✅
