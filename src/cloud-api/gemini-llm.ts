@@ -19,7 +19,7 @@ import { chatHistoryDir } from "../utils/dir";
 dotenv.config();
 
 const chatHistoryFileName = `gemini_chat_history_${moment().format(
-  "YYYYMMDD_HHmmss"
+  "YYYY-MM-DD_HH-mm-ss"
 )}.json`;
 
 const resetChatHistory = (): void => {

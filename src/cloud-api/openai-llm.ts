@@ -20,7 +20,7 @@ dotenv.config();
 const openaiLLMModel = process.env.OPENAI_LLM_MODEL || "gpt-4o"; // Default model
 
 const chatHistoryFileName = `openai_chat_history_${moment().format(
-  "YYYYMMDD_HHmmss"
+  "YYYY-MM-DD_HH-mm-ss"
 )}.json`;
 
 const messages: Message[] = [
