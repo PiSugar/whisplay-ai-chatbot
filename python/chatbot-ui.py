@@ -1,10 +1,5 @@
-import unicodedata
-import argparse
 from PIL import Image, ImageDraw, ImageFont
-import cairosvg
-from io import BytesIO
 import os
-import numpy as np
 import time
 import socket
 import json
