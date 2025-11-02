@@ -1,6 +1,5 @@
 from picamera2 import Picamera2
 from whisplay import WhisplayBoard
-import signal
 import sys
 import time
 
@@ -15,11 +14,6 @@ if __name__ == "__main__":
         whisplay.cleanup()
         sys.exit(0)
         
-    signal.signal(signal.SIGTERM, cleanup_and_exit)
-    signal.signal(signal.SIGINT, cleanup_and_exit)
-    signal.signal(signal.SIGKILL, cleanup_and_exit)
-    signal.signal(signal.SIGQUIT, cleanup_and_exit)
-    signal.signal(signal.SIGSTOP, cleanup_and_exit)
     try:
         # Keep the main thread alive
         while True:
