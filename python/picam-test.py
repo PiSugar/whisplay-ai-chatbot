@@ -17,7 +17,7 @@ if __name__ == "__main__":
         sys.exit(0)
         
     picam2 = Picamera2()
-    picam2.configure(picam2.create_preview_configuration(main={"format": "RGB888", "size": (whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)}))
+    picam2.configure(picam2.create_preview_configuration(main={"size": (whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)}))
     picam2.start()
     time.sleep(2)  # Allow camera to warm up
     try:
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         # Keep the main thread alive
         while True:
             # Capture image from Pi Camera
-            
+            print("[Camera] Capturing frame...")
             frame = picam2.capture_array()
             img = Image.fromarray(frame)
             img = img.resize((whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), Image.LANCZOS)
@@ -34,7 +34,7 @@ if __name__ == "__main__":
             # Draw the image on the LCD
             whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, pixel_data)
 
-            # time.sleep(0.1)  # Adjust the delay as needed for your application
+            time.sleep(0.1)  # Adjust the delay as needed for your application
     except KeyboardInterrupt:
         picam2.stop()
         cleanup_and_exit(None, None)
