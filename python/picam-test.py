@@ -28,9 +28,9 @@ if __name__ == "__main__":
             
             frame = picam2.capture_array()
             img = Image.fromarray(frame)
-            img = img.resize((whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT))
+            img = img.resize((whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), Image.LANCZOS)
             # Convert the image to RGB565 format
-            pixel_data = ImageUtils.image_to_rgb565(img)
+            pixel_data = ImageUtils.image_to_rgb565(img, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)
             # Draw the image on the LCD
             whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, pixel_data)
 
