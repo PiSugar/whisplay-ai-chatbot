@@ -17,7 +17,7 @@ if __name__ == "__main__":
         sys.exit(0)
         
     picam2 = Picamera2()
-    picam2.configure(picam2.create_preview_configuration(main={"size": (480, 560)}))
+    picam2.configure(picam2.create_preview_configuration(main={"size": (whisplay.LCD_WIDTH * 2, whisplay.LCD_HEIGHT * 2)}))
     picam2.start()
     whisplay.set_backlight(100)
     time.sleep(2)  # Allow camera to warm up
