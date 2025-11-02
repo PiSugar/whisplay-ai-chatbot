@@ -30,7 +30,7 @@ if __name__ == "__main__":
             img = Image.fromarray(frame)
             img = img.resize((whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT))
             # Convert the image to RGB565 format
-            pixel_data = ImageUtils.convert_image_to_rgb565(img)
+            pixel_data = ImageUtils.image_to_rgb565(img)
             # Draw the image on the LCD
             whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, pixel_data)
 
