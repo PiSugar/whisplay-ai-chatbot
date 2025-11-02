@@ -39,7 +39,7 @@ if __name__ == "__main__":
         # Keep the main thread alive
         while True:
             # Capture image from Pi Camera
-            print("[Camera] Capturing frame...")
+            start_time = time.time()
             frame = picam2.capture_array()
             # img = img.resize((whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), Image.LANCZOS)
             # Convert the image to RGB565 format
@@ -53,8 +53,9 @@ if __name__ == "__main__":
             
             # Send the pixel data to the display
             whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, pixel_bytes)
-
-            time.sleep(0.1)  # Adjust the delay as needed for your application
+            end_time = time.time()
+            fps = 1 / (end_time - start_time)
+            print(f"[Camera] Displayed frame at {fps:.2f} FPS")
     except KeyboardInterrupt:
         picam2.stop()
         cleanup_and_exit(None, None)
