@@ -45,9 +45,14 @@ if __name__ == "__main__":
             # Convert the image to RGB565 format
             # pixel_data = bgr888_to_rgb565(frame, rgb565_buf)
             frame = cv2.resize(frame, (240, 280), interpolation=cv2.INTER_NEAREST)
-            rgb565 = np.frombuffer(frame, dtype=np.uint16)
-            # Draw the image on the LCD
-            whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, rgb565)
+            r = (frame[:, :, 0] >> 3).astype(np.uint16)  # 5 bit
+            g = (frame[:, :, 1] >> 2).astype(np.uint16)  # 6 bit
+            b = (frame[:, :, 2] >> 3).astype(np.uint16)  # 5 bit
+            rgb565 = (r << 11) | (g << 5) | b
+            pixel_bytes = rgb565.byteswap().tobytes()
+            
+            # Send the pixel data to the display
+            whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, pixel_bytes)
 
             time.sleep(0.1)  # Adjust the delay as needed for your application
     except KeyboardInterrupt:
