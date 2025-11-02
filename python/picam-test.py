@@ -39,14 +39,12 @@ if __name__ == "__main__":
             # Capture image from Pi Camera
             print("[Camera] Capturing frame...")
             frame = picam2.capture_array()
-            # img = Image.fromarray(frame)
+            img = Image.fromarray(frame)
             # img = img.resize((whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), Image.LANCZOS)
             # Convert the image to RGB565 format
-            # pixel_data = ImageUtils.image_to_rgb565(img, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)
-            
-            # pixel_data = rgb888_to_565_inplace(frame, rgb565_buf)
+            pixel_data = ImageUtils.image_to_rgb565(img, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)
             # Draw the image on the LCD
-            whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, frame)
+            whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, pixel_data)
 
             time.sleep(0.1)  # Adjust the delay as needed for your application
     except KeyboardInterrupt:
