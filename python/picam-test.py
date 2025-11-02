@@ -27,7 +27,7 @@ if __name__ == "__main__":
         return buf.byteswap().tobytes()
         
     picam2 = Picamera2()
-    picam2.configure(picam2.create_preview_configuration(main={"size": (whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT), "format": "RGB888"}))
+    picam2.configure(picam2.create_preview_configuration(main={"size": (whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)}))
     picam2.start()
     whisplay.set_backlight(100)
     rgb565_buf = np.empty((whisplay.LCD_HEIGHT, whisplay.LCD_WIDTH), dtype=np.uint16)
@@ -44,9 +44,9 @@ if __name__ == "__main__":
             # Convert the image to RGB565 format
             # pixel_data = ImageUtils.image_to_rgb565(img, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT)
             
-            pixel_data = rgb888_to_565_inplace(frame, rgb565_buf)
+            # pixel_data = rgb888_to_565_inplace(frame, rgb565_buf)
             # Draw the image on the LCD
-            whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, pixel_data)
+            whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, frame)
 
             time.sleep(0.1)  # Adjust the delay as needed for your application
     except KeyboardInterrupt:
