@@ -314,8 +314,12 @@ def on_button_release():
             print("[Camera] Capturing image...")
             if camera_thread is not None:
                 camera_thread.capture()
+                notification = {"event": "camera_capture"}
+                send_to_all_clients(notification)
         # long press to toggle camera mode
         elif camera_mode_button_press_time - camera_mode_button_release_time > 0.5:
+            notification = {"event": "exit_camera_mode"}
+            send_to_all_clients(notification)
             camera_mode = False
         return  # Ignore button presses in camera mode
     

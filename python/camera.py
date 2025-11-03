@@ -1,4 +1,5 @@
 from picamera2 import Picamera2
+from PIL import Image
 import cv2
 from whisplay import WhisplayBoard
 import sys
@@ -31,7 +32,6 @@ class CameraThread(threading.Thread):
                 self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
                 end_time = time.time()
                 fps = 1 / (end_time - start_time)
-                print(f"[Camera] Displayed frame at {fps:.2f} FPS")
                 
         # Display the captured image
         image = ImageUtils.crop_center(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)

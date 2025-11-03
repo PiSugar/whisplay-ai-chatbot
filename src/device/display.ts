@@ -155,13 +155,13 @@ export class WhisplayDisplay {
       });
       this.client.on("data", (data: Buffer) => {
         const dataString = data.toString();
+        if (dataString.trim() === "OK") {
+          return;
+        }
         console.log(
           `[${getCurrentTimeTag()}] Received data from Whisplay hat:`,
           dataString
         );
-        if (dataString.trim() === "OK") {
-          return;
-        }
         try {
           const json = JSON.parse(dataString);
           if (json.event === "button_pressed") {
