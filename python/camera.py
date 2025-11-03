@@ -36,8 +36,11 @@ class CameraThread(threading.Thread):
     def capture(self):
         frame = self.picam2.capture_array()
         self.capture_image = Image.fromarray(frame)
+        # convert to RGB to avoid errors when saving as JPEG (JPEG does not support alpha)
+        if self.capture_image.mode != "RGB":
+            self.capture_image = self.capture_image.convert("RGB")
         # save to file
-        self.capture_image.save(self.image_path)
+        self.capture_image.save(self.image_path, format="JPEG", quality=95)
         print(f"[Camera] Captured image saved to {self.image_path}")
 
     def stop(self):
