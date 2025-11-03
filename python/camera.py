@@ -34,7 +34,7 @@ class CameraThread(threading.Thread):
                 fps = 1 / (end_time - start_time)
                 
         # Display the captured image
-        image = ImageUtils.crop_center(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
+        image = ImageUtils.image_to_rgb565(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
         pixel_bytes = ImageUtils.convertCameraFrameToRGB565(image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
         self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
                 
