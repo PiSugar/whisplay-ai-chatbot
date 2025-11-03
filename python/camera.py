@@ -21,21 +21,16 @@ class CameraThread(threading.Thread):
         self.image_path = image_path
 
     def run(self):
-        while self.running:
-            if self.capture_image is not None:
-                # crop and display the captured image
-                break
-            else:
-                start_time = time.time()
-                frame = self.picam2.capture_array()
-                pixel_bytes = ImageUtils.convertCameraFrameToRGB565(frame, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
-                self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
-                end_time = time.time()
-                fps = 1 / (end_time - start_time)
+        while self.running and self.capture_image is None:
+            start_time = time.time()
+            frame = self.picam2.capture_array()
+            pixel_bytes = ImageUtils.convertCameraFrameToRGB565(frame, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
+            self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
+            end_time = time.time()
+            fps = 1 / (end_time - start_time)
                 
         # Display the captured image
-        image = ImageUtils.image_to_rgb565(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
-        pixel_bytes = ImageUtils.convertCameraFrameToRGB565(image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
+        pixel_bytes = ImageUtils.image_to_rgb565(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
         self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
                 
     def capture(self):
