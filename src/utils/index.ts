@@ -189,11 +189,15 @@ export const getRecordFileDurationMs = async (
 ): Promise<number> => {
   const format = filePath.endsWith(".mp3") ? "mp3" : "wav";
   if (!existsSync(filePath)) return 0;
-  const data = readFileSync(filePath);
-  if (format === "wav") {
-    return getWavFileDurationMs(data);
-  } else if (format === "mp3") {
-    return await mp3Duration(data);
+  try {
+    const data = readFileSync(filePath);
+    if (format === "wav") {
+      return getWavFileDurationMs(data);
+    } else if (format === "mp3") {
+      return await mp3Duration(data);
+    }
+  } catch (error) {
+    return 0;
   }
   return 0;
 };
