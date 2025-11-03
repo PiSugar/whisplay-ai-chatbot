@@ -1,6 +1,9 @@
 import { display } from "./device/display";
 import Battery from "./device/battery";
 import ChatFlow from "./core/ChatFlow";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const battery = new Battery();
 battery.connect().catch(e => {
@@ -12,4 +15,6 @@ battery.addListener("batteryLevel", (data: any) => {
   });
 });
 
-new ChatFlow();
+new ChatFlow({
+  enableCamera: process.env.ENABLE_CAMERA === "true",
+});

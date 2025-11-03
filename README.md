@@ -60,7 +60,7 @@ If you make changes to the node code or just pull the new code from this reposit
 bash build.sh
 ```
 
-If there's new third-party libraries to the python code, make sure to install them in global environment with `--break-system-packages`.
+If If you encounter `ModuleNotFoundError` or there's new third-party libraries to the python code, please run the following command to update the dependencies for python:
 ```
 cd python
 pip install -r requirements.txt --break-system-packages

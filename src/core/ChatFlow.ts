@@ -1,8 +1,14 @@
-import { getCurrentTimeTag, splitSentences } from "./../utils/index";
+import moment from "moment";
+import {
+  getCurrentTimeTag,
+  getRecordFileDurationMs,
+  splitSentences,
+} from "./../utils/index";
 import { get, noop } from "lodash";
 import {
   onButtonPressed,
   onButtonReleased,
+  onButtonDoubleClick,
   display,
   getCurrentStatus,
 } from "../device/display";
@@ -14,7 +20,7 @@ import {
 } from "../cloud-api/server";
 import { extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
-import { recordingsDir } from "../utils/dir";
+import { cameraDir, recordingsDir } from "../utils/dir";
 import { getLatestGenImg } from "../utils/image";
 
 class ChatFlow {
@@ -26,8 +32,9 @@ class ChatFlow {
   partialThinking: string = "";
   thinkingSentences: string[] = [];
   answerId: number = 0;
+  enableCamera: boolean = false;
 
-  constructor() {
+  constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
     this.recordingsDir = recordingsDir;
     this.setCurrentFlow("sleep");
@@ -53,6 +60,17 @@ class ChatFlow {
         });
       }
     );
+    if (options?.enableCamera) {
+      this.enableCamera = true;
+    }
+  }
+
+  async recognizeAudio(path: string): Promise<string> {
+    if ((await getRecordFileDurationMs(path)) < 500) {
+      console.log("Record audio too short, skipping recognition.");
+      return Promise.resolve("");
+    }
+    return recognizeAudio(path);
   }
 
   partialThinkingCallback = (
@@ -85,6 +103,16 @@ class ChatFlow {
           this.setCurrentFlow("listening");
         });
         onButtonReleased(noop);
+        if (this.enableCamera) {
+          onButtonDoubleClick(() => {
+            display({
+              camera_mode: true,
+              capture_image_path: `${cameraDir}/capture-${moment().format(
+                "YYYYMMDD-HHmmss"
+              )}.jpg`,
+            });
+          });
+        }
         display({
           status: "idle",
           emoji: "😴",
@@ -126,8 +154,9 @@ class ChatFlow {
         display({
           status: "recognizing",
         });
+        onButtonDoubleClick(null);
         Promise.race([
-          recognizeAudio(this.currentRecordFilePath),
+          this.recognizeAudio(this.currentRecordFilePath),
           new Promise<string>((resolve) => {
             onButtonPressed(() => {
               resolve("[UserPress]");

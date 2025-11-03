@@ -3,6 +3,8 @@ import { get, isArray } from "lodash";
 import { FunctionCall } from "../type";
 import moment from "moment";
 import { exec } from "child_process";
+import { existsSync, readFileSync } from "fs";
+import mp3Duration from "mp3-duration";
 
 // 输入 [[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]]
 // 输出 [{"function":{"arguments":" {\"volume\": 21}","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}]
@@ -180,4 +182,18 @@ export const purifyTextForTTS = (text: string): string => {
   return text
     .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
     .trim();
+};
+
+export const getRecordFileDurationMs = async (
+  filePath: string
+): Promise<number> => {
+  const format = filePath.endsWith(".mp3") ? "mp3" : "wav";
+  if (!existsSync(filePath)) return 0;
+  const data = readFileSync(filePath);
+  if (format === "wav") {
+    return getWavFileDurationMs(data);
+  } else if (format === "mp3") {
+    return await mp3Duration(data);
+  }
+  return 0;
 };

@@ -9,12 +9,13 @@ import signal
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
+from camera import CameraThread
 from utils import ColorUtils, ImageUtils, TextUtils
 
 scroll_thread = None
 scroll_stop_event = threading.Event()
 
-status_font_size=28
+status_font_size=24
 emoji_font_size=40
 battery_font_size=13
 
@@ -28,6 +29,11 @@ current_scroll_top = 0
 current_scroll_speed = 6
 current_image_path = ""
 current_image = None
+camera_mode = False
+camera_mode_button_press_time = 0
+camera_mode_button_release_time = 0
+camera_capture_image_path = ""
+camera_thread = None
 clients = {}
 
 class RenderThread(threading.Thread):
@@ -56,7 +62,9 @@ class RenderThread(threading.Thread):
             whisplay.draw_image(0, 0, whisplay.LCD_WIDTH, whisplay.LCD_HEIGHT, rgb565_data)
 
     def render_frame(self, status, emoji, text, scroll_top, battery_level, battery_color):
-        global current_scroll_speed, current_image_path, current_image
+        global current_scroll_speed, current_image_path, current_image, camera_mode
+        if camera_mode:
+            return  # Skip rendering if in camera mode
         if current_image_path not in [None, ""]:
             # Try to load image from path
             if current_image is not None:
@@ -283,20 +291,41 @@ def send_to_all_clients(message):
             print(f"[Server] Sent notification to client {addr}: {display_message}")
         except Exception as e:
             print(f"[Server] Failed to send notification to client {addr}: {e}")
+            
+
 
 def on_button_pressed():
+    global camera_mode, camera_mode_button_press_time
+    if camera_mode:
+        camera_mode_button_press_time = time.time()
+        return
     """Function executed when button is pressed"""
     print("[Server] Button pressed")
     notification = {"event": "button_pressed"}
     send_to_all_clients(notification)
 
 def on_button_release():
+    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
+    if camera_mode:
+        camera_mode_button_release_time = time.time()
+        # if single press and release within 0.5 seconds
+        if camera_mode_button_release_time - camera_mode_button_press_time < 0.5:
+            # capture image
+            print("[Camera] Capturing image...")
+            if camera_thread is not None:
+                camera_thread.capture()
+        # long press to toggle camera mode
+        elif camera_mode_button_press_time - camera_mode_button_release_time > 0.5:
+            camera_mode = False
+        return  # Ignore button presses in camera mode
+    
     """Function executed when button is released"""
     print("[Server] Button released")
     notification = {"event": "button_released"}
     send_to_all_clients(notification)
 
 def handle_client(client_socket, addr, whisplay):
+    global camera_capture_image_path, camera_mode, camera_thread
     print(f"[Socket] Client {addr} connected")
     clients[addr] = client_socket
     try:
@@ -326,6 +355,9 @@ def handle_client(client_socket, addr, whisplay):
                     battery_level = content.get("battery_level", None)
                     battery_color = content.get("battery_color", None)
                     image_path = content.get("image", None)
+                    capture_image_path = content.get("capture_image_path", None)
+                    # boolean to enable camera mode
+                    camera_mode = content.get("camera_mode", None)
 
                     if rgbled:
                         rgb255_tuple = ColorUtils.get_rgb255_from_any(rgbled)
@@ -338,6 +370,22 @@ def handle_client(client_socket, addr, whisplay):
                         
                     if brightness:
                         whisplay.set_backlight(brightness)
+                        
+                    if capture_image_path is not None:
+                        camera_capture_image_path = capture_image_path
+                    
+                    if camera_mode is not None:
+                        camera_mode = camera_mode
+                        if camera_mode:
+                            print("[Camera] Entering camera mode...")
+                            camera_thread = CameraThread(whisplay, camera_capture_image_path)
+                            camera_thread.start()
+                        else:
+                            print("[Camera] Exiting camera mode...")
+                            if camera_thread is not None:
+                                camera_thread.stop()
+                                camera_thread = None
+                            camera_mode = False
                         
                     if (text is not None) or (status is not None) or (emoji is not None) or \
                        (battery_level is not None) or (battery_color is not None) or \
