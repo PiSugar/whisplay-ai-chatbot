@@ -357,7 +357,7 @@ def handle_client(client_socket, addr, whisplay):
                     image_path = content.get("image", None)
                     capture_image_path = content.get("capture_image_path", None)
                     # boolean to enable camera mode
-                    camera_mode = content.get("camera_mode", None)
+                    set_camera_mode = content.get("camera_mode", None)
 
                     if rgbled:
                         rgb255_tuple = ColorUtils.get_rgb255_from_any(rgbled)
@@ -374,10 +374,10 @@ def handle_client(client_socket, addr, whisplay):
                     if capture_image_path is not None:
                         camera_capture_image_path = capture_image_path
                     
-                    if camera_mode is not None:
-                        camera_mode = camera_mode
-                        if camera_mode:
+                    if set_camera_mode is not None:
+                        if set_camera_mode:
                             print("[Camera] Entering camera mode...")
+                            camera_mode = True
                             camera_thread = CameraThread(whisplay, camera_capture_image_path)
                             camera_thread.start()
                         else:
