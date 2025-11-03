@@ -67,12 +67,14 @@ export class WhisplayDisplay {
 
       if (doubleClickDetected) {
         this.buttonDoubleClickCallback?.();
-      } else if (this.buttonReleaseTimeArray.length > 1) {
-        const lastReleaseTime = this.buttonReleaseTimeArray.pop()!;
-        const lastPressTime = this.buttonPressTimeArray.pop()!;
+      } else {
+        const lastReleaseTime = this.buttonReleaseTimeArray.pop() || 0;
+        const lastPressTime = this.buttonPressTimeArray.pop() || 0;
         if (lastPressTime > lastReleaseTime) {
+          console.log('delay emit pressed')
           this.buttonPressedCallback();
         } else {
+          console.log('delay emit released')
           this.buttonReleasedCallback();
         }
       }
@@ -167,6 +169,7 @@ export class WhisplayDisplay {
           if (json.event === "button_pressed") {
             this.buttonPressTimeArray.push(Date.now());
             if (!this.buttonDetectInterval) {
+              console.log('emit pressed')
               this.buttonPressedCallback();
             }
             this.startMonitoringDoubleClick();
@@ -174,6 +177,7 @@ export class WhisplayDisplay {
           if (json.event === "button_released") {
             this.buttonReleaseTimeArray.push(Date.now());
             if (!this.buttonDetectInterval) {
+              console.log('emit released')
               this.buttonReleasedCallback();
             }
           }

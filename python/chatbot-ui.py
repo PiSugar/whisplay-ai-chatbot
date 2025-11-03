@@ -101,7 +101,7 @@ class RenderThread(threading.Thread):
             draw = ImageDraw.Draw(image)
             
             clock_font_size = 24
-            clock_font = ImageFont.truetype(self.font_path, clock_font_size)
+            # clock_font = ImageFont.truetype(self.font_path, clock_font_size)
 
             # current_time = time.strftime("%H:%M:%S")
             # draw.text((self.whisplay.LCD_WIDTH // 2, self.whisplay.LCD_HEIGHT // 2), current_time, font=clock_font, fill=(255, 255, 255, 255))
