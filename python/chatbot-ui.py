@@ -293,10 +293,14 @@ def send_to_all_clients(message):
             print(f"[Server] Failed to send notification to client {addr}: {e}")
 
 def check_is_released():
-    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
+    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time, camera_thread
     if camera_mode and camera_mode_button_release_time < camera_mode_button_press_time:
         # long press detected, exit camera mode
         print("[Camera] Exiting camera mode due to long press...")
+        if camera_thread is not None:
+            camera_thread.stop()
+            camera_thread.join()
+            camera_thread = None
         notification = {"event": "exit_camera_mode"}
         send_to_all_clients(notification)
         camera_mode = False
