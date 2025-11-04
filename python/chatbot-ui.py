@@ -291,21 +291,21 @@ def send_to_all_clients(message):
             print(f"[Server] Sent notification to client {addr}: {display_message}")
         except Exception as e:
             print(f"[Server] Failed to send notification to client {addr}: {e}")
-            
 
+def check_is_released():
+    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
+    if camera_mode and camera_mode_button_release_time < camera_mode_button_press_time:
+        # long press detected, exit camera mode
+        print("[Camera] Exiting camera mode due to long press...")
+        notification = {"event": "exit_camera_mode"}
+        send_to_all_clients(notification)
+        camera_mode = False
 
 def on_button_pressed():
     global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
     if camera_mode:
         camera_mode_button_press_time = time.time()
-        # check after 2 seconds, exit camera mode
-        def check_is_released():
-            if camera_mode and camera_mode_button_release_time < camera_mode_button_press_time:
-                # long press detected, exit camera mode
-                print("[Camera] Exiting camera mode due to long press...")
-                notification = {"event": "exit_camera_mode"}
-                send_to_all_clients(notification)
-                camera_mode = False
+        # check after 2 seconds, exit camera mode if not released
         threading.Timer(2.0, check_is_released).start()
         return
     """Function executed when button is pressed"""
