@@ -141,6 +141,9 @@ class ChatFlow {
         });
         result.then(() => {
           this.setCurrentFlow("asr");
+        }).catch((err) => {
+          console.error("Error during recording:", err);
+          this.setCurrentFlow("sleep");
         });
         display({
           status: "listening",
