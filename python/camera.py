@@ -1,10 +1,8 @@
 from picamera2 import Picamera2
 from PIL import Image
-import cv2
 from whisplay import WhisplayBoard
 import sys
 import time
-import numpy as np
 import threading
 from utils import ImageUtils
 
@@ -32,6 +30,7 @@ class CameraThread(threading.Thread):
         # Display the captured image
         pixel_bytes = ImageUtils.image_to_rgb565(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
         self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
+        time.sleep(2)  # Display for 2 seconds
                 
     def capture(self):
         frame = self.picam2.capture_array()
@@ -46,6 +45,7 @@ class CameraThread(threading.Thread):
     def stop(self):
         self.picam2.stop()
         self.running = False
+        self.join()
 
 
 if __name__ == "__main__":
