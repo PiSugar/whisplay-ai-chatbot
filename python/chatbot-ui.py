@@ -295,9 +295,18 @@ def send_to_all_clients(message):
 
 
 def on_button_pressed():
-    global camera_mode, camera_mode_button_press_time
+    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
     if camera_mode:
         camera_mode_button_press_time = time.time()
+        # check after 2 seconds, exit camera mode
+        def check_is_released():
+            if camera_mode and camera_mode_button_release_time < camera_mode_button_press_time:
+                # long press detected, exit camera mode
+                print("[Camera] Exiting camera mode due to long press...")
+                notification = {"event": "exit_camera_mode"}
+                send_to_all_clients(notification)
+                camera_mode = False
+        threading.Timer(2.0, check_is_released).start()
         return
     """Function executed when button is pressed"""
     print("[Server] Button pressed")
@@ -308,21 +317,15 @@ def on_button_release():
     global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
     if camera_mode:
         camera_mode_button_release_time = time.time()
-        # if single press and release within 0.5 seconds
-        if camera_mode_button_release_time - camera_mode_button_press_time < 0.8:
+        # if single press and release within 2 seconds
+        if camera_mode_button_release_time - camera_mode_button_press_time <= 2:
             # capture image
             print("[Camera] Capturing image...")
             if camera_thread is not None:
                 camera_thread.capture()
                 notification = {"event": "camera_capture"}
                 send_to_all_clients(notification)
-        # long press to toggle camera mode
-        else:
-            notification = {"event": "exit_camera_mode"}
-            send_to_all_clients(notification)
-            camera_mode = False
         return  # Ignore button presses in camera mode
-    
     """Function executed when button is released"""
     print("[Server] Button released")
     notification = {"event": "button_released"}
