@@ -33,10 +33,10 @@ class CameraThread(threading.Thread):
             self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
             end_time = time.time()
             fps = 1 / (end_time - start_time)
-                
         # Display the captured image
-        pixel_bytes = ImageUtils.image_to_rgb565(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
-        self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
+        if self.capture_image is not None:
+            pixel_bytes = ImageUtils.image_to_rgb565(self.capture_image, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
+            self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
         time.sleep(2)  # Display for 2 seconds
                 
     def capture(self):
