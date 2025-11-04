@@ -14,9 +14,13 @@ class CameraThread(threading.Thread):
         self.picam2 = Picamera2()
         self.picam2.configure(self.picam2.create_preview_configuration(main={"size": (self.whisplay.LCD_WIDTH * 2, self.whisplay.LCD_HEIGHT * 2)}))
         self.picam2.start()
-        self.running = True
+        self.running = False
         self.capture_image = None
         self.image_path = image_path
+        
+    def start(self):
+        self.running = True
+        return super().start()
 
     def run(self):
         while self.running and self.capture_image is None:
@@ -43,8 +47,8 @@ class CameraThread(threading.Thread):
         print(f"[Camera] Captured image saved to {self.image_path}")
 
     def stop(self):
-        self.picam2.stop()
         self.running = False
+        self.picam2.stop()
         self.join()
 
 
