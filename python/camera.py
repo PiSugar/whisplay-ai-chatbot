@@ -7,13 +7,16 @@ import threading
 from utils import ImageUtils
 
 class CameraThread(threading.Thread):
+    
+    picam2 = None
 
     def __init__(self, whisplay, image_path):
         super().__init__()
         self.whisplay = whisplay
-        self.picam2 = Picamera2()
-        self.picam2.configure(self.picam2.create_preview_configuration(main={"size": (self.whisplay.LCD_WIDTH * 2, self.whisplay.LCD_HEIGHT * 2)}))
-        self.picam2.start()
+        if CameraThread.picam2 is None:
+            CameraThread.picam2 = Picamera2()
+            CameraThread.picam2.configure(CameraThread.picam2.create_preview_configuration(main={"size": (self.whisplay.LCD_WIDTH * 2, self.whisplay.LCD_HEIGHT * 2)}))
+        CameraThread.picam2.start()
         self.running = False
         self.capture_image = None
         self.image_path = image_path
@@ -25,7 +28,7 @@ class CameraThread(threading.Thread):
     def run(self):
         while self.running and self.capture_image is None:
             start_time = time.time()
-            frame = self.picam2.capture_array()
+            frame = CameraThread.picam2.capture_array()
             pixel_bytes = ImageUtils.convertCameraFrameToRGB565(frame, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
             self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
             end_time = time.time()
@@ -37,7 +40,7 @@ class CameraThread(threading.Thread):
         time.sleep(2)  # Display for 2 seconds
                 
     def capture(self):
-        frame = self.picam2.capture_array()
+        frame = CameraThread.picam2.capture_array()
         self.capture_image = Image.fromarray(frame)
         # convert to RGB to avoid errors when saving as JPEG (JPEG does not support alpha)
         if self.capture_image.mode != "RGB":
