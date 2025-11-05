@@ -15,7 +15,7 @@ const loadLatestGenImg = () => {
     .sort((a, b) => {
       const aTime = fs.statSync(path.join(imageDir, a)).mtime.getTime();
       const bTime = fs.statSync(path.join(imageDir, b)).mtime.getTime();
-      return bTime - aTime;
+      return aTime - bTime;
     })
     .map((file) => path.join(imageDir, file));
   genImgList.push(...images);
@@ -31,7 +31,7 @@ const loadLatestCapturedImg = () => {
     .sort((a, b) => {
       const aTime = fs.statSync(path.join(cameraDir, a)).mtime.getTime();
       const bTime = fs.statSync(path.join(cameraDir, b)).mtime.getTime();
-      return bTime - aTime;
+      return aTime - bTime;
     })
     .map((file) => path.join(cameraDir, file));
   capturedImgList.push(...images);
