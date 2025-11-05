@@ -1,21 +1,15 @@
 import axios from "axios";
 import * as fs from "fs";
 import * as path from "path";
-import { get, isEmpty, partial } from "lodash";
+import { isEmpty } from "lodash";
 import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
 } from "../config/llm-config";
-import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
-import {
-  FunctionCall,
-  Message,
-  OllamaFunctionCall,
-  OllamaMessage,
-} from "../type";
+import { Message, OllamaFunctionCall, OllamaMessage } from "../type";
 import { ChatWithLLMStreamFunction } from "./interface";
 import { chatHistoryDir } from "../utils/dir";
 import moment from "moment";
@@ -177,7 +171,6 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           })
         );
 
-        console.log("call results: ", results);
         const newMessages: OllamaMessage[] = results.map(
           ([name, result]: any) => ({
             role: "tool",
@@ -185,6 +178,22 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             tool_name: name as string,
           })
         );
+
+        // If describeImage tool was called, append its result as assistant message
+        const describeMessage = newMessages.find(
+          (msg) =>
+            msg.tool_name === "describeImage" &&
+            !msg.content.startsWith("[error]")
+        );
+        if (describeMessage) {
+          newMessages.push({
+            role: "assistant",
+            content: describeMessage.content,
+          });
+          endResolve();
+          endCallback();
+          return;
+        }
 
         await chatWithLLMStream(
           newMessages as Message[],

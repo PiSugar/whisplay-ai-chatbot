@@ -74,7 +74,6 @@ if (visionServer === VisionServer.ollama) {
         think: false,
         stream: false,
       });
-      console.log("Ollama vision response:", response.data);
       const content = get(response.data, "message.content", "");
       return content || "[error] No content received from Ollama.";
     },
