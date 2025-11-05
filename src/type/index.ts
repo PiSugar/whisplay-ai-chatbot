@@ -42,6 +42,10 @@ export enum ImageGenerationServer {
   volcengine = "volcengine",
 }
 
+export enum VisionServer {
+  ollama = "ollama",
+}
+
 export interface FunctionCall {
   function: {
     arguments: string;
