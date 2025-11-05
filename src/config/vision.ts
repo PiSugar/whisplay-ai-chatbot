@@ -42,24 +42,25 @@ if (visionServer === VisionServer.ollama) {
   visionTools.push({
     type: "function",
     function: {
-      name: "viewAndDescribeImage",
+      name: "imageInsight",
       description:
-        "view and describe the image, when user asks about what you see, invoke this function.",
+        "Invoke this function to analyze and describe the image when the user asks about its content.",
       parameters: {
         type: "object",
         properties: {
           imageType: {
             type: "enum",
-            description: "the type of image to view, default is `latestShowed`",
+            description:
+              "Specifies which image to analyze. Default is `lastShowed`.",
             enum: ["lastShowed", "latestCaptured", "latestGenerated"],
           },
           prompt: {
             type: "string",
             description:
-              "The text prompt to assist image understanding, for example: 'What is in this image?'",
+              "The query or prompt to help with interpreting the image, e.g., 'What is in this image?'",
           },
         },
-        required: ["prompt"],
+        required: ["prompt", "imageType"],
       },
     },
     func: async (params) => {
