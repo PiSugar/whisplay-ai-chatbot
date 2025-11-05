@@ -2,8 +2,6 @@ import { VisionServer, LLMTool } from "../type";
 import axios from "axios";
 import dotenv from "dotenv";
 import {
-  getLatestCapturedImg,
-  getLatestGenImg,
   getLatestShowedImage,
   showLatestCapturedImg,
 } from "../utils/image";
@@ -42,18 +40,12 @@ if (visionServer === VisionServer.ollama) {
   visionTools.push({
     type: "function",
     function: {
-      name: "viewAndDescribeImage",
+      name: "describeImage",
       description:
         "Analyze and interpret an image with the help of vision model, e.g., describe the image content or answer questions about the image.",
       parameters: {
         type: "object",
         properties: {
-          imageType: {
-            type: "enum",
-            description:
-              "Specifies which image to analyze. Default is `lastShowed`.",
-            enum: ["lastShowed", "latestCaptured", "latestGenerated"],
-          },
           prompt: {
             type: "string",
             description:
@@ -64,13 +56,8 @@ if (visionServer === VisionServer.ollama) {
       },
     },
     func: async (params) => {
-      const { prompt, imageType = "latestShowed" } = params;
+      const { prompt } = params;
       let imgPath = getLatestShowedImage();
-      if (imageType === "latestCaptured") {
-        imgPath = getLatestCapturedImg();
-      } else if (imageType == "latestGenerated") {
-        imgPath = getLatestGenImg();
-      }
       if (!imgPath) {
         return "[error] No image is found.";
       }
