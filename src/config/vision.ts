@@ -37,3 +37,7 @@ if (enableCamera) {
     },
   });
 }
+
+export const addVisionTools = (tools: LLMTool[]) => {
+  tools.push(...visionTools);
+};
