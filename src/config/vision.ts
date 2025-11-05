@@ -1,7 +1,12 @@
 import { VisionServer, LLMTool } from "../type";
 import axios from "axios";
 import dotenv from "dotenv";
-import { getLatestCapturedImg, showLatestCapturedImg } from "../utils/image";
+import {
+  getLatestCapturedImg,
+  getLatestGenImg,
+  getLatestShowedImage,
+  showLatestCapturedImg,
+} from "../utils/image";
 import { get } from "lodash";
 import { readFileSync } from "fs";
 
@@ -39,10 +44,15 @@ if (visionServer === VisionServer.ollama) {
     function: {
       name: "viewAndDescribeImage",
       description:
-        "view and describe the image to assist image understanding",
+        "view and describe the image, when user asks about what you see, invoke this function.",
       parameters: {
         type: "object",
         properties: {
+          imageType: {
+            type: "enum",
+            description: "the type of image to view, default is `latestShowed`",
+            enum: ["lastShowed", "latestCaptured", "latestGenerated"],
+          },
           prompt: {
             type: "string",
             description:
@@ -53,18 +63,23 @@ if (visionServer === VisionServer.ollama) {
       },
     },
     func: async (params) => {
-      const imgPath = getLatestCapturedImg();
-      if (!imgPath) {
-        return "[error] No captured image is found.";
+      const { prompt, imageType = "latestShowed" } = params;
+      let imgPath = getLatestShowedImage();
+      if (imageType === "latestCaptured") {
+        imgPath = getLatestCapturedImg();
+      } else if (imageType == "latestGenerated") {
+        imgPath = getLatestGenImg();
       }
-      const { prompt } = params;
+      if (!imgPath) {
+        return "[error] No image is found.";
+      }
       const fileData = readFileSync(imgPath).toString("base64");
       const response = await axios.post(`${ollamaEndpoint}/api/chat`, {
         model: ollamaVisionModel,
         messages: [
           {
             role: "user",
-            content: prompt,
+            content: `${prompt} Respond no more than 100 words.`,
             images: [fileData],
           },
         ],

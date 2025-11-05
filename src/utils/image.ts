@@ -6,6 +6,11 @@ export const genImgList: string[] = [];
 export const capturedImgList: string[] = [];
 
 let latestDisplayImg = "";
+let latestShowedImg = "";
+
+const setLatestShowedImage = (imagePath: string) => {
+  latestShowedImg = imagePath;
+};
 
 // 加载最新生成的图片路径到list中
 const loadLatestGenImg = () => {
@@ -53,25 +58,42 @@ export const getLatestDisplayImg = () => {
 export const showLatestGenImg = () => {
   if (genImgList.length !== 0) {
     latestDisplayImg = genImgList[genImgList.length - 1] || "";
-    return true;
+    if (latestDisplayImg) {
+      setLatestShowedImage(latestDisplayImg);
+    }
+    return !!latestDisplayImg;
   } else {
     return false;
   }
 };
 
+export const getLatestGenImg = () => {
+  return genImgList.length !== 0 ? genImgList[genImgList.length - 1] : "";
+};
+
 export const setLatestCapturedImg = (imgPath: string) => {
   capturedImgList.push(imgPath);
+  setLatestShowedImage(imgPath);
 };
 
 export const getLatestCapturedImg = () => {
-  return capturedImgList.length !== 0 ? capturedImgList[capturedImgList.length - 1] : "";
+  return capturedImgList.length !== 0
+    ? capturedImgList[capturedImgList.length - 1]
+    : "";
 };
 
 export const showLatestCapturedImg = () => {
   if (capturedImgList.length !== 0) {
     latestDisplayImg = capturedImgList[capturedImgList.length - 1] || "";
-    return true;
+    if (latestDisplayImg) {
+      setLatestShowedImage(latestDisplayImg);
+    }
+    return !!latestDisplayImg;
   } else {
     return false;
   }
-}
+};
+
+export const getLatestShowedImage = () => {
+  return latestShowedImg;
+};
