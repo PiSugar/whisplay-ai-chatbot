@@ -80,9 +80,10 @@ switch (asrServer) {
     break;
   case ASRServer.whisper:
     recognizeAudio = WisperASR;
+    break
   default:
     console.warn(
-      `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI`
+      `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI/VOSK/WHISPER`
     );
     break;
 }
