@@ -36,6 +36,7 @@ export class WhisplayDisplay {
   private buttonPressedCallback: () => void = () => {};
   private buttonReleasedCallback: () => void = () => {};
   private buttonDoubleClickCallback: (() => void) | null = null;
+  private onCameraCaptureCallback: () => void = () => {};
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
   private buttonPressTimeArray: number[] = [];
@@ -177,6 +178,9 @@ export class WhisplayDisplay {
               this.buttonReleasedCallback();
             }
           }
+          if (json.event === "camera_capture") {
+            this.onCameraCaptureCallback();
+          }
         } catch {
           console.error("Failed to parse JSON from data");
         }
@@ -201,6 +205,10 @@ export class WhisplayDisplay {
 
   onButtonDoubleClick(callback: (() => void) | null): void {
     this.buttonDoubleClickCallback = callback || null;
+  }
+
+  onCameraCapture(callback: () => void): void {
+    this.onCameraCaptureCallback = callback;
   }
 
   private async sendToDisplay(data: string): Promise<void> {
@@ -268,6 +276,8 @@ export const onButtonReleased =
   displayInstance.onButtonReleased.bind(displayInstance);
 export const onButtonDoubleClick =
   displayInstance.onButtonDoubleClick.bind(displayInstance);
+export const onCameraCapture =
+  displayInstance.onCameraCapture.bind(displayInstance);
 
 function cleanup() {
   console.log("Cleaning up display process before exit...");

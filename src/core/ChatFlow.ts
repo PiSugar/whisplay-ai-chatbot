@@ -11,6 +11,7 @@ import {
   onButtonDoubleClick,
   display,
   getCurrentStatus,
+  onCameraCapture,
 } from "../device/display";
 import { recordAudioManually, recordFileFormat } from "../device/audio";
 import {
@@ -21,7 +22,7 @@ import {
 import { extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
 import { cameraDir, recordingsDir } from "../utils/dir";
-import { getLatestGenImg } from "../utils/image";
+import { getLatestDisplayImg, setLatestCapturedImg } from "../utils/image";
 
 class ChatFlow {
   currentFlowName: string = "";
@@ -103,14 +104,19 @@ class ChatFlow {
           this.setCurrentFlow("listening");
         });
         onButtonReleased(noop);
+        // camera mode
         if (this.enableCamera) {
+          const captureImgPath = `${cameraDir}/capture-${moment().format(
+            "YYYYMMDD-HHmmss"
+          )}.jpg`;
           onButtonDoubleClick(() => {
             display({
               camera_mode: true,
-              capture_image_path: `${cameraDir}/capture-${moment().format(
-                "YYYYMMDD-HHmmss"
-              )}.jpg`,
+              capture_image_path: captureImgPath,
             });
+          });
+          onCameraCapture(() => {
+            setLatestCapturedImg(captureImgPath);
           });
         }
         display({
@@ -119,7 +125,9 @@ class ChatFlow {
           RGB: "#000055",
           ...(getCurrentStatus().text === "Listening..."
             ? {
-                text: "Press the button to start",
+                text: `Long Press the button to say something${
+                  this.enableCamera ? ",\ndouble click to launch camera" : ""
+                }.`,
               }
             : {}),
         });
@@ -139,12 +147,14 @@ class ChatFlow {
             RGB: "#ff6800", // yellow
           });
         });
-        result.then(() => {
-          this.setCurrentFlow("asr");
-        }).catch((err) => {
-          console.error("Error during recording:", err);
-          this.setCurrentFlow("sleep");
-        });
+        result
+          .then(() => {
+            this.setCurrentFlow("asr");
+          })
+          .catch((err) => {
+            console.error("Error during recording:", err);
+            this.setCurrentFlow("sleep");
+          });
         display({
           status: "listening",
           emoji: "😐",
@@ -215,7 +225,7 @@ class ChatFlow {
         );
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {
-            const img = getLatestGenImg();
+            const img = getLatestDisplayImg();
             if (img) {
               display({
                 image: img,
