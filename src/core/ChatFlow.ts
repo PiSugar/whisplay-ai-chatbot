@@ -223,10 +223,16 @@ class ChatFlow {
           () => endPartial(currentAnswerId),
           (partialThinking) =>
             this.partialThinkingCallback(partialThinking, currentAnswerId),
-          (functionName: string) => {
-            display({
-              text: `Invoking [${functionName}]...`,
-            });
+          (functionName: string, result?: string) => {
+            if (result) {
+              display({
+                text: `[${functionName}]${result}`,
+              });
+            } else {
+              display({
+                text: `Invoking [${functionName}]...`,
+              });
+            }
           }
         );
         getPlayEndPromise().then(() => {

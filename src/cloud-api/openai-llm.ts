@@ -43,7 +43,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialCallback: (partial: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void
 ): Promise<void> => {
   if (!openai) {
     console.error("OpenAI API key is not set.");
@@ -112,7 +112,18 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         const func = llmFuncMap[name! as string];
         invokeFunctionCallback?.(name! as string);
         if (func) {
-          return [id, await func(args)];
+          return [
+            id,
+            await func(args)
+              .then((res) => {
+                invokeFunctionCallback?.(name! as string, res);
+                return res;
+              })
+              .catch((err) => {
+                console.error(`Error executing function ${name}:`, err);
+                return `Error executing function ${name}: ${err.message}`;
+              }),
+          ];
         } else {
           console.error(`Function ${name} not found`);
           return [id, `Function ${name} not found`];

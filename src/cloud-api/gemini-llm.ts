@@ -59,7 +59,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void
 ): Promise<void> => {
   if (!gemini || !chat) {
     console.error("Google Gemini API key is not set.");
@@ -156,7 +156,10 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             invokeFunctionCallback?.(name! as string);
             return [
               id,
-              await func(args).catch((err) => {
+              await func(args).then(res => {
+                invokeFunctionCallback?.(name! as string, res);
+                return res;
+              }).catch((err) => {
                 console.error(`Error executing function ${name}:`, err);
                 return `Error executing function ${name}: ${err.message}`;
               }),

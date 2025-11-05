@@ -10,7 +10,12 @@ import {
 import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
-import { FunctionCall, Message, OllamaFunctionCall, OllamaMessage } from "../type";
+import {
+  FunctionCall,
+  Message,
+  OllamaFunctionCall,
+  OllamaMessage,
+} from "../type";
 import { ChatWithLLMStreamFunction } from "./interface";
 import { chatHistoryDir } from "../utils/dir";
 import moment from "moment";
@@ -47,13 +52,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void
 ): Promise<void> => {
   if (shouldResetChatHistory()) {
     resetChatHistory();
   }
   updateLastMessageTime();
-  messages.push(...inputMessages as OllamaMessage[]);
+  messages.push(...(inputMessages as OllamaMessage[]));
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
@@ -128,14 +133,15 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
     response.data.on("end", async () => {
       console.log("Stream ended");
-      const functionCalls = functionCallsPackages
-        .flat()
-        .map((call, index) => ({
-          id: `call_${Date.now()}_${Math.random()}_${index}`,
-          type: "function",
-          function: call.function,
-        }));
-      console.log("functionCallsPackages: ", JSON.stringify(functionCallsPackages));
+      const functionCalls = functionCallsPackages.flat().map((call, index) => ({
+        id: `call_${Date.now()}_${Math.random()}_${index}`,
+        type: "function",
+        function: call.function,
+      }));
+      console.log(
+        "functionCallsPackages: ",
+        JSON.stringify(functionCallsPackages)
+      );
       console.log("functionCalls: ", JSON.stringify(functionCalls));
       messages.push({
         role: "assistant",
@@ -154,10 +160,15 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               invokeFunctionCallback?.(name! as string);
               return [
                 name,
-                await func(args).catch((err) => {
-                  console.error(`Error executing function ${name}:`, err);
-                  return `Error executing function ${name}: ${err.message}`;
-                }),
+                await func(args)
+                  .then((res) => {
+                    invokeFunctionCallback?.(name! as string, res);
+                    return res;
+                  })
+                  .catch((err) => {
+                    console.error(`Error executing function ${name}:`, err);
+                    return `Error executing function ${name}: ${err.message}`;
+                  }),
               ];
             } else {
               console.error(`Function ${name} not found`);
@@ -167,16 +178,22 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         );
 
         console.log("call results: ", results);
-        const newMessages: OllamaMessage[] = results.map(([name, result]: any) => ({
-          role: "tool",
-          content: result as string,
-          tool_name: name as string,
-        }));
+        const newMessages: OllamaMessage[] = results.map(
+          ([name, result]: any) => ({
+            role: "tool",
+            content: result as string,
+            tool_name: name as string,
+          })
+        );
 
-        await chatWithLLMStream(newMessages as Message[], partialCallback, () => {
-          endResolve();
-          endCallback();
-        });
+        await chatWithLLMStream(
+          newMessages as Message[],
+          partialCallback,
+          () => {
+            endResolve();
+            endCallback();
+          }
+        );
         return;
       } else {
         endResolve();
