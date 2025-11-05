@@ -179,6 +179,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           })
         );
 
+        // Speed up the vision description response if applicable
         // If describeImage tool was called, append its result as assistant message
         const describeMessage = newMessages.find(
           (msg) =>
@@ -190,6 +191,16 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             role: "assistant",
             content: describeMessage.content,
           });
+          // append describeMessage content in chunks
+          const words = describeMessage.content.split(" ");
+          let index = 0;
+          while (index < words.length) {
+            const chunk = words.slice(index, index + 10).join(" ");
+            partialCallback(chunk);
+            index += 10;
+            await new Promise((res) => setTimeout(res, 1000));
+          }
+          partialCallback(describeMessage.content);
           endResolve();
           endCallback();
           return;
