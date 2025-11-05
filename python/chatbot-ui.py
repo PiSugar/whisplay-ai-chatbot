@@ -359,7 +359,7 @@ def handle_client(client_socket, addr, whisplay):
                 if not line.strip():
                     continue
                         
-                print(f"[Socket - {addr}] Received data: {line}")
+                # print(f"[Socket - {addr}] Received data: {line}")
                 try:
                     content = json.loads(line)
                     transaction_id = content.get("transaction_id", None)
