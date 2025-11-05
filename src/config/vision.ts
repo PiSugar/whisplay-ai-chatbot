@@ -71,6 +71,7 @@ if (visionServer === VisionServer.ollama) {
             images: [fileData],
           },
         ],
+        think: false,
         stream: false,
       });
       console.log("Ollama vision response:", response.data);
