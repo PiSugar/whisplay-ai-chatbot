@@ -37,9 +37,9 @@ if (visionServer === VisionServer.ollama) {
   visionTools.push({
     type: "function",
     function: {
-      name: "understandImageWithOllama",
+      name: "viewAndDescribeImage",
       description:
-        "Understand the content of an image using Ollama's vision model",
+        "view and describe the image to assist image understanding",
       parameters: {
         type: "object",
         properties: {
