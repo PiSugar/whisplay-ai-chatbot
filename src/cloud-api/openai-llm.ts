@@ -42,7 +42,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partial: string) => void,
   endCallback: () => void,
-  partialThinkingCallback?: (partialThinking: string) => void
+  partialThinkingCallback?: (partialThinking: string) => void,
+  invokeFunctionCallback?: (functionName: string) => void
 ): Promise<void> => {
   if (!openai) {
     console.error("OpenAI API key is not set.");
@@ -109,6 +110,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           );
         }
         const func = llmFuncMap[name! as string];
+        invokeFunctionCallback?.(name! as string);
         if (func) {
           return [id, await func(args)];
         } else {

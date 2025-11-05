@@ -194,6 +194,7 @@ class ChatFlow {
         break;
       case "answer":
         display({
+          status: "answering...",
           RGB: "#00c8a3",
         });
         this.currentFlowName = "answer";
@@ -221,7 +222,12 @@ class ChatFlow {
           (text) => partial(text, currentAnswerId),
           () => endPartial(currentAnswerId),
           (partialThinking) =>
-            this.partialThinkingCallback(partialThinking, currentAnswerId)
+            this.partialThinkingCallback(partialThinking, currentAnswerId),
+          (functionName: string) => {
+            display({
+              text: `Invoking [${functionName}]...`,
+            });
+          }
         );
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {

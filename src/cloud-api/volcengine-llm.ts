@@ -46,7 +46,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
-  partialThinkingCallback?: (partialThinking: string) => void
+  partialThinkingCallback?: (partialThinking: string) => void,
+  invokeFunctionCallback?: (functionName: string) => void
 ): Promise<void> => {
   if (!doubaoAccessToken) {
     console.error("Doubao access token is not set.");
@@ -157,6 +158,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               );
             }
             const func = llmFuncMap[name! as string];
+            invokeFunctionCallback?.(name! as string);
             if (func) {
               return [
                 id,
