@@ -42,9 +42,9 @@ if (visionServer === VisionServer.ollama) {
   visionTools.push({
     type: "function",
     function: {
-      name: "imageInsight",
+      name: "seeImage",
       description:
-        "Automatically invoked **when the user asks about the contents of an image**, such as 'What can you see in the image?'. This function will analyze and describe the image.",
+        "Analyze and interpret an image with the help of vision model, e.g., describe the image content or answer questions about the image.",
       parameters: {
         type: "object",
         properties: {
