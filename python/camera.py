@@ -15,7 +15,7 @@ class CameraThread(threading.Thread):
         self.whisplay = whisplay
         if CameraThread.picam2 is None:
             CameraThread.picam2 = Picamera2()
-            CameraThread.picam2.configure(CameraThread.picam2.create_preview_configuration(main={"size": (self.whisplay.LCD_WIDTH * 2, self.whisplay.LCD_HEIGHT * 2)}))
+            CameraThread.picam2.configure(CameraThread.picam2.create_preview_configuration(main={"size": (self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)}))
         CameraThread.picam2.start()
         self.running = False
         self.capture_image = None
