@@ -5,6 +5,13 @@ export interface Message {
   tool_call_id?: string;
 }
 
+export interface OllamaMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string
+  tool_calls?: OllamaFunctionCall[][];
+  tool_name?: string;
+}
+
 export enum ASRServer {
   volcengine = "volcengine",
   tencent = "tencent",
@@ -43,6 +50,15 @@ export interface FunctionCall {
   id?: string;
   index: number;
   type?: string;
+}
+
+// {"function":{"index":0,"name":"setVolume","arguments":{"percent":50}}}
+export interface OllamaFunctionCall {
+  function: {
+    index: number;
+    name: string;
+    arguments: Record<string, any>;
+  };
 }
 
 

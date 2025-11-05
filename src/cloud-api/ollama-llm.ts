@@ -10,7 +10,7 @@ import {
 import { combineFunction } from "../utils";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
-import { FunctionCall, Message } from "../type";
+import { FunctionCall, Message, OllamaFunctionCall, OllamaMessage } from "../type";
 import { ChatWithLLMStreamFunction } from "./interface";
 import { chatHistoryDir } from "../utils/dir";
 import moment from "moment";
@@ -27,7 +27,7 @@ const chatHistoryFileName = `ollama_chat_history_${moment().format(
   "YYYYMMDD_HHmmss"
 )}.json`;
 
-const messages: Message[] = [
+const messages: OllamaMessage[] = [
   {
     role: "system",
     content: systemPrompt,
@@ -52,7 +52,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     resetChatHistory();
   }
   updateLastMessageTime();
-  messages.push(...inputMessages);
+  messages.push(...inputMessages as OllamaMessage[]);
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
@@ -65,7 +65,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   });
   let partialAnswer = "";
   let partialThinking = "";
-  const functionCallsPackages: any[] = [];
+  const functionCallsPackages: OllamaFunctionCall[][] = [];
 
   try {
     const response = await axios.post(
@@ -116,6 +116,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
           // Handle tool calls from Ollama
           if (parsedData.message?.tool_calls) {
+            // tool_calls format: [[{"function":{"index":0,"name":"setVolume","arguments":{"percent":50}}}]]
             functionCallsPackages.push(parsedData.message.tool_calls);
           }
         } catch (error) {
@@ -126,34 +127,31 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
     response.data.on("end", async () => {
       console.log("Stream ended");
-      const functionCalls = combineFunction(functionCallsPackages);
+      const functionCalls = functionCallsPackages
+        .flat()
+        .map((call, index) => ({
+          id: `call_${Date.now()}_${Math.random()}_${index}`,
+          type: "function",
+          function: call.function,
+        }));
+      console.log("functionCallsPackages: ", JSON.stringify(functionCallsPackages));
       console.log("functionCalls: ", JSON.stringify(functionCalls));
       messages.push({
         role: "assistant",
         content: partialAnswer,
-        tool_calls: functionCalls,
+        tool_calls: functionCallsPackages as any,
       });
 
       if (!isEmpty(functionCalls)) {
         const results = await Promise.all(
-          functionCalls.map(async (call: FunctionCall) => {
+          functionCalls.map(async (call: OllamaFunctionCall) => {
             const {
-              function: { arguments: argString, name },
-              id,
+              function: { arguments: args, name },
             } = call;
-            let args: Record<string, any> = {};
-            try {
-              args = JSON.parse(argString || "{}");
-            } catch {
-              console.error(
-                `Error parsing arguments for function ${name}:`,
-                argString
-              );
-            }
             const func = llmFuncMap[name! as string];
             if (func) {
               return [
-                id,
+                name,
                 await func(args).catch((err) => {
                   console.error(`Error executing function ${name}:`, err);
                   return `Error executing function ${name}: ${err.message}`;
@@ -161,19 +159,19 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               ];
             } else {
               console.error(`Function ${name} not found`);
-              return [id, `Function ${name} not found`];
+              return [name, `Function ${name} not found`];
             }
           })
         );
 
         console.log("call results: ", results);
-        const newMessages: Message[] = results.map(([id, result]: any) => ({
+        const newMessages: OllamaMessage[] = results.map(([name, result]: any) => ({
           role: "tool",
           content: result as string,
-          tool_call_id: id as string,
+          tool_name: name as string,
         }));
 
-        await chatWithLLMStream(newMessages, partialCallback, () => {
+        await chatWithLLMStream(newMessages as Message[], partialCallback, () => {
           endResolve();
           endCallback();
         });
