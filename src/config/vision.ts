@@ -42,7 +42,7 @@ if (visionServer === VisionServer.ollama) {
   visionTools.push({
     type: "function",
     function: {
-      name: "seeImage",
+      name: "viewAndDescribeImage",
       description:
         "Analyze and interpret an image with the help of vision model, e.g., describe the image content or answer questions about the image.",
       parameters: {
@@ -60,7 +60,7 @@ if (visionServer === VisionServer.ollama) {
               "The query or prompt to help with interpreting the image, e.g., 'What is in this image?'",
           },
         },
-        required: ["prompt", "imageType"],
+        required: ["prompt"],
       },
     },
     func: async (params) => {
