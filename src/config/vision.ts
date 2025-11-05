@@ -44,7 +44,7 @@ if (visionServer === VisionServer.ollama) {
     function: {
       name: "imageInsight",
       description:
-        "Invoke this function to analyze and describe the image when the user asks about its content.",
+        "Automatically invoked **when the user asks about the contents of an image**, such as 'What can you see in the image?'. This function will analyze and describe the image.",
       parameters: {
         type: "object",
         properties: {
