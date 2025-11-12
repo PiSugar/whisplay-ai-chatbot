@@ -103,3 +103,9 @@ export interface LLMTool {
   }
   func: LLMFunc
 }
+
+export enum ToolReturnTag {
+  Success = "[success]",
+  Error = "[error]",
+  Response = "[response]", // use as assistant response
+}

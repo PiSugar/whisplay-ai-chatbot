@@ -1,4 +1,4 @@
-import { ImageGenerationServer, LLMTool } from "../type";
+import { ImageGenerationServer, LLMTool, ToolReturnTag } from "../type";
 import axios from "axios";
 import dotenv from "dotenv";
 import { setLatestGenImg, showLatestGenImg } from "../utils/image";
@@ -83,8 +83,8 @@ if (
         console.error("Error saving image:", error);
       }
       return isSuccess
-        ? `[success]Image file saved.`
-        : "[error]Image generation failed.";
+        ? `${ToolReturnTag.Success}Image file saved.`
+        : `${ToolReturnTag.Error}Image generation failed.`;
     },
   });
 }
@@ -152,14 +152,14 @@ if (
           writeFileSync(imagePath, buffer);
           setLatestGenImg(imagePath);
           console.log(`Image saved as ${imagePath}`);
-          return `[success]Image file saved.`;
+          return `${ToolReturnTag.Success}Image file saved.`;
         } else {
           console.error("No image data received from Volcengine.");
-          return "[error]Image generation failed.";
+          return `${ToolReturnTag.Error}Image generation failed.`;
         }
       } catch (error) {
         console.error("Error generating image with Volcengine:", error);
-        return "[error]Image generation failed.";
+        return `${ToolReturnTag.Error}Image generation failed.`;
       }
     },
   });
@@ -204,14 +204,14 @@ if (openai && imageGenerationServer === ImageGenerationServer.openai) {
           writeFileSync(imagePath, buffer);
           setLatestGenImg(imagePath);
           console.log(`Image saved as ${imagePath}`);
-          return `[success]Image file saved.`;
+          return `${ToolReturnTag.Success}Image file saved.`;
         } else {
           console.error("No image data received from OpenAI.");
-          return "[error]Image generation failed.";
+          return `${ToolReturnTag.Error}Image generation failed.`;
         }
       } catch (error) {
         console.error("Error generating image with OpenAI:", error);
-        return "[error]Image generation failed.";
+        return `${ToolReturnTag.Error}Image generation failed.`;
       }
     },
   });
@@ -228,8 +228,8 @@ if (!isEmpty(imageGenerationTools)) {
     func: async (params) => {
       const isShow = showLatestGenImg();
       return isShow
-        ? `[success]Ready to show.`
-        : `[error]No previously generated image found.`;
+        ? `${ToolReturnTag.Success}Ready to show.`
+        : `${ToolReturnTag.Error}No previously generated image found.`;
     },
   });
 }

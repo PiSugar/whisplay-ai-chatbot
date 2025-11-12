@@ -1,7 +1,7 @@
 import { isEmpty } from "lodash";
 import * as fs from "fs";
 import * as path from "path";
-import { LLMTool } from "../type";
+import { LLMTool, ToolReturnTag } from "../type";
 import {
   shouldResetChatHistory,
   systemPrompt,
@@ -15,6 +15,7 @@ import { ChatWithLLMStreamFunction } from "./interface";
 import { ToolListUnion, ToolUnion, Part } from "@google/genai";
 import moment from "moment";
 import { chatHistoryDir } from "../utils/dir";
+import { extractToolResponse, stimulateStreamResponse } from "../config/common";
 
 dotenv.config();
 
@@ -156,13 +157,15 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             invokeFunctionCallback?.(name! as string);
             return [
               id,
-              await func(args).then(res => {
-                invokeFunctionCallback?.(name! as string, res);
-                return res;
-              }).catch((err) => {
-                console.error(`Error executing function ${name}:`, err);
-                return `Error executing function ${name}: ${err.message}`;
-              }),
+              await func(args)
+                .then((res) => {
+                  invokeFunctionCallback?.(name! as string, res);
+                  return res;
+                })
+                .catch((err) => {
+                  console.error(`Error executing function ${name}:`, err);
+                  return `Error executing function ${name}: ${err.message}`;
+                }),
             ];
           } else {
             console.error(`Function ${name} not found`);
@@ -177,6 +180,31 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         content: result as string,
         tool_call_id: id as string,
       }));
+
+      // Directly extract and return the tool result if available
+      const describeMessage = newMessages.find((msg) =>
+        msg.content.startsWith(ToolReturnTag.Response)
+      );
+      const responseContent = extractToolResponse(
+        describeMessage?.content || ""
+      );
+      if (responseContent) {
+        console.log(
+          `[LLM] Tool response starts with "[response]", return it directly.`
+        );
+        newMessages.push({
+          role: "assistant",
+          content: responseContent,
+        });
+        // append responseContent in chunks
+        await stimulateStreamResponse({
+          content: responseContent,
+          partialCallback,
+          endResolve,
+          endCallback,
+        });
+        return;
+      }
 
       await chatWithLLMStream(newMessages, partialCallback, () => {
         endResolve();

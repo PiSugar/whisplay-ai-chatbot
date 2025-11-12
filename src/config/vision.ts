@@ -1,10 +1,7 @@
-import { VisionServer, LLMTool } from "../type";
+import { VisionServer, LLMTool, ToolReturnTag } from "../type";
 import axios from "axios";
 import dotenv from "dotenv";
-import {
-  getLatestShowedImage,
-  showLatestCapturedImg,
-} from "../utils/image";
+import { getLatestShowedImage, showLatestCapturedImg } from "../utils/image";
 import { get } from "lodash";
 import { readFileSync } from "fs";
 
@@ -59,7 +56,7 @@ if (visionServer === VisionServer.ollama) {
       const { prompt } = params;
       let imgPath = getLatestShowedImage();
       if (!imgPath) {
-        return "[error] No image is found.";
+        return `${ToolReturnTag.Error} No image is found.`;
       }
       const fileData = readFileSync(imgPath).toString("base64");
       const response = await axios.post(`${ollamaEndpoint}/api/chat`, {
@@ -75,7 +72,10 @@ if (visionServer === VisionServer.ollama) {
         stream: false,
       });
       const content = get(response.data, "message.content", "");
-      return content || "[error] No content received from Ollama.";
+      return (
+        `${ToolReturnTag.Response}${content}` ||
+        `${ToolReturnTag.Error} No content received from Ollama.`
+      );
     },
   });
 }

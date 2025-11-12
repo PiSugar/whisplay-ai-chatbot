@@ -9,10 +9,16 @@ import {
 } from "../config/llm-config";
 import { llmTools, llmFuncMap } from "../config/llm-tools";
 import dotenv from "dotenv";
-import { Message, OllamaFunctionCall, OllamaMessage } from "../type";
+import {
+  Message,
+  OllamaFunctionCall,
+  OllamaMessage,
+  ToolReturnTag,
+} from "../type";
 import { ChatWithLLMStreamFunction } from "./interface";
 import { chatHistoryDir } from "../utils/dir";
 import moment from "moment";
+import { extractToolResponse, stimulateStreamResponse } from "../config/common";
 
 dotenv.config();
 
@@ -179,30 +185,28 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           })
         );
 
-        // Speed up the vision description response if applicable
-        // If describeImage tool was called, append its result as assistant message
-        const describeMessage = newMessages.find(
-          (msg) =>
-            msg.tool_name === "describeImage" &&
-            !msg.content.startsWith("[error]")
+        // Directly extract and return the tool result if available
+        const describeMessage = newMessages.find((msg) =>
+          msg.content.startsWith(ToolReturnTag.Response)
         );
-        if (describeMessage) {
+        const responseContent = extractToolResponse(
+          describeMessage?.content || ""
+        );
+        if (responseContent) {
+          console.log(
+            `[LLM] Tool response starts with "[response]", return it directly.`
+          );
           newMessages.push({
             role: "assistant",
-            content: describeMessage.content,
+            content: responseContent,
           });
-          // append describeMessage content in chunks
-          const words = describeMessage.content.split(" ");
-          let index = 0;
-          while (index < words.length) {
-            const chunk = words.slice(index, index + 10).join(" ");
-            partialCallback(chunk);
-            index += 10;
-            await new Promise((res) => setTimeout(res, 1000));
-          }
-          partialCallback(describeMessage.content);
-          endResolve();
-          endCallback();
+          // append responseContent in chunks
+          await stimulateStreamResponse({
+            content: responseContent,
+            partialCallback,
+            endResolve,
+            endCallback,
+          });
           return;
         }
 

@@ -8,12 +8,13 @@ import {
   systemPrompt,
   updateLastMessageTime,
 } from "../config/llm-config";
-import { FunctionCall, Message } from "../type";
+import { FunctionCall, Message, ToolReturnTag } from "../type";
 import { combineFunction } from "../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../config/llm-tools";
 import { ChatWithLLMStreamFunction } from "./interface";
 import { chatHistoryDir } from "../utils/dir";
+import { extractToolResponse, stimulateStreamResponse } from "../config/common";
 
 dotenv.config();
 // OpenAI LLM
@@ -137,6 +138,29 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       content: result as string,
       tool_call_id: id as string,
     }));
+
+    // Directly extract and return the tool result if available
+    const describeMessage = newMessages.find((msg) =>
+      msg.content.startsWith(ToolReturnTag.Response)
+    );
+    const responseContent = extractToolResponse(describeMessage?.content || "");
+    if (responseContent) {
+      console.log(
+        `[LLM] Tool response starts with "[response]", return it directly.`
+      );
+      newMessages.push({
+        role: "assistant",
+        content: responseContent,
+      });
+      // append responseContent in chunks
+      await stimulateStreamResponse({
+        content: responseContent,
+        partialCallback,
+        endResolve,
+        endCallback,
+      });
+      return;
+    }
 
     await chatWithLLMStream(newMessages, partialCallback, () => {
       endResolve();
