@@ -26,6 +26,10 @@ import {
   chatWithLLMStream as GeminiLLMStream,
   resetChatHistory as GeminiResetChatHistory,
 } from "./gemini/gemini-llm";
+import {
+  chatWithLLMStream as GrokLLMStream,
+  resetChatHistory as GrokResetChatHistory,
+} from "./grok/grok-llm";
 import VolcengineTTS from "./volcengine/volcengine-tts";
 import OpenAITTS from "./openai/openai-tts";
 import geminiTTS from "./gemini/gemini-tts";
@@ -105,9 +109,13 @@ switch (llmServer) {
     chatWithLLMStream = GeminiLLMStream;
     resetChatHistory = GeminiResetChatHistory;
     break;
+  case LLMServer.grok:
+    chatWithLLMStream = GrokLLMStream;
+    resetChatHistory = GrokResetChatHistory;
+    break;
   default:
     console.warn(
-      `unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI/GEMINI/OLLAMA`
+      `unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI/GEMINI/OLLAMA/GROK`
     );
     break;
 }

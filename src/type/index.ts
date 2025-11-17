@@ -26,6 +26,7 @@ export enum LLMServer {
   openai = "openai",
   ollama = "ollama",
   gemini = "gemini",
+  grok = "grok",
 }
 
 export enum TTSServer {
