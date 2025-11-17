@@ -1,4 +1,4 @@
-import { getPcmWavDurationMs } from "../utils";
+import { getPcmWavDurationMs } from "../../utils";
 import {
   geminiTTSSpeaker,
   geminiTTSModel,

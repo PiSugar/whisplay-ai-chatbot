@@ -1,9 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { spawn } from "child_process";
-import { getWavFileDurationMs } from "../utils";
+import { getWavFileDurationMs } from "../../utils";
 import dotenv from "dotenv";
-import { ttsDir } from "../utils/dir";
+import { ttsDir } from "../../utils/dir";
 
 dotenv.config();
 

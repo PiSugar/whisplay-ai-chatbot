@@ -1,5 +1,5 @@
 import { OpenAI, ClientOptions } from "openai";
-import { proxyFetch } from "./proxy-fetch";
+import { proxyFetch } from "../proxy-fetch";
 import dotenv from "dotenv";
 
 dotenv.config();

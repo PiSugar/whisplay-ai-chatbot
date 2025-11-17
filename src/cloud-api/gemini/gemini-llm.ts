@@ -1,21 +1,21 @@
 import { isEmpty } from "lodash";
 import * as fs from "fs";
 import * as path from "path";
-import { LLMTool, ToolReturnTag } from "../type";
+import { LLMTool, ToolReturnTag } from "../../type";
 import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
-} from "../config/llm-config";
+} from "../../config/llm-config";
 import { gemini, geminiModel } from "./gemini";
-import { llmTools, llmFuncMap, llmToolsForGemini } from "../config/llm-tools";
+import { llmTools, llmFuncMap, llmToolsForGemini } from "../../config/llm-tools";
 import dotenv from "dotenv";
-import { FunctionCall, Message } from "../type";
-import { ChatWithLLMStreamFunction } from "./interface";
+import { FunctionCall, Message } from "../../type";
+import { ChatWithLLMStreamFunction } from "../interface";
 import { ToolListUnion, ToolUnion, Part } from "@google/genai";
 import moment from "moment";
-import { chatHistoryDir } from "../utils/dir";
-import { extractToolResponse, stimulateStreamResponse } from "../config/common";
+import { chatHistoryDir } from "../../utils/dir";
+import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 
 dotenv.config();
 

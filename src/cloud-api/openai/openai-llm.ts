@@ -7,14 +7,14 @@ import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
-} from "../config/llm-config";
-import { FunctionCall, Message, ToolReturnTag } from "../type";
-import { combineFunction } from "../utils";
+} from "../../config/llm-config";
+import { FunctionCall, Message, ToolReturnTag } from "../../type";
+import { combineFunction } from "../../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
-import { llmFuncMap, llmTools } from "../config/llm-tools";
-import { ChatWithLLMStreamFunction } from "./interface";
-import { chatHistoryDir } from "../utils/dir";
-import { extractToolResponse, stimulateStreamResponse } from "../config/common";
+import { llmFuncMap, llmTools } from "../../config/llm-tools";
+import { ChatWithLLMStreamFunction } from "../interface";
+import { chatHistoryDir } from "../../utils/dir";
+import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 
 dotenv.config();
 // OpenAI LLM

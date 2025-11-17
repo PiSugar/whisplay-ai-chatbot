@@ -2,12 +2,12 @@ import { ImageGenerationServer, LLMTool, ToolReturnTag } from "../type";
 import axios from "axios";
 import dotenv from "dotenv";
 import { setLatestGenImg, showLatestGenImg } from "../utils/image";
-import { gemini } from "../cloud-api/gemini";
+import { gemini } from "../cloud-api/gemini/gemini";
 import { GenerateContentResponse } from "@google/genai";
 import path from "path";
 import { imageDir } from "../utils/dir";
 import { writeFileSync } from "fs";
-import { openai } from "../cloud-api/openai";
+import { openai } from "../cloud-api/openai/openai";
 import { ImageGenerateParamsNonStreaming } from "openai/resources/images";
 import { isEmpty } from "lodash";
 

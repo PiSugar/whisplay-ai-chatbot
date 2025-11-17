@@ -7,14 +7,14 @@ import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
-} from "../config/llm-config";
-import { combineFunction } from "../utils";
-import { llmTools, llmFuncMap } from "../config/llm-tools";
+} from "../../config/llm-config";
+import { combineFunction } from "../../utils";
+import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
-import { FunctionCall, Message, ToolReturnTag } from "../type";
-import { ChatWithLLMStreamFunction } from "./interface";
-import { chatHistoryDir } from "../utils/dir";
-import { extractToolResponse, stimulateStreamResponse } from "../config/common";
+import { FunctionCall, Message, ToolReturnTag } from "../../type";
+import { ChatWithLLMStreamFunction } from "../interface";
+import { chatHistoryDir } from "../../utils/dir";
+import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 
 dotenv.config();
 

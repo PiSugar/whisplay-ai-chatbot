@@ -1,41 +1,41 @@
 import { noop } from "lodash";
 import dotenv from "dotenv";
 import { ASRServer, ImageGenerationServer, LLMServer, TTSServer } from "../type";
-import { recognizeAudio as VolcengineASR } from "./volcengine-asr";
+import { recognizeAudio as VolcengineASR } from "./volcengine/volcengine-asr";
 import {
   recognizeAudio as TencentASR,
   synthesizeSpeech as TencentTTS,
-} from "./tencent-cloud";
-import { recognizeAudio as OpenAIASR } from "./openai-asr";
-import { recognizeAudio as GeminiASR } from "./gemini-asr";
-import { recognizeAudio as VoskASR } from "./vosk-asr";
-import { recognizeAudio as WisperASR } from "./whisper-asr";
+} from "./tencent/tencent-cloud";
+import { recognizeAudio as OpenAIASR } from "./openai/openai-asr";
+import { recognizeAudio as GeminiASR } from "./gemini/gemini-asr";
+import { recognizeAudio as VoskASR } from "./local/vosk-asr";
+import { recognizeAudio as WisperASR } from "./local/whisper-asr";
 import {
   chatWithLLMStream as VolcengineLLMStream,
   resetChatHistory as VolcengineResetChatHistory,
-} from "./volcengine-llm";
+} from "./volcengine/volcengine-llm";
 import {
   chatWithLLMStream as OpenAILLMStream,
   resetChatHistory as OpenAIResetChatHistory,
-} from "./openai-llm";
+} from "./openai/openai-llm";
 import {
   chatWithLLMStream as OllamaLLMStream,
   resetChatHistory as OllamaResetChatHistory,
-} from "./ollama-llm";
+} from "./local/ollama-llm";
 import {
   chatWithLLMStream as GeminiLLMStream,
   resetChatHistory as GeminiResetChatHistory,
-} from "./gemini-llm";
-import VolcengineTTS from "./volcengine-tts";
-import OpenAITTS from "./openai-tts";
-import geminiTTS from "./gemini-tts";
+} from "./gemini/gemini-llm";
+import VolcengineTTS from "./volcengine/volcengine-tts";
+import OpenAITTS from "./openai/openai-tts";
+import geminiTTS from "./gemini/gemini-tts";
 import {
   ChatWithLLMStreamFunction,
   RecognizeAudioFunction,
   ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
-import piperTTS from "./piper-tts";
+import piperTTS from "./local/piper-tts";
 
 dotenv.config();
 

@@ -1,6 +1,6 @@
 import fs from "fs";
 import { spawn } from "child_process";
-import { ASRServer } from "../type";
+import { ASRServer } from "../../type";
 
 const modelSize = process.env.WHISPER_MODEL_SIZE || "tiny";
 const language = process.env.WHISPER_LANGUAGE || "";

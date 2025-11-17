@@ -6,19 +6,19 @@ import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
-} from "../config/llm-config";
-import { llmTools, llmFuncMap } from "../config/llm-tools";
+} from "../../config/llm-config";
+import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
 import {
   Message,
   OllamaFunctionCall,
   OllamaMessage,
   ToolReturnTag,
-} from "../type";
-import { ChatWithLLMStreamFunction } from "./interface";
-import { chatHistoryDir } from "../utils/dir";
+} from "../../type";
+import { ChatWithLLMStreamFunction } from "../interface";
+import { chatHistoryDir } from "../../utils/dir";
 import moment from "moment";
-import { extractToolResponse, stimulateStreamResponse } from "../config/common";
+import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 
 dotenv.config();
 

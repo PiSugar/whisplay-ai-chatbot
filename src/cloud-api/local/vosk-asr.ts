@@ -1,6 +1,6 @@
 import fs from "fs";
 import { spawn } from "child_process";
-import { ASRServer } from "../type";
+import { ASRServer } from "../../type";
 
 const modelPath = process.env.VOSK_MODEL_PATH || "";
 const asrServer = (process.env.ASR_SERVER || "").toLowerCase() as ASRServer;

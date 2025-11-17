@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { undiciProxyFetch } from "./proxy-fetch";
+import { undiciProxyFetch } from "../proxy-fetch";
 
 
 dotenv.config();
