@@ -1,6 +1,12 @@
 import { noop } from "lodash";
 import dotenv from "dotenv";
-import { ASRServer, ImageGenerationServer, LLMServer, TTSServer } from "../type";
+import {
+  ASRServer,
+  ImageGenerationServer,
+  LLMServer,
+  TTSServer,
+  VisionServer,
+} from "../type";
 import { recognizeAudio as VolcengineASR } from "./volcengine/volcengine-asr";
 import {
   recognizeAudio as TencentASR,
@@ -60,11 +66,16 @@ export const ttsServer: TTSServer = (
 export const imageGenerationServer: ImageGenerationServer = (
   process.env.IMAGE_GENERATION_SERVER || ""
 ).toLowerCase() as ImageGenerationServer;
+export const visionServer: VisionServer = (
+  process.env.VISION_SERVER || ""
+).toLowerCase() as VisionServer;
 
 console.log(`Current ASR Server: ${asrServer}`);
 console.log(`Current LLM Server: ${llmServer}`);
 console.log(`Current TTS Server: ${ttsServer}`);
-if (imageGenerationServer) console.log(`Current Image Generation Server: ${imageGenerationServer}`);
+if (imageGenerationServer)
+  console.log(`Current Image Generation Server: ${imageGenerationServer}`);
+if (visionServer) console.log(`Current Vision Server: ${visionServer}`);
 
 switch (asrServer) {
   case ASRServer.volcengine:
@@ -84,7 +95,7 @@ switch (asrServer) {
     break;
   case ASRServer.whisper:
     recognizeAudio = WisperASR;
-    break
+    break;
   default:
     console.warn(
       `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI/VOSK/WHISPER`

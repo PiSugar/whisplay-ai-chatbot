@@ -7,12 +7,7 @@ import { isEmpty } from "lodash";
 import { addGeminiGenerationTool } from "../cloud-api/gemini/gemini-image-generation";
 import { addOpenaiGenerationTool } from "../cloud-api/openai/openai-image-generation";
 import { addVolcengineGenerationTool } from "../cloud-api/volcengine/volcengine-image-generation";
-
-dotenv.config();
-
-const imageGenerationServer = (
-  process.env.IMAGE_GENERATION_SERVER || ""
-).toLocaleLowerCase();
+import { imageGenerationServer } from "../cloud-api/server";
 
 const imageGenerationTools: LLMTool[] = [];
 
