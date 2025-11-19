@@ -30,10 +30,13 @@ const geminiTTS = async (
           languageCode: geminiTTSLanguageCode,
         },
       },
+    }).catch(err => {
+      console.log("Gemini TTS request failed:", err);
+      return null;
     });
 
     const audioData =
-      response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
     if (!audioData) {
       console.error("No audio content received from Gemini TTS");
