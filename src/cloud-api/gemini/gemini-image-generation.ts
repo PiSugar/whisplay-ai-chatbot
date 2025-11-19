@@ -24,11 +24,11 @@ export const addGeminiGenerationTool = (imageGenerationTools: LLMTool[]) => {
             type: "string",
             description: "The text prompt to generate the image from",
           },
-          withImageContext: {
-            type: "boolean",
-            description:
-              "Whether to use the image context in the conversation for generation",
-          },
+          // withImageContext: {
+          //   type: "boolean",
+          //   description:
+          //     "Whether to use the image context in the conversation for generation",
+          // },
         },
         required: ["prompt"],
       },
@@ -37,20 +37,20 @@ export const addGeminiGenerationTool = (imageGenerationTools: LLMTool[]) => {
       console.log(`Generating image with gemini model: ${geminiImageModel}`);
       const { prompt, withImageContext } = params;
       let imageContext = undefined;
-      if (withImageContext) {
-        const latestImgPath = getLatestShowedImage();
-        if (latestImgPath) {
-          const base64ImageFile = readFileSync(latestImgPath, {
-            encoding: "base64",
-          });
-          imageContext = {
-            inlineData: {
-              mimeType: getImageMimeType(latestImgPath),
-              data: base64ImageFile,
-            },
-          };
-        }
-      }
+      // if (withImageContext) {
+      //   const latestImgPath = getLatestShowedImage();
+      //   if (latestImgPath) {
+      //     const base64ImageFile = readFileSync(latestImgPath, {
+      //       encoding: "base64",
+      //     });
+      //     imageContext = {
+      //       inlineData: {
+      //         mimeType: getImageMimeType(latestImgPath),
+      //         data: base64ImageFile,
+      //       },
+      //     };
+      //   }
+      // }
       const response = (await gemini!.models
         .generateContent({
           model: geminiImageModel!,

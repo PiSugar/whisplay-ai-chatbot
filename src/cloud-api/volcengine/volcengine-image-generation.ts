@@ -26,11 +26,11 @@ export const addVolcengineGenerationTool = (
             type: "string",
             description: "The text prompt to generate the image from",
           },
-          withImageContext: {
-            type: "boolean",
-            description:
-              "Whether to use the image context in the conversation for generation",
-          },
+          // withImageContext: {
+          //   type: "boolean",
+          //   description:
+          //     "Whether to use the image context in the conversation for generation",
+          // },
         },
         required: ["prompt"],
       },
@@ -39,17 +39,17 @@ export const addVolcengineGenerationTool = (
       console.log(`Generating image with doubao model: ${doubaoImageModel}`);
       const { prompt, withImageContext } = params;
       let imageUrl = undefined;
-      if (withImageContext) {
-        const latestImgPath = getLatestShowedImage();
-        if (latestImgPath) {
-          const base64ImageFile = readFileSync(latestImgPath, {
-            encoding: "base64",
-          });
-          imageUrl = `data:${getImageMimeType(
-            latestImgPath
-          )};base64,${base64ImageFile}`;
-        }
-      }
+      // if (withImageContext) {
+      //   const latestImgPath = getLatestShowedImage();
+      //   if (latestImgPath) {
+      //     const base64ImageFile = readFileSync(latestImgPath, {
+      //       encoding: "base64",
+      //     });
+      //     imageUrl = `data:${getImageMimeType(
+      //       latestImgPath
+      //     )};base64,${base64ImageFile}`;
+      //   }
+      // }
       try {
         const response = await axios.post(
           "https://ark.cn-beijing.volces.com/api/v3/images/generations",
