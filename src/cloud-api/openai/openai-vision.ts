@@ -54,7 +54,7 @@ export const addOpenaiVisionTool = (visionTools: LLMTool[]) => {
         });
         const content = get(response, "choices[0].message.content", "");
         return (
-          `${ToolReturnTag.Response}${content}` ||
+          `${ToolReturnTag.Success}${content}` ||
           `${ToolReturnTag.Error} No content received from OpenAI.`
         );
       } catch (error) {

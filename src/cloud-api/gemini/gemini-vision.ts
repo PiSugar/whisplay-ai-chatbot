@@ -50,7 +50,7 @@ export const addGeminiVisionTool = (visionTools: LLMTool[]) => {
       });
       const content = response.text;
       return (
-        `${ToolReturnTag.Response}${content}` ||
+        `${ToolReturnTag.Success}${content}` ||
         `${ToolReturnTag.Error} No content received from Ollama.`
       );
     },

@@ -71,7 +71,7 @@ export const addVolcengineVisionTool = (visionTools: LLMTool[]) => {
         const data = response.data;
         const content = get(data, "choices[0].message.content", "");
         return (
-          `${ToolReturnTag.Response}${content}` ||
+          `${ToolReturnTag.Success}${content}` ||
           `${ToolReturnTag.Error} No content received from OpenAI.`
         );
       } catch (error) {

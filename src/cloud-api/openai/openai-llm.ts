@@ -139,29 +139,6 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       tool_call_id: id as string,
     }));
 
-    // Directly extract and return the tool result if available
-    const describeMessage = newMessages.find((msg) =>
-      msg.content.startsWith(ToolReturnTag.Response)
-    );
-    const responseContent = extractToolResponse(describeMessage?.content || "");
-    if (responseContent) {
-      console.log(
-        `[LLM] Tool response starts with "[response]", return it directly.`
-      );
-      newMessages.push({
-        role: "assistant",
-        content: responseContent,
-      });
-      // append responseContent in chunks
-      await stimulateStreamResponse({
-        content: responseContent,
-        partialCallback,
-        endResolve,
-        endCallback,
-      });
-      return;
-    }
-
     await chatWithLLMStream(newMessages, partialCallback, () => {
       endResolve();
       endCallback();
