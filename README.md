@@ -112,8 +112,8 @@ The chatbot saves conversation history and generated images in the `data` folder
 - Support image generation (openai/gemini/volcengine) ✅
 - Refactor python render thread, better performance ✅
 - Add Google Gemini API support ✅
-- Add Grok API support
-- RPI camera support
+- Add Grok API support ✅
+- RPI camera support ✅
 - Support speaker recognition
 
 ## License
