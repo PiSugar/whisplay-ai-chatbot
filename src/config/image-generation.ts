@@ -7,7 +7,12 @@ import { isEmpty } from "lodash";
 import { addGeminiGenerationTool } from "../cloud-api/gemini/gemini-image-generation";
 import { addOpenaiGenerationTool } from "../cloud-api/openai/openai-image-generation";
 import { addVolcengineGenerationTool } from "../cloud-api/volcengine/volcengine-image-generation";
-import { imageGenerationServer } from "../cloud-api/server";
+
+dotenv.config();
+
+export const imageGenerationServer: ImageGenerationServer = (
+  process.env.IMAGE_GENERATION_SERVER || ""
+).toLowerCase() as ImageGenerationServer;
 
 const imageGenerationTools: LLMTool[] = [];
 
@@ -44,5 +49,6 @@ if (!isEmpty(imageGenerationTools)) {
 }
 
 export const addImageGenerationTools = (tools: LLMTool[]) => {
+  console.log(`Image generation tools added: ${imageGenerationTools.map((t) => t.function.name).join(", ")}`);
   tools.push(...imageGenerationTools);
 };

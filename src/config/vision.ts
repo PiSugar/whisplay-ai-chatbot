@@ -5,10 +5,12 @@ import { addOllamaVisionTool } from "../cloud-api/local/ollama-vision";
 import { addOpenaiVisionTool } from "../cloud-api/openai/openai-vision";
 import { addGeminiVisionTool } from "../cloud-api/gemini/gemini-vision";
 import { addVolcengineVisionTool } from "../cloud-api/volcengine/volcengine-vision";
-import { visionServer } from "../cloud-api/server";
 
 dotenv.config();
 
+const visionServer: VisionServer = (
+  process.env.VISION_SERVER || ""
+).toLowerCase() as VisionServer;
 const enableCamera = process.env.ENABLE_CAMERA === "true";
 
 const visionTools: LLMTool[] = [];

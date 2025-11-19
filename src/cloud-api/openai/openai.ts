@@ -14,8 +14,6 @@ export const openaiVisionModel =
 // OpenAI Image Generation
 export const openaiImageModel = process.env.OPENAI_IMAGE_MODEL || "dall-e-3";
 
-
-
 const openAiOptions: ClientOptions = {
   apiKey: openAiAPIKey,
   fetch: proxyFetch as any,
