@@ -12,9 +12,7 @@ export const geminiTTSSpeaker = process.env.GEMINI_TTS_SPEAKER || "Callirrhoe";
 export const geminiTTSLanguageCode =
   process.env.GEMINI_TTS_LANGUAGE_CODE || "en-US";
 export const geminiVisionModel =
-  process.env.GEMINI_VISION_MODEL ||
-  process.env.GEMINI_MODEL ||
-  "gemini-1.5-flash";
+  process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash";
 export const geminiImageModel =
   process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 
