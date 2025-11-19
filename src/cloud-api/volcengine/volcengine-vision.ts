@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import { getLatestShowedImage } from "../../utils/image";
 import { get } from "lodash";
 import { readFileSync } from "fs";
-import { volcengineVisionModel, doubaoAccessToken } from "./volcengine"
+import { volcengineVisionModel, doubaoAccessToken } from "./volcengine";
 import axios from "axios";
 
 dotenv.config();
@@ -18,7 +18,7 @@ export const addVolcengineVisionTool = (visionTools: LLMTool[]) => {
     function: {
       name: "describeImage",
       description:
-        "Analyze and interpret an image with the help of vision model, e.g., describe the image content or answer questions about the image.",
+        "Use this tool when user wants to analyze and interpret an image with the help of vision model, the tool will get the latest showed image byitself and answer questions about the image.",
       parameters: {
         type: "object",
         properties: {
