@@ -1,11 +1,8 @@
 import { LLMTool, ToolReturnTag } from "../../type";
-import dotenv from "dotenv";
 import { getLatestShowedImage } from "../../utils/image";
 import { get } from "lodash";
 import { readFileSync } from "fs";
 import { openai, openaiVisionModel } from "../../cloud-api/openai/openai";
-
-dotenv.config();
 
 export const addOpenaiVisionTool = (visionTools: LLMTool[]) => {
   // Add OpenAI vision tools here

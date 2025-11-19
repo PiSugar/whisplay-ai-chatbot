@@ -18,7 +18,13 @@ const openaiTTS = async (
     model: openAiVoiceModel,
     voice: openAiVoiceType,
     input: text,
+  }).catch((error) => {
+    console.error("OpenAI TTS failed:", error);
+    return null;
   });
+  if (!mp3) {
+    return { data: Buffer.from([]), duration: 0 };
+  }
   const buffer = Buffer.from(await mp3.arrayBuffer());
   const duration = await mp3Duration(buffer);
   return { data: buffer, duration: duration * 1000 };
