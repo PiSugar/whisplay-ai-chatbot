@@ -14,7 +14,6 @@ import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../../config/llm-tools";
 import { ChatWithLLMStreamFunction } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
-import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 
 dotenv.config();
 // OpenAI LLM

@@ -11,10 +11,9 @@ import {
 import { combineFunction } from "../../utils";
 import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
-import { FunctionCall, Message, ToolReturnTag } from "../../type";
+import { FunctionCall, Message } from "../../type";
 import { ChatWithLLMStreamFunction } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
-import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 
 dotenv.config();
 
