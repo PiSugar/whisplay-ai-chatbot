@@ -1,13 +1,13 @@
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
+import {
+  byteDanceAccessToken,
+  byteDanceAppId,
+  byteDanceVoiceType,
+} from "./volcengine";
 
 dotenv.config();
-
-// ByteDance TTS
-const byteDanceAppId = process.env.VOLCENGINE_APP_ID as string;
-const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN as string;
-const byteDanceVoiceType = process.env.VOLCENGINE_VOICE_TYPE || "zh_female_wanwanxiaohe_moon_bigtts";
 
 interface Payload {
   app: {
@@ -36,7 +36,9 @@ interface TTSResponse {
   duration: number;
 }
 
-const volcengineTTS = async (text: string): Promise<TTSResponse | undefined> => {
+const volcengineTTS = async (
+  text: string
+): Promise<TTSResponse | undefined> => {
   if (!byteDanceAppId || !byteDanceAccessToken) {
     console.error("ByteDance App ID or Access Token is not set.");
     return;

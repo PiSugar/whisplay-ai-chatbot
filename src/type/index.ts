@@ -45,6 +45,9 @@ export enum ImageGenerationServer {
 
 export enum VisionServer {
   ollama = "ollama",
+  openai = "openai",
+  gemini = "gemini",
+  volcengine = "volcengine",
 }
 
 export interface FunctionCall {
@@ -67,7 +70,7 @@ export interface OllamaFunctionCall {
 }
 
 
-export type LLMFunc = (params: Record<string, any>) => Promise<string>
+export type LLMFunc = (params: any) => Promise<string>
 
 export interface LLMTool {
   id?: string;

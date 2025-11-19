@@ -3,11 +3,9 @@ import WebSocket from "ws";
 import zlib from "zlib";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
+import { byteDanceAccessToken, byteDanceAppId } from "./volcengine";
 
 dotenv.config();
-
-const byteDanceAppId = process.env.VOLCENGINE_APP_ID || "";
-const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN || "";
 
 // Default WebSocket message headers (4 bytes)
 const DefaultFullClientWsHeader = Buffer.from([0x11, 0x10, 0x11, 0x00]);

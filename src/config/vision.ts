@@ -1,18 +1,16 @@
-import { VisionServer, LLMTool, ToolReturnTag } from "../type";
-import axios from "axios";
+import { VisionServer, LLMTool } from "../type";
 import dotenv from "dotenv";
-import { getLatestShowedImage, showLatestCapturedImg } from "../utils/image";
-import { get } from "lodash";
-import { readFileSync } from "fs";
+import { showLatestCapturedImg } from "../utils/image";
+import { addOllamaVisionTool } from "../cloud-api/local/ollama-vision";
+import { addOpenaiVisionTool } from "../cloud-api/openai/openai-vision";
+import { addGeminiVisionTool } from "../cloud-api/gemini/gemini-vision";
+import { addVolcengineVisionTool } from "../cloud-api/volcengine/volcengine-vision";
 
 dotenv.config();
 
 const enableCamera = process.env.ENABLE_CAMERA === "true";
 
 const visionServer = (process.env.VISION_SERVER || "").toLocaleLowerCase();
-
-const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
-const ollamaVisionModel = process.env.OLLAMA_VISION_MODEL || "qwen3-vl:2b";
 
 const visionTools: LLMTool[] = [];
 
@@ -21,7 +19,7 @@ if (enableCamera) {
     type: "function",
     function: {
       name: "showCapturedImage",
-      description: "Show the lastest captured image",
+      description: "Show the latest captured image",
       parameters: {},
     },
     func: async (params) => {
@@ -33,51 +31,21 @@ if (enableCamera) {
   });
 }
 
-if (visionServer === VisionServer.ollama) {
-  visionTools.push({
-    type: "function",
-    function: {
-      name: "describeImage",
-      description:
-        "Analyze and interpret an image with the help of vision model, e.g., describe the image content or answer questions about the image.",
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: {
-            type: "string",
-            description:
-              "The query or prompt to help with interpreting the image, e.g., 'What is in this image?'",
-          },
-        },
-        required: ["prompt"],
-      },
-    },
-    func: async (params) => {
-      const { prompt } = params;
-      let imgPath = getLatestShowedImage();
-      if (!imgPath) {
-        return `${ToolReturnTag.Error} No image is found.`;
-      }
-      const fileData = readFileSync(imgPath).toString("base64");
-      const response = await axios.post(`${ollamaEndpoint}/api/chat`, {
-        model: ollamaVisionModel,
-        messages: [
-          {
-            role: "user",
-            content: `${prompt} Respond no more than 100 words.`,
-            images: [fileData],
-          },
-        ],
-        think: false,
-        stream: false,
-      });
-      const content = get(response.data, "message.content", "");
-      return (
-        `${ToolReturnTag.Response}${content}` ||
-        `${ToolReturnTag.Error} No content received from Ollama.`
-      );
-    },
-  });
+switch (visionServer) {
+  case VisionServer.ollama:
+    addOllamaVisionTool(visionTools);
+    break;
+  case VisionServer.openai:
+    addOpenaiVisionTool(visionTools);
+    break;
+  case VisionServer.gemini:
+    addGeminiVisionTool(visionTools);
+    break;
+  case VisionServer.volcengine:
+    addVolcengineVisionTool(visionTools);
+    break;
+  default:
+    break;
 }
 
 export const addVisionTools = (tools: LLMTool[]) => {
