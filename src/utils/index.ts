@@ -194,7 +194,7 @@ export const getRecordFileDurationMs = async (
     if (format === "wav") {
       return getWavFileDurationMs(data);
     } else if (format === "mp3") {
-      return await mp3Duration(data);
+      return await mp3Duration(data) * 1000;
     }
   } catch (error) {
     return 0;
