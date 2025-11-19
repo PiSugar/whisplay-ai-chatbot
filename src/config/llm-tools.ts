@@ -6,6 +6,7 @@ import { cloneDeep } from "lodash";
 import { transformToGeminiType } from "../utils";
 import dotenv from "dotenv";
 import { addImageGenerationTools } from "./image-generation";
+import { addVisionTools } from "./vision";
 
 dotenv.config();
 
@@ -82,6 +83,7 @@ const defaultTools: LLMTool[] = [
 ];
 
 addImageGenerationTools(defaultTools);
+addVisionTools(defaultTools);
 
 // 如果有custom-tools文件夹，收集custom-tools文件夹中的文件导出的所有tools
 const customTools: LLMTool[] = [];

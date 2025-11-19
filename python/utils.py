@@ -4,6 +4,7 @@ from io import BytesIO
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import cairosvg
+import cv2
 
 class ColorUtils:
   @staticmethod
@@ -80,6 +81,25 @@ class ImageUtils:
     low_byte = (rgb565 & 0xFF).astype(np.uint8)
     interleaved = np.dstack((high_byte, low_byte)).flatten().tolist()
     return interleaved
+  
+  @staticmethod
+  def convertCameraFrameToRGB565(frame: np.ndarray, width: int, height: int):
+    # Resize frame to fit the display
+    frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_NEAREST)
+    r = (frame[:, :, 0] >> 3).astype(np.uint16)  # 5 bit
+    g = (frame[:, :, 1] >> 2).astype(np.uint16)  # 6 bit
+    b = (frame[:, :, 2] >> 3).astype(np.uint16)  # 5 bit
+    rgb565_data = (r << 11) | (g << 5) | b
+    return rgb565_data.byteswap().tobytes()
+  
+  @staticmethod
+  def crop_center(image: Image.Image, target_width: int, target_height: int) -> Image.Image:
+    width, height = image.size
+    left = (width - target_width) // 2
+    top = (height - target_height) // 2
+    right = (width + target_width) // 2
+    bottom = (height + target_height) // 2
+    return image.crop((left, top, right, bottom)).resize((target_width, target_height), Image.LANCZOS)
 
 
 class EmojiUtils:

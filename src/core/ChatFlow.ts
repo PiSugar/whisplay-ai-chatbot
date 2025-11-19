@@ -1,10 +1,17 @@
-import { getCurrentTimeTag, splitSentences } from "./../utils/index";
+import moment from "moment";
+import {
+  getCurrentTimeTag,
+  getRecordFileDurationMs,
+  splitSentences,
+} from "./../utils/index";
 import { get, noop } from "lodash";
 import {
   onButtonPressed,
   onButtonReleased,
+  onButtonDoubleClick,
   display,
   getCurrentStatus,
+  onCameraCapture,
 } from "../device/display";
 import { recordAudioManually, recordFileFormat } from "../device/audio";
 import {
@@ -14,8 +21,8 @@ import {
 } from "../cloud-api/server";
 import { extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
-import { recordingsDir } from "../utils/dir";
-import { getLatestGenImg } from "../utils/image";
+import { cameraDir, recordingsDir } from "../utils/dir";
+import { getLatestDisplayImg, setLatestCapturedImg } from "../utils/image";
 
 class ChatFlow {
   currentFlowName: string = "";
@@ -26,8 +33,9 @@ class ChatFlow {
   partialThinking: string = "";
   thinkingSentences: string[] = [];
   answerId: number = 0;
+  enableCamera: boolean = false;
 
-  constructor() {
+  constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
     this.recordingsDir = recordingsDir;
     this.setCurrentFlow("sleep");
@@ -53,6 +61,17 @@ class ChatFlow {
         });
       }
     );
+    if (options?.enableCamera) {
+      this.enableCamera = true;
+    }
+  }
+
+  async recognizeAudio(path: string): Promise<string> {
+    if ((await getRecordFileDurationMs(path)) < 500) {
+      console.log("Record audio too short, skipping recognition.");
+      return Promise.resolve("");
+    }
+    return recognizeAudio(path);
   }
 
   partialThinkingCallback = (
@@ -85,13 +104,30 @@ class ChatFlow {
           this.setCurrentFlow("listening");
         });
         onButtonReleased(noop);
+        // camera mode
+        if (this.enableCamera) {
+          const captureImgPath = `${cameraDir}/capture-${moment().format(
+            "YYYYMMDD-HHmmss"
+          )}.jpg`;
+          onButtonDoubleClick(() => {
+            display({
+              camera_mode: true,
+              capture_image_path: captureImgPath,
+            });
+          });
+          onCameraCapture(() => {
+            setLatestCapturedImg(captureImgPath);
+          });
+        }
         display({
           status: "idle",
           emoji: "😴",
           RGB: "#000055",
           ...(getCurrentStatus().text === "Listening..."
             ? {
-                text: "Press the button to start",
+                text: `Long Press the button to say something${
+                  this.enableCamera ? ",\ndouble click to launch camera" : ""
+                }.`,
               }
             : {}),
         });
@@ -111,9 +147,14 @@ class ChatFlow {
             RGB: "#ff6800", // yellow
           });
         });
-        result.then(() => {
-          this.setCurrentFlow("asr");
-        });
+        result
+          .then(() => {
+            this.setCurrentFlow("asr");
+          })
+          .catch((err) => {
+            console.error("Error during recording:", err);
+            this.setCurrentFlow("sleep");
+          });
         display({
           status: "listening",
           emoji: "😐",
@@ -126,8 +167,9 @@ class ChatFlow {
         display({
           status: "recognizing",
         });
+        onButtonDoubleClick(null);
         Promise.race([
-          recognizeAudio(this.currentRecordFilePath),
+          this.recognizeAudio(this.currentRecordFilePath),
           new Promise<string>((resolve) => {
             onButtonPressed(() => {
               resolve("[UserPress]");
@@ -152,6 +194,7 @@ class ChatFlow {
         break;
       case "answer":
         display({
+          status: "answering...",
           RGB: "#00c8a3",
         });
         this.currentFlowName = "answer";
@@ -179,11 +222,22 @@ class ChatFlow {
           (text) => partial(text, currentAnswerId),
           () => endPartial(currentAnswerId),
           (partialThinking) =>
-            this.partialThinkingCallback(partialThinking, currentAnswerId)
+            this.partialThinkingCallback(partialThinking, currentAnswerId),
+          (functionName: string, result?: string) => {
+            if (result) {
+              display({
+                text: `[${functionName}]${result}`,
+              });
+            } else {
+              display({
+                text: `Invoking [${functionName}]...`,
+              });
+            }
+          }
         );
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {
-            const img = getLatestGenImg();
+            const img = getLatestDisplayImg();
             if (img) {
               display({
                 image: img,

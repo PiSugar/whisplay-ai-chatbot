@@ -1,41 +1,51 @@
 import { noop } from "lodash";
 import dotenv from "dotenv";
-import { ASRServer, ImageGenerationServer, LLMServer, TTSServer } from "../type";
-import { recognizeAudio as VolcengineASR } from "./volcengine-asr";
+import {
+  ASRServer,
+  ImageGenerationServer,
+  LLMServer,
+  TTSServer,
+  VisionServer,
+} from "../type";
+import { recognizeAudio as VolcengineASR } from "./volcengine/volcengine-asr";
 import {
   recognizeAudio as TencentASR,
   synthesizeSpeech as TencentTTS,
-} from "./tencent-cloud";
-import { recognizeAudio as OpenAIASR } from "./openai-asr";
-import { recognizeAudio as GeminiASR } from "./gemini-asr";
-import { recognizeAudio as VoskASR } from "./vosk-asr";
-import { recognizeAudio as WisperASR } from "./whisper-asr";
+} from "./tencent/tencent-cloud";
+import { recognizeAudio as OpenAIASR } from "./openai/openai-asr";
+import { recognizeAudio as GeminiASR } from "./gemini/gemini-asr";
+import { recognizeAudio as VoskASR } from "./local/vosk-asr";
+import { recognizeAudio as WisperASR } from "./local/whisper-asr";
 import {
   chatWithLLMStream as VolcengineLLMStream,
   resetChatHistory as VolcengineResetChatHistory,
-} from "./volcengine-llm";
+} from "./volcengine/volcengine-llm";
 import {
   chatWithLLMStream as OpenAILLMStream,
   resetChatHistory as OpenAIResetChatHistory,
-} from "./openai-llm";
+} from "./openai/openai-llm";
 import {
   chatWithLLMStream as OllamaLLMStream,
   resetChatHistory as OllamaResetChatHistory,
-} from "./ollama-llm";
+} from "./local/ollama-llm";
 import {
   chatWithLLMStream as GeminiLLMStream,
   resetChatHistory as GeminiResetChatHistory,
-} from "./gemini-llm";
-import VolcengineTTS from "./volcengine-tts";
-import OpenAITTS from "./openai-tts";
-import geminiTTS from "./gemini-tts";
+} from "./gemini/gemini-llm";
+import {
+  chatWithLLMStream as GrokLLMStream,
+  resetChatHistory as GrokResetChatHistory,
+} from "./grok/grok-llm";
+import VolcengineTTS from "./volcengine/volcengine-tts";
+import OpenAITTS from "./openai/openai-tts";
+import geminiTTS from "./gemini/gemini-tts";
 import {
   ChatWithLLMStreamFunction,
   RecognizeAudioFunction,
   ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
-import piperTTS from "./piper-tts";
+import piperTTS from "./local/piper-tts";
 
 dotenv.config();
 
@@ -56,11 +66,16 @@ export const ttsServer: TTSServer = (
 export const imageGenerationServer: ImageGenerationServer = (
   process.env.IMAGE_GENERATION_SERVER || ""
 ).toLowerCase() as ImageGenerationServer;
+export const visionServer: VisionServer = (
+  process.env.VISION_SERVER || ""
+).toLowerCase() as VisionServer;
 
 console.log(`Current ASR Server: ${asrServer}`);
 console.log(`Current LLM Server: ${llmServer}`);
 console.log(`Current TTS Server: ${ttsServer}`);
-if (imageGenerationServer) console.log(`Current Image Generation Server: ${imageGenerationServer}`);
+if (imageGenerationServer)
+  console.log(`Current Image Generation Server: ${imageGenerationServer}`);
+if (visionServer) console.log(`Current Vision Server: ${visionServer}`);
 
 switch (asrServer) {
   case ASRServer.volcengine:
@@ -80,7 +95,7 @@ switch (asrServer) {
     break;
   case ASRServer.whisper:
     recognizeAudio = WisperASR;
-    break
+    break;
   default:
     console.warn(
       `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI/VOSK/WHISPER`
@@ -105,9 +120,13 @@ switch (llmServer) {
     chatWithLLMStream = GeminiLLMStream;
     resetChatHistory = GeminiResetChatHistory;
     break;
+  case LLMServer.grok:
+    chatWithLLMStream = GrokLLMStream;
+    resetChatHistory = GrokResetChatHistory;
+    break;
   default:
     console.warn(
-      `unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI/GEMINI/OLLAMA`
+      `unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI/GEMINI/OLLAMA/GROK`
     );
     break;
 }

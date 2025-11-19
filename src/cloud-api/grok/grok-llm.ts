@@ -7,24 +7,23 @@ import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
-} from "../config/llm-config";
-import { combineFunction } from "../utils";
-import { llmTools, llmFuncMap } from "../config/llm-tools";
+} from "../../config/llm-config";
+import { combineFunction } from "../../utils";
+import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
-import { FunctionCall, Message } from "../type";
-import { ChatWithLLMStreamFunction } from "./interface";
-import { chatHistoryDir } from "../utils/dir";
+import { FunctionCall, Message, ToolReturnTag } from "../../type";
+import { ChatWithLLMStreamFunction } from "../interface";
+import { chatHistoryDir } from "../../utils/dir";
+import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 
 dotenv.config();
 
-// Doubao LLM
-const doubaoAccessToken = process.env.VOLCENGINE_DOUBAO_ACCESS_TOKEN || "";
-const doubaoLLMModel =
-  process.env.VOLCENGINE_DOUBAO_LLM_MODEL || "doubao-1-5-lite-32k-250115"; // Default model
-const enableThinking = process.env.ENABLE_THINKING === "true";
+// Grok LLM
+const grokAccessToken = process.env.GROK_API_KEY || "";
+const grokLLMModel = process.env.GROK_LLM_MODEL || "grok-4-latest"; // Default model
 
-const chatHistoryFileName = `doubao_chat_history_${moment().format(
-  "YYYYMMDD_HHmmss"
+const chatHistoryFileName = `grok_chat_history_${moment().format(
+  "YYYY-MM-DD_HH-mm-ss"
 )}.json`;
 
 const messages: Message[] = [
@@ -46,10 +45,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
-  partialThinkingCallback?: (partialThinking: string) => void
+  partialThinkingCallback?: (partialThinking: string) => void,
+  invokeFunctionCallback?: (functionName: string, result?: string) => void
 ): Promise<void> => {
-  if (!doubaoAccessToken) {
-    console.error("Doubao access token is not set.");
+  if (!grokAccessToken) {
+    console.error("Grok access token is not set.");
     return;
   }
   if (shouldResetChatHistory()) {
@@ -67,23 +67,22 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     );
   });
   let partialAnswer = "";
-  let partialThinking = "";
   const functionCallsPackages: any[] = [];
 
   try {
     const response = await axios.post(
-      "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      "https://api.x.ai/v1/chat/completions",
       {
-        model: doubaoLLMModel,
+        model: grokLLMModel,
         messages,
         stream: true,
         tools: llmTools,
-        think: enableThinking,
+        temperature: 0.7,
       },
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${doubaoAccessToken}`,
+          Authorization: `Bearer ${grokAccessToken}`,
         },
         responseType: "stream",
       }
@@ -111,13 +110,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         const toolCalls = parsedData
           .map((item) => get(item, "choices[0].delta.tool_calls", []))
           .filter((arr) => !isEmpty(arr));
-        const thinking = parsedData
-          .map((item) => get(item, "choices[0].delta.thinking", ""))
-          .join("");
-        if (thinking) {
-          partialThinkingCallback?.(thinking);
-          partialThinking += thinking;
-        }
+
         if (toolCalls.length) {
           functionCallsPackages.push(...toolCalls);
         }
@@ -157,13 +150,19 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               );
             }
             const func = llmFuncMap[name! as string];
+            invokeFunctionCallback?.(name! as string);
             if (func) {
               return [
                 id,
-                await func(args).catch((err) => {
-                  console.error(`Error executing function ${name}:`, err);
-                  return `Error executing function ${name}: ${err.message}`;
-                }),
+                await func(args)
+                  .then((res) => {
+                    invokeFunctionCallback?.(name! as string, res);
+                    return res;
+                  })
+                  .catch((err) => {
+                    console.error(`Error executing function ${name}:`, err);
+                    return `Error executing function ${name}: ${err.message}`;
+                  }),
               ];
             } else {
               console.error(`Function ${name} not found`);
@@ -178,6 +177,31 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           content: result as string,
           tool_call_id: id as string,
         }));
+
+        // Directly extract and return the tool result if available
+        const describeMessage = newMessages.find((msg) =>
+          msg.content.startsWith(ToolReturnTag.Response)
+        );
+        const responseContent = extractToolResponse(
+          describeMessage?.content || ""
+        );
+        if (responseContent) {
+          console.log(
+            `[LLM] Tool response starts with "[response]", return it directly.`
+          );
+          newMessages.push({
+            role: "assistant",
+            content: responseContent,
+          });
+          // append responseContent in chunks
+          await stimulateStreamResponse({
+            content: responseContent,
+            partialCallback,
+            endResolve,
+            endCallback,
+          });
+          return;
+        }
 
         await chatWithLLMStream(newMessages, partialCallback, () => {
           endResolve();

@@ -1,6 +1,7 @@
 import fs from "fs";
 import { spawn } from "child_process";
-import { ASRServer } from "../type";
+import { ASRServer } from "../../type";
+import { asrDir } from "../../utils/dir";
 
 const modelSize = process.env.WHISPER_MODEL_SIZE || "tiny";
 const language = process.env.WHISPER_LANGUAGE || "";
@@ -50,6 +51,8 @@ export const recognizeAudio = async (
       "transcribe",
       "--output_format",
       "txt",
+      "--output_dir",
+      asrDir,
       audioFilePath,
     ];
     if (language) {

@@ -7,20 +7,20 @@ import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
-} from "../config/llm-config";
-import { FunctionCall, Message } from "../type";
-import { combineFunction } from "../utils";
+} from "../../config/llm-config";
+import { FunctionCall, Message, ToolReturnTag } from "../../type";
+import { combineFunction } from "../../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
-import { llmFuncMap, llmTools } from "../config/llm-tools";
-import { ChatWithLLMStreamFunction } from "./interface";
-import { chatHistoryDir } from "../utils/dir";
+import { llmFuncMap, llmTools } from "../../config/llm-tools";
+import { ChatWithLLMStreamFunction } from "../interface";
+import { chatHistoryDir } from "../../utils/dir";
 
 dotenv.config();
 // OpenAI LLM
 const openaiLLMModel = process.env.OPENAI_LLM_MODEL || "gpt-4o"; // Default model
 
 const chatHistoryFileName = `openai_chat_history_${moment().format(
-  "YYYYMMDD_HHmmss"
+  "YYYY-MM-DD_HH-mm-ss"
 )}.json`;
 
 const messages: Message[] = [
@@ -42,7 +42,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partial: string) => void,
   endCallback: () => void,
-  partialThinkingCallback?: (partialThinking: string) => void
+  partialThinkingCallback?: (partialThinking: string) => void,
+  invokeFunctionCallback?: (functionName: string, result?: string) => void
 ): Promise<void> => {
   if (!openai) {
     console.error("OpenAI API key is not set.");
@@ -109,8 +110,20 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           );
         }
         const func = llmFuncMap[name! as string];
+        invokeFunctionCallback?.(name! as string);
         if (func) {
-          return [id, await func(args)];
+          return [
+            id,
+            await func(args)
+              .then((res) => {
+                invokeFunctionCallback?.(name! as string, res);
+                return res;
+              })
+              .catch((err) => {
+                console.error(`Error executing function ${name}:`, err);
+                return `Error executing function ${name}: ${err.message}`;
+              }),
+          ];
         } else {
           console.error(`Function ${name} not found`);
           return [id, `Function ${name} not found`];

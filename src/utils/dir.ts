@@ -28,6 +28,9 @@ if (cleanDataFolderOnStart) {
 
 ensureDirExists(dataDir);
 
+export const asrDir = path.join(dataDir, "asr");
+ensureDirExists(asrDir);
+
 export const ttsDir = path.join(dataDir, "tts");
 ensureDirExists(ttsDir);
 
@@ -39,3 +42,6 @@ ensureDirExists(chatHistoryDir);
 
 export const imageDir = path.join(dataDir, "images");
 ensureDirExists(imageDir);
+
+export const cameraDir = path.join(dataDir, "camera");
+ensureDirExists(cameraDir);

@@ -26,6 +26,7 @@ export enum LLMServer {
   openai = "openai",
   ollama = "ollama",
   gemini = "gemini",
+  grok = "grok",
 }
 
 export enum TTSServer {
@@ -37,6 +38,13 @@ export enum TTSServer {
 }
 
 export enum ImageGenerationServer {
+  openai = "openai",
+  gemini = "gemini",
+  volcengine = "volcengine",
+}
+
+export enum VisionServer {
+  ollama = "ollama",
   openai = "openai",
   gemini = "gemini",
   volcengine = "volcengine",
@@ -62,7 +70,7 @@ export interface OllamaFunctionCall {
 }
 
 
-export type LLMFunc = (params: Record<string, any>) => Promise<string>
+export type LLMFunc = (params: any) => Promise<string>
 
 export interface LLMTool {
   id?: string;
@@ -98,4 +106,10 @@ export interface LLMTool {
     }
   }
   func: LLMFunc
+}
+
+export enum ToolReturnTag {
+  Success = "[success]",
+  Error = "[error]",
+  Response = "[response]", // use as assistant response
 }

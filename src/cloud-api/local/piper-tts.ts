@@ -1,9 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { spawn } from "child_process";
-import { getWavFileDurationMs } from "../utils";
+import { getWavFileDurationMs } from "../../utils";
 import dotenv from "dotenv";
-import { ttsDir } from "../utils/dir";
+import { ttsDir } from "../../utils/dir";
 
 dotenv.config();
 
@@ -41,11 +41,11 @@ const piperTTS = async (
       }
 
       try {
-        const buffer = await fs.readFileSync(tempWavFile);
-        const duration = await getWavFileDurationMs(buffer);
+        const buffer = fs.readFileSync(tempWavFile);
+        const duration = getWavFileDurationMs(buffer);
 
         // Clean up temp file
-        await fs.unlinkSync(tempWavFile);
+        fs.unlinkSync(tempWavFile);
 
         // remove wav header, otherwise playback process will stop automatically
         const headerSize = 44;

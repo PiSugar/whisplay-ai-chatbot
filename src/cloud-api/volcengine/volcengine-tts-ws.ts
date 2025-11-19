@@ -1,15 +1,10 @@
-import axios from "axios";
 import WebSocket from "ws";
 import zlib from "zlib";
 import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
+import { byteDanceAccessToken, byteDanceAppId, byteDanceVoiceType } from "./volcengine";
 
 dotenv.config();
-
-// ByteDance TTS
-const byteDanceAppId = process.env.VOLCENGINE_APP_ID || "";
-const byteDanceAccessToken = process.env.VOLCENGINE_ACCESS_TOKEN || "";
-const byteDanceVoiceType = process.env.VOLCENGINE_VOICE_TYPE || "zh_female_wanwanxiaohe_moon_bigtts";
 
 const host = "openspeech.bytedance.com";
 const api_url = `wss://${host}/api/v1/tts/ws_binary`;
@@ -78,6 +73,7 @@ client.on("message", (data: WebSocket.Data) => {
   } else if (message_type === 0xc) {
     payload = payload.slice(4);
     if (message_compression === 1) {
+      // @ts-ignore
       payload = zlib.gunzipSync(payload);
     }
     console.log(`Frontend message: ${payload}`);

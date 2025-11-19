@@ -13,21 +13,9 @@ interface Status {
   battery_color: string;
   battery_level: number;
   image: string;
+  camera_mode: boolean;
+  capture_image_path: string;
 }
-
-const MAX_CHARACTERS = 25 * 6; // 25 characters per line, 6 lines
-
-const autoCropText = (text: string): string => {
-  return text;
-  // if (text.length <= MAX_CHARACTERS) {
-  //   return text;
-  // }
-  // const { sentences, remaining } = splitSentences(text);
-  // while (sentences.join(" ").length > MAX_CHARACTERS && sentences.length > 0) {
-  //   sentences.shift();
-  // }
-  // return sentences.join(" ") + remaining;
-};
 
 export class WhisplayDisplay {
   private currentStatus: Status = {
@@ -40,19 +28,59 @@ export class WhisplayDisplay {
     battery_color: "#000000",
     battery_level: 100, // 0-100
     image: "",
+    camera_mode: false,
+    capture_image_path: "",
   };
 
   private client = null as Socket | null;
   private buttonPressedCallback: () => void = () => {};
   private buttonReleasedCallback: () => void = () => {};
+  private buttonDoubleClickCallback: (() => void) | null = null;
+  private onCameraCaptureCallback: () => void = () => {};
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
+  private buttonPressTimeArray: number[] = [];
+  private buttonReleaseTimeArray: number[] = [];
+  private buttonDetectInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.startPythonProcess();
     this.isReady = new Promise<void>((resolve) => {
       this.connectWithRetry(15, resolve);
     });
+  }
+
+  startMonitoringDoubleClick(): void {
+    if (this.buttonDetectInterval || !this.buttonDoubleClickCallback) return;
+    // check if there are two presses and two releases
+    this.buttonDetectInterval = setTimeout(() => {
+      // clean old click arrays >= 1500ms
+      const now = Date.now();
+      this.buttonPressTimeArray = this.buttonPressTimeArray.filter(
+        (time) => now - time <= 1000
+      );
+      this.buttonReleaseTimeArray = this.buttonReleaseTimeArray.filter(
+        (time) => now - time <= 1000
+      );
+      const doubleClickDetected =
+        this.buttonPressTimeArray.length >= 2 &&
+        this.buttonReleaseTimeArray.length >= 2;
+
+      if (doubleClickDetected) {
+        this.buttonDoubleClickCallback?.();
+      } else {
+        const lastReleaseTime = this.buttonReleaseTimeArray.pop() || 0;
+        const lastPressTime = this.buttonPressTimeArray.pop() || 0;
+        if (!lastReleaseTime || lastReleaseTime < lastPressTime) {
+          this.buttonPressedCallback();
+        }
+      }
+
+      // reset arrays and interval
+      this.buttonPressTimeArray = [];
+      this.buttonReleaseTimeArray = [];
+      this.buttonDetectInterval = null;
+    }, 800);
   }
 
   startPythonProcess(): void {
@@ -126,20 +154,32 @@ export class WhisplayDisplay {
       });
       this.client.on("data", (data: Buffer) => {
         const dataString = data.toString();
+        if (dataString.trim() === "OK") {
+          return;
+        }
         console.log(
           `[${getCurrentTimeTag()}] Received data from Whisplay hat:`,
           dataString
         );
-        if (dataString.trim() === "OK") {
-          return;
-        }
         try {
           const json = JSON.parse(dataString);
           if (json.event === "button_pressed") {
-            this.buttonPressedCallback();
+            this.buttonPressTimeArray.push(Date.now());
+            this.startMonitoringDoubleClick();
+            if (!this.buttonDetectInterval) {
+              console.log('emit pressed')
+              this.buttonPressedCallback();
+            }
           }
           if (json.event === "button_released") {
-            this.buttonReleasedCallback();
+            this.buttonReleaseTimeArray.push(Date.now());
+            if (!this.buttonDetectInterval) {
+              console.log('emit released')
+              this.buttonReleasedCallback();
+            }
+          }
+          if (json.event === "camera_capture") {
+            this.onCameraCaptureCallback();
           }
         } catch {
           console.error("Failed to parse JSON from data");
@@ -163,6 +203,14 @@ export class WhisplayDisplay {
     this.buttonReleasedCallback = callback;
   }
 
+  onButtonDoubleClick(callback: (() => void) | null): void {
+    this.buttonDoubleClickCallback = callback || null;
+  }
+
+  onCameraCapture(callback: () => void): void {
+    this.onCameraCaptureCallback = callback;
+  }
+
   private async sendToDisplay(data: string): Promise<void> {
     await this.isReady;
     try {
@@ -179,9 +227,6 @@ export class WhisplayDisplay {
   }
 
   async display(newStatus: Partial<Status> = {}): Promise<void> {
-    if (newStatus.text) {
-      newStatus.text = autoCropText(newStatus.text);
-    }
     const {
       status,
       emoji,
@@ -229,6 +274,10 @@ export const onButtonPressed =
   displayInstance.onButtonPressed.bind(displayInstance);
 export const onButtonReleased =
   displayInstance.onButtonReleased.bind(displayInstance);
+export const onButtonDoubleClick =
+  displayInstance.onButtonDoubleClick.bind(displayInstance);
+export const onCameraCapture =
+  displayInstance.onCameraCapture.bind(displayInstance);
 
 function cleanup() {
   console.log("Cleaning up display process before exit...");

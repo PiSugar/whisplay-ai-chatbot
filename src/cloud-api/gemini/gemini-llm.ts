@@ -1,25 +1,25 @@
 import { isEmpty } from "lodash";
 import * as fs from "fs";
 import * as path from "path";
-import { LLMTool } from "../type";
+import { LLMTool } from "../../type";
 import {
   shouldResetChatHistory,
   systemPrompt,
   updateLastMessageTime,
-} from "../config/llm-config";
+} from "../../config/llm-config";
 import { gemini, geminiModel } from "./gemini";
-import { llmTools, llmFuncMap, llmToolsForGemini } from "../config/llm-tools";
+import { llmFuncMap, llmToolsForGemini } from "../../config/llm-tools";
 import dotenv from "dotenv";
-import { FunctionCall, Message } from "../type";
-import { ChatWithLLMStreamFunction } from "./interface";
+import { FunctionCall, Message } from "../../type";
+import { ChatWithLLMStreamFunction } from "../interface";
 import { ToolListUnion, ToolUnion, Part } from "@google/genai";
 import moment from "moment";
-import { chatHistoryDir } from "../utils/dir";
+import { chatHistoryDir } from "../../utils/dir";
 
 dotenv.config();
 
 const chatHistoryFileName = `gemini_chat_history_${moment().format(
-  "YYYYMMDD_HHmmss"
+  "YYYY-MM-DD_HH-mm-ss"
 )}.json`;
 
 const resetChatHistory = (): void => {
@@ -58,7 +58,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
-  partialThinkingCallback?: (partialThinking: string) => void
+  partialThinkingCallback?: (partialThinking: string) => void,
+  invokeFunctionCallback?: (functionName: string, result?: string) => void
 ): Promise<void> => {
   if (!gemini || !chat) {
     console.error("Google Gemini API key is not set.");
@@ -152,12 +153,18 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           }
           const func = llmFuncMap[name! as string];
           if (func) {
+            invokeFunctionCallback?.(name! as string);
             return [
               id,
-              await func(args).catch((err) => {
-                console.error(`Error executing function ${name}:`, err);
-                return `Error executing function ${name}: ${err.message}`;
-              }),
+              await func(args)
+                .then((res) => {
+                  invokeFunctionCallback?.(name! as string, res);
+                  return res;
+                })
+                .catch((err) => {
+                  console.error(`Error executing function ${name}:`, err);
+                  return `Error executing function ${name}: ${err.message}`;
+                }),
             ];
           } else {
             console.error(`Function ${name} not found`);
