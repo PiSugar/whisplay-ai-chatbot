@@ -107,7 +107,7 @@ The chatbot saves conversation history and generated images in the `data` folder
 - Enable the AI assistant to adjust the volume autonomously ✅
 - Reset the conversation history if there is no speech for five minutes ✅
 - Support local llm server ✅
-- Support local asr (vosk) ✅
+- Support local asr (whisper/vosk) ✅
 - Support local tts (piper) ✅
 - Support image generation (openai/gemini/volcengine) ✅
 - Refactor python render thread, better performance ✅
