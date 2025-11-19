@@ -48,5 +48,6 @@ switch (visionServer) {
 }
 
 export const addVisionTools = (tools: LLMTool[]) => {
+  console.log(`Vision tools added: ${visionTools.map((t) => t.function.name).join(", ")}`);
   tools.push(...visionTools);
 };

@@ -19,7 +19,7 @@ const openaiTTS = async (
     voice: openAiVoiceType,
     input: text,
   }).catch((error) => {
-    console.error("OpenAI TTS failed:", error);
+    console.log("OpenAI TTS failed:", error);
     return null;
   });
   if (!mp3) {
