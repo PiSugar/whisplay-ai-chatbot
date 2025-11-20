@@ -16,7 +16,7 @@ export const addGeminiGenerationTool = (imageGenerationTools: LLMTool[]) => {
     type: "function",
     function: {
       name: "generateImage",
-      description: "Generate or draw an image from a text prompt",
+      description: "Generate or draw an image from a text prompt, or edit an image based on a text prompt.",
       parameters: {
         type: "object",
         properties: {
@@ -24,11 +24,11 @@ export const addGeminiGenerationTool = (imageGenerationTools: LLMTool[]) => {
             type: "string",
             description: "The text prompt to generate the image from",
           },
-          // withImageContext: {
-          //   type: "boolean",
-          //   description:
-          //     "Whether to use the image context in the conversation for generation",
-          // },
+          withImageContext: {
+            type: "boolean",
+            description:
+              "When user mentions 'this image/picture/photo' or similar, set this to true, the tools will request and provide context from the latest showed image",
+          },
         },
         required: ["prompt"],
       },
@@ -37,20 +37,20 @@ export const addGeminiGenerationTool = (imageGenerationTools: LLMTool[]) => {
       console.log(`Generating image with gemini model: ${geminiImageModel}`);
       const { prompt, withImageContext } = params;
       let imageContext = undefined;
-      // if (withImageContext) {
-      //   const latestImgPath = getLatestShowedImage();
-      //   if (latestImgPath) {
-      //     const base64ImageFile = readFileSync(latestImgPath, {
-      //       encoding: "base64",
-      //     });
-      //     imageContext = {
-      //       inlineData: {
-      //         mimeType: getImageMimeType(latestImgPath),
-      //         data: base64ImageFile,
-      //       },
-      //     };
-      //   }
-      // }
+      if (withImageContext) {
+        const latestImgPath = getLatestShowedImage();
+        if (latestImgPath) {
+          const base64ImageFile = readFileSync(latestImgPath, {
+            encoding: "base64",
+          });
+          imageContext = {
+            inlineData: {
+              mimeType: getImageMimeType(latestImgPath),
+              data: base64ImageFile,
+            },
+          };
+        }
+      }
       const response = (await gemini!.models
         .generateContent({
           model: geminiImageModel!,

@@ -24,11 +24,11 @@ export const addOpenaiGenerationTool = (imageGenerationTools: LLMTool[]) => {
             type: "string",
             description: "The text prompt to generate the image from",
           },
-          // withImageContext: {
-          //   type: "boolean",
-          //   description:
-          //     "Whether to use the image context in the conversation for generation",
-          // },
+          withImageContext: {
+            type: "boolean",
+            description:
+              "When user mentions 'this image/picture/photo' or similar, set this to true, the tools will request and provide context from the latest showed image",
+          },
         },
         required: ["prompt"],
       },
@@ -37,9 +37,11 @@ export const addOpenaiGenerationTool = (imageGenerationTools: LLMTool[]) => {
       console.log(`Generating image with openai model: ${openaiImageModel}`);
       const { prompt, withImageContext } = params;
       if (["dall-e-2", "dall-e-3"].includes(openaiImageModel)) {
-        // if (withImageContext) {
-        //   return `${ToolReturnTag.Error} OpenAI DALL-E models do not support image context for generation.`;
-        // }
+        if (withImageContext) {
+          console.warn(
+            `OpenAI image generation with model ${openaiImageModel} does not support image context, ignoring the withImageContext parameter.`
+          );
+        }
         const requestParams: ImageGenerateParamsNonStreaming = {
           model: openaiImageModel,
           prompt: prompt as string,
@@ -70,17 +72,17 @@ export const addOpenaiGenerationTool = (imageGenerationTools: LLMTool[]) => {
         }
       } else {
         let imageUrl = undefined;
-        // if (withImageContext) {
-        //   const latestImgPath = getLatestShowedImage();
-        //   if (latestImgPath) {
-        //     const base64ImageFile = readFileSync(latestImgPath, {
-        //       encoding: "base64",
-        //     });
-        //     imageUrl = `data:${getImageMimeType(
-        //       latestImgPath
-        //     )};base64,${base64ImageFile}`;
-        //   }
-        // }
+        if (withImageContext) {
+          const latestImgPath = getLatestShowedImage();
+          if (latestImgPath) {
+            const base64ImageFile = readFileSync(latestImgPath, {
+              encoding: "base64",
+            });
+            imageUrl = `data:${getImageMimeType(
+              latestImgPath
+            )};base64,${base64ImageFile}`;
+          }
+        }
         try {
           const response = await openai!.responses.create({
             model: openaiImageModel,
