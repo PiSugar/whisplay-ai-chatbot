@@ -7,6 +7,8 @@ import { ASRServer, TTSServer } from "../type";
 
 dotenv.config();
 
+const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
+
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
 export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(asrServer)
   ? "wav"
@@ -14,17 +16,23 @@ export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(asr
 
 function startPlayerProcess() {
   if (useWavPlayer) {
-    return spawn("aplay", [
-      "-f",
-      "S16_LE", // 16-bit PCM
+    // use sox play for wav files
+    return spawn("play", [
+      "-t",
+      "raw", // raw format
+      "-b",
+      "16", // 16-bit
+      "-e",
+      "signed-integer", // signed PCM
       "-r",
-      "24000", // rate
+      "24000", // sample rate
       "-c",
-      "1", // channels
+      "1", // mono
       "-", // read from stdin
     ]);
   } else {
-    return spawn("mpg123", ["-", "--scale", "2", "-o", "alsa"]);
+    // use mpg123 for mp3 files
+    return spawn("mpg123", ["-", "--scale", "2", "-o", "alsa", "-a", `hw:${soundCardIndex},0`]);
   }
 }
 
