@@ -5,6 +5,9 @@ import fs from "fs";
 import path from "path";
 import { playAudioData } from "../device/audio";
 import getAudioDurationInSeconds from "get-audio-duration";
+import { spawn } from "child_process";
+
+const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
 export const listWavFilesInTtsDir = (): string[] => {
   if (!fs.existsSync(ttsDir)) {
@@ -21,11 +24,32 @@ const files = listWavFilesInTtsDir();
 const playAllWavFiles = async () => {
   for (const filePath of files) {
     console.log("Playing:", filePath);
-    const buffer = fs.readFileSync(filePath);
-    const duration = (await getAudioDurationInSeconds(filePath)) * 1000;
-    const headerSize = 44;
-    const trimmedBuffer = buffer.subarray(headerSize);
-    await playAudioData(trimmedBuffer, duration);
+    // const buffer = fs.readFileSync(filePath);
+    // const duration = (await getAudioDurationInSeconds(filePath)) * 1000;
+    // const headerSize = 44;
+    // const trimmedBuffer = buffer.subarray(headerSize);
+    await new Promise<void>(async (resolve, reject) => {
+      const process = spawn("play", [
+        "-f",
+        "S16_LE",
+        "-c",
+        "1",
+        "-r",
+        "24000",
+        "-D",
+        `hw:${soundCardIndex},0`,
+        filePath
+      ]);
+      process.on("close", (code: number) => {
+        if (code !== 0) {
+          console.error(`Playback process exited with code ${code}`);
+          reject(new Error(`Playback process exited with code ${code}`));
+        } else {
+          console.log(`Finished playing ${filePath}`);
+          resolve();
+        }
+      });
+    });
   }
 };
 
