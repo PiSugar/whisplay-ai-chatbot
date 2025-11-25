@@ -1,5 +1,5 @@
 import { exec, spawn, ChildProcess } from "child_process";
-import { isEmpty, noop } from "lodash";
+import { isEmpty, noop, set } from "lodash";
 import { killAllProcesses } from "../utils";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
@@ -19,18 +19,19 @@ export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(
 
 function startPlayerProcess() {
   if (useWavPlayer) {
+    return null;
     // use sox play for wav files
-    return spawn("play", [
-      "-f",
-      "S16_LE",
-      "-c",
-      "1",
-      "-r",
-      "24000",
-      "-D",
-      `hw:${soundCardIndex},0`,
-      "-", // read from stdin
-    ]);
+    // return spawn("play", [
+    //   "-f",
+    //   "S16_LE",
+    //   "-c",
+    //   "1",
+    //   "-r",
+    //   "24000",
+    //   "-D",
+    //   `hw:${soundCardIndex},0`,
+    //   "-", // read from stdin
+    // ]);
   } else {
     // use mpg123 for mp3 files
     return spawn("mpg123", [
@@ -142,13 +143,46 @@ setTimeout(() => {
 }, 5000);
 
 const playAudioData = (
-  resAudioData: Buffer,
+  resAudioData: Buffer | string,
   audioDuration: number
 ): Promise<void> => {
   if (isEmpty(resAudioData) || audioDuration <= 0) {
     console.log("No audio data to play, skipping playback.");
     return Promise.resolve();
   }
+  // play wav file using aplay
+  if (typeof resAudioData === "string") {
+    return Promise.race([
+      new Promise<void>((resolve) => {
+        setTimeout(() => {
+          resolve();
+        }, audioDuration + 1000);
+      }),
+      new Promise<void>((resolve, reject) => {
+        console.log("Playback duration:", audioDuration);
+        player.isPlaying = true;
+        const process = spawn("aplay", [
+          resAudioData,
+          "-D",
+          `hw:${soundCardIndex},0`,
+        ]);
+        process.on("close", (code: number) => {
+          player.isPlaying = false;
+          if (code !== 0) {
+            console.error(`Audio playback error: ${code}`);
+            reject(code);
+          } else {
+            console.log("Audio playback completed");
+            resolve();
+          }
+        });
+      }),
+    ]).catch((error) => {
+      console.error("Audio playback error:", error);
+    });
+  }
+  
+  // play mp3 buffer using mpg123
   const audioBuffer = Buffer.from(resAudioData as any, "base64");
   return new Promise((resolve, reject) => {
     console.log("Playback duration:", audioDuration);

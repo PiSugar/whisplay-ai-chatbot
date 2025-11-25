@@ -13,7 +13,7 @@ const piperModelPath =
 
 const piperTTS = async (
   text: string
-): Promise<{ data: Buffer; duration: number }> => {
+): Promise<{ data: Buffer | string; duration: number }> => {
   return new Promise((resolve, reject) => {
     const now = Date.now();
     const tempWavFile = path.join(ttsDir, `piper_${now}.wav`);
@@ -45,6 +45,12 @@ const piperTTS = async (
       }
 
       try {
+        // get sample rate and channels of the generated wav file
+        const originalBuffer = fs.readFileSync(tempWavFile);
+        const header = originalBuffer.subarray(0, 44);
+        const originalSampleRate = header.readUInt32LE(24);
+        const originalChannels = header.readUInt16LE(22);
+
         // use sox to convert wav to 24kHz, 16bit, stereo
         await new Promise<void>((res, rej) => {
             
@@ -53,9 +59,9 @@ const piperTTS = async (
             "0.9",
             tempWavFile,
             "-r",
-            "24000",
+            originalSampleRate.toString(),
             "-c",
-            "2",
+            originalChannels.toString(),
             convertedWavFile,
           ]);
 
@@ -71,16 +77,11 @@ const piperTTS = async (
           });
         });
 
-        const buffer = fs.readFileSync(convertedWavFile);
         const duration = (await getAudioDurationInSeconds(convertedWavFile)) * 1000;
-
         // Clean up temp file
-        fs.unlinkSync(convertedWavFile);
-
-        // remove wav header, otherwise playback process will stop automatically
-        const headerSize = 44;
-        const trimmedBuffer = buffer.subarray(headerSize);
-        resolve({ data: trimmedBuffer, duration });
+        // fs.unlinkSync(convertedWavFile);
+        
+        resolve({ data: convertedWavFile, duration });
       } catch (error) {
         // reject(error);
         console.log("Error processing Piper output:", `"${text}"`, error);

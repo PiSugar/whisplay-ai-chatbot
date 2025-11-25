@@ -29,16 +29,10 @@ const playAllWavFiles = async () => {
     // const headerSize = 44;
     // const trimmedBuffer = buffer.subarray(headerSize);
     await new Promise<void>(async (resolve, reject) => {
-      const process = spawn("play", [
-        "-f",
-        "S16_LE",
-        "-c",
-        "1",
-        "-r",
-        "24000",
+      const process = spawn("aplay", [
+        filePath,
         "-D",
         `hw:${soundCardIndex},0`,
-        filePath
       ]);
       process.on("close", (code: number) => {
         if (code !== 0) {
@@ -49,10 +43,10 @@ const playAllWavFiles = async () => {
           resolve();
         }
       });
+    }).catch((error) => {
+      console.error("Error during playback:", error);
     });
   }
 };
 
-setTimeout(() => {
-  playAllWavFiles();
-}, 6000);
+playAllWavFiles();
