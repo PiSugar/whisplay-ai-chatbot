@@ -15,7 +15,9 @@ const piperTTS = async (
   text: string
 ): Promise<{ data: Buffer; duration: number }> => {
   return new Promise((resolve, reject) => {
-    const tempWavFile = path.join(ttsDir, `piper_${Date.now()}.wav`);
+    const now = Date.now();
+    const tempWavFile = path.join(ttsDir, `piper_${now}.wav`);
+    const convertedWavFile = path.join(ttsDir, `piper_${now}_converted.wav`);
     const piperProcess = spawn(piperBinaryPath, [
       "--model",
       piperModelPath,
@@ -43,11 +45,37 @@ const piperTTS = async (
       }
 
       try {
-        const buffer = fs.readFileSync(tempWavFile);
-        const duration = (await getAudioDurationInSeconds(tempWavFile)) * 1000;
+        // 使用sox将文件转为采样率24000Hz的双声道WAV文件
+        await new Promise<void>((res, rej) => {
+            
+          const soxProcess = spawn("sox", [
+            "-v",
+            "0.9",
+            tempWavFile,
+            "-r",
+            "24000",
+            "-c",
+            "1",
+            convertedWavFile,
+          ]);
+
+          soxProcess.on("close", (soxCode: number) => {
+            if (soxCode !== 0) {
+              console.error(`Sox process exited with code ${soxCode}`);
+              rej(new Error(`Sox process exited with code ${soxCode}`));
+            } else {
+              // Replace original file with converted file
+              fs.unlinkSync(tempWavFile);
+              res();
+            }
+          });
+        });
+
+        const buffer = fs.readFileSync(convertedWavFile);
+        const duration = (await getAudioDurationInSeconds(convertedWavFile)) * 1000;
 
         // Clean up temp file
-        fs.unlinkSync(tempWavFile);
+        fs.unlinkSync(convertedWavFile);
 
         // remove wav header, otherwise playback process will stop automatically
         const headerSize = 44;

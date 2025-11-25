@@ -11,18 +11,9 @@ const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
 
-const getSampleRate = (server: TTSServer): number => {
-  if (server === TTSServer.gemini) {
-    return 24000;
-  }
-  if (server === TTSServer.piper) {
-    // medium - 22.05Khz 
-    return 22050;
-  }
-  return 24000;
-};
-
-export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(asrServer)
+export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(
+  asrServer
+)
   ? "wav"
   : "mp3";
 
@@ -30,21 +21,27 @@ function startPlayerProcess() {
   if (useWavPlayer) {
     // use sox play for wav files
     return spawn("play", [
-      "-t",
-      "raw", // raw format
-      "-b",
-      "16", // 16-bit
-      "-e",
-      "signed-integer", // signed PCM
-      "-r",
-      '' + getSampleRate(ttsServer), // sample rate
+      "-f",
+      "S16_LE",
       "-c",
-      "1", // mono
+      "1",
+      "-r",
+      "24000",
+      "-D",
+      `hw:${soundCardIndex},0`,
       "-", // read from stdin
     ]);
   } else {
     // use mpg123 for mp3 files
-    return spawn("mpg123", ["-", "--scale", "2", "-o", "alsa", "-a", `hw:${soundCardIndex},0`]);
+    return spawn("mpg123", [
+      "-",
+      "--scale",
+      "2",
+      "-o",
+      "alsa",
+      "-a",
+      `hw:${soundCardIndex},0`,
+    ]);
   }
 }
 
