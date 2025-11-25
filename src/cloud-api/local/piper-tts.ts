@@ -19,6 +19,8 @@ const piperTTS = async (
     const piperProcess = spawn(piperBinaryPath, [
       "--model",
       piperModelPath,
+      "--sentence-silence",
+      "1",
       "--output_file",
       tempWavFile,
     ]);
