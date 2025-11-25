@@ -29,4 +29,6 @@ const playAllWavFiles = async () => {
   }
 };
 
-playAllWavFiles();
+setTimeout(() => {
+  playAllWavFiles();
+}, 6000);
