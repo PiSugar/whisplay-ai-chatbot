@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
+import { getAudioDurationInSeconds } from "get-audio-duration";
 import { spawn } from "child_process";
-import { getWavFileDurationMs } from "../../utils";
 import dotenv from "dotenv";
 import { ttsDir } from "../../utils/dir";
 
@@ -42,7 +42,7 @@ const piperTTS = async (
 
       try {
         const buffer = fs.readFileSync(tempWavFile);
-        const duration = getWavFileDurationMs(buffer);
+        const duration = (await getAudioDurationInSeconds(tempWavFile)) * 1000;
 
         // Clean up temp file
         fs.unlinkSync(tempWavFile);

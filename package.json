@@ -17,6 +17,7 @@
     "axios": "^1.8.4",
     "crypto": "^1.0.1",
     "dotenv": "^16.5.0",
+    "get-audio-duration": "^4.0.1",
     "https-proxy-agent": "^7.0.6",
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
