@@ -1,4 +1,7 @@
-import { getPcmWavDurationMs } from "../../utils";
+import path from "path";
+import getAudioDurationInSeconds from "get-audio-duration";
+import { savePcmAsWav } from "../../utils";
+import { ttsDir } from "../../utils/dir";
 import {
   geminiTTSSpeaker,
   geminiTTSModel,
@@ -11,7 +14,7 @@ dotenv.config();
 
 const geminiTTS = async (
   text: string
-): Promise<{ data: Buffer; duration: number; }> => {
+): Promise<{ data: Buffer | string; duration: number; }> => {
   try {
     if (!gemini) {
       console.error("Google Gemini API key is not set.");
@@ -45,13 +48,13 @@ const geminiTTS = async (
 
     const buffer = Buffer.from(audioData, "base64");
 
+    // save file to ttsDir
+    const filePath = path.join(ttsDir, `gemini_tts_${Date.now()}.wav`);
+    savePcmAsWav(buffer, filePath, 24000, 1);
+
     return {
-      data: buffer,
-      duration: getPcmWavDurationMs(buffer, {
-        channels: 1,
-        sampleRate: 24000,
-        sampleWidth: 2,
-      }) + 800, // add 800ms buffer to avoid cut-off
+      data: filePath,
+      duration: await getAudioDurationInSeconds(filePath) * 1000, // add 800ms buffer to avoid cut-off
     };
   } catch (error) {
     console.error("Gemini TTS error:", error);

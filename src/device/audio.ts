@@ -1,5 +1,5 @@
 import { exec, spawn, ChildProcess } from "child_process";
-import { isEmpty, noop } from "lodash";
+import { isEmpty, noop, set } from "lodash";
 import { killAllProcesses } from "../utils";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
@@ -10,29 +10,39 @@ dotenv.config();
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
-export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(asrServer)
+
+export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(
+  asrServer
+)
   ? "wav"
   : "mp3";
 
 function startPlayerProcess() {
   if (useWavPlayer) {
+    return null;
     // use sox play for wav files
-    return spawn("play", [
-      "-t",
-      "raw", // raw format
-      "-b",
-      "16", // 16-bit
-      "-e",
-      "signed-integer", // signed PCM
-      "-r",
-      "24000", // sample rate
-      "-c",
-      "1", // mono
-      "-", // read from stdin
-    ]);
+    // return spawn("play", [
+    //   "-f",
+    //   "S16_LE",
+    //   "-c",
+    //   "1",
+    //   "-r",
+    //   "24000",
+    //   "-D",
+    //   `hw:${soundCardIndex},0`,
+    //   "-", // read from stdin
+    // ]);
   } else {
     // use mpg123 for mp3 files
-    return spawn("mpg123", ["-", "--scale", "2", "-o", "alsa", "-a", `hw:${soundCardIndex},0`]);
+    return spawn("mpg123", [
+      "-",
+      "--scale",
+      "2",
+      "-o",
+      "alsa",
+      "-a",
+      `hw:${soundCardIndex},0`,
+    ]);
   }
 }
 
@@ -133,14 +143,44 @@ setTimeout(() => {
 }, 5000);
 
 const playAudioData = (
-  resAudioData: string,
+  resAudioData: Buffer | string,
   audioDuration: number
 ): Promise<void> => {
   if (isEmpty(resAudioData) || audioDuration <= 0) {
     console.log("No audio data to play, skipping playback.");
     return Promise.resolve();
   }
-  const audioBuffer = Buffer.from(resAudioData, "base64");
+  // play wav file using aplay
+  if (typeof resAudioData === "string") {
+    const filePath = resAudioData;
+    return Promise.race([
+      new Promise<void>((resolve) => {
+        setTimeout(() => {
+          resolve();
+        }, audioDuration + 1000);
+      }),
+      new Promise<void>((resolve, reject) => {
+        console.log("Playback duration:", audioDuration);
+        player.isPlaying = true;
+        const process = spawn("play", [filePath]);
+        process.on("close", (code: number) => {
+          player.isPlaying = false;
+          if (code !== 0) {
+            console.error(`Audio playback error: ${code}`);
+            reject(code);
+          } else {
+            console.log("Audio playback completed");
+            resolve();
+          }
+        });
+      }),
+    ]).catch((error) => {
+      console.error("Audio playback error:", error);
+    });
+  }
+
+  // play mp3 buffer using mpg123
+  const audioBuffer = Buffer.from(resAudioData as any, "base64");
   return new Promise((resolve, reject) => {
     console.log("Playback duration:", audioDuration);
     player.isPlaying = true;

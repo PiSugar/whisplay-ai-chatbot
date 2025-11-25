@@ -76,9 +76,7 @@ class ChatFlow {
 
   partialThinkingCallback = (
     partialThinking: string,
-    answerId: number
   ): void => {
-    if (this.currentFlowName !== "answer" || answerId < this.answerId) return;
     this.partialThinking += partialThinking;
     const { sentences, remaining } = splitSentences(this.partialThinking);
     if (sentences.length > 0) {
@@ -133,6 +131,7 @@ class ChatFlow {
         });
         break;
       case "listening":
+        this.answerId += 1;
         this.currentFlowName = "listening";
         this.currentRecordFilePath = `${
           this.recordingsDir
@@ -198,7 +197,6 @@ class ChatFlow {
           RGB: "#00c8a3",
         });
         this.currentFlowName = "answer";
-        this.answerId += 1;
         const currentAnswerId = this.answerId;
         onButtonPressed(() => {
           this.setCurrentFlow("listening");
@@ -219,10 +217,13 @@ class ChatFlow {
               content: this.asrText,
             },
           ],
-          (text) => partial(text, currentAnswerId),
-          () => endPartial(currentAnswerId),
+          (text) =>
+            currentAnswerId === this.answerId && partial(text),
+          () =>
+            currentAnswerId === this.answerId && endPartial(),
           (partialThinking) =>
-            this.partialThinkingCallback(partialThinking, currentAnswerId),
+            currentAnswerId === this.answerId &&
+            this.partialThinkingCallback(partialThinking),
           (functionName: string, result?: string) => {
             if (result) {
               display({

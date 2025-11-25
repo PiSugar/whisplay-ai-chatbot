@@ -3,7 +3,7 @@ import { get, isArray } from "lodash";
 import { FunctionCall } from "../type";
 import moment from "moment";
 import { exec } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import mp3Duration from "mp3-duration";
 
 // 输入 [[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]]
@@ -119,12 +119,16 @@ export function getPcmWavDurationMs(
 export function getWavFileDurationMs(buffer: Buffer<ArrayBuffer>): number {
   // WAV 文件头部信息在前 44 字节
   const header = buffer.subarray(0, 44);
-  // const channels = header.readUInt16LE(22); // 通道数
-  // const sampleRate = header.readUInt32LE(24); // 采样率
-  const byteRate = header.readUInt32LE(28); // 字节率
-  const dataLength = buffer.length - 44; // 音频数据长度
-  const durationSeconds = dataLength / byteRate;
-  return Math.round(durationSeconds * 1000);
+  const channels = header.readUInt16LE(22); // 通道数
+  const sampleRate = header.readUInt32LE(24); // 采样率
+  const sampleWidth = header.readUInt16LE(34) / 8; // 每个采样字节数（位深度除以8）
+  const body = buffer.subarray(44);
+
+  return getPcmWavDurationMs(body, {
+    sampleRate,
+    channels,
+    sampleWidth,
+  });
 }
 
 export const killAllProcesses = (pid: number) => {
@@ -194,10 +198,63 @@ export const getRecordFileDurationMs = async (
     if (format === "wav") {
       return getWavFileDurationMs(data);
     } else if (format === "mp3") {
-      return await mp3Duration(data) * 1000;
+      return (await mp3Duration(data)) * 1000;
     }
   } catch (error) {
     return 0;
   }
   return 0;
 };
+
+export function pcmToWav(
+  pcmBuffer: Buffer,
+  sampleRate = 24000,
+  numChannels = 1
+) {
+  const bytesPerSample = 2; // LINEAR16 = 16bit = 2 bytes
+  const byteRate = sampleRate * numChannels * bytesPerSample;
+
+  const header = Buffer.alloc(44);
+
+  // ChunkID "RIFF"
+  header.write("RIFF", 0);
+  // ChunkSize = 36 + SubChunk2Size
+  header.writeUInt32LE(36 + pcmBuffer.length, 4);
+  // Format "WAVE"
+  header.write("WAVE", 8);
+
+  // Subchunk1ID "fmt "
+  header.write("fmt ", 12);
+  // Subchunk1Size = 16 for PCM
+  header.writeUInt32LE(16, 16);
+  // AudioFormat = 1 (PCM)
+  header.writeUInt16LE(1, 20);
+  // NumChannels
+  header.writeUInt16LE(numChannels, 22);
+  // SampleRate
+  header.writeUInt32LE(sampleRate, 24);
+  // ByteRate
+  header.writeUInt32LE(byteRate, 28);
+  // BlockAlign
+  header.writeUInt16LE(numChannels * bytesPerSample, 32);
+  // BitsPerSample
+  header.writeUInt16LE(bytesPerSample * 8, 34);
+
+  // Subchunk2ID "data"
+  header.write("data", 36);
+  // Subchunk2Size = pcmBuffer.length
+  header.writeUInt32LE(pcmBuffer.length, 40);
+
+  return Buffer.concat([header, pcmBuffer]);
+}
+
+export function savePcmAsWav(
+  pcmBuffer: Buffer,
+  outputPath: string,
+  sampleRate = 24000,
+  numOfChannels = 1
+) {
+  const wavBuffer = pcmToWav(pcmBuffer, sampleRate, numOfChannels);
+  writeFileSync(outputPath, wavBuffer);
+  console.log("Saved WAV:", outputPath);
+}

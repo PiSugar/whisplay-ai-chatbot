@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
+import { getAudioDurationInSeconds } from "get-audio-duration";
 import { spawn } from "child_process";
-import { getWavFileDurationMs } from "../../utils";
 import dotenv from "dotenv";
 import { ttsDir } from "../../utils/dir";
 
@@ -13,12 +13,16 @@ const piperModelPath =
 
 const piperTTS = async (
   text: string
-): Promise<{ data: Buffer; duration: number }> => {
+): Promise<{ data: Buffer | string; duration: number }> => {
   return new Promise((resolve, reject) => {
-    const tempWavFile = path.join(ttsDir, `piper_${Date.now()}.wav`);
+    const now = Date.now();
+    const tempWavFile = path.join(ttsDir, `piper_${now}.wav`);
+    const convertedWavFile = path.join(ttsDir, `piper_${now}_converted.wav`);
     const piperProcess = spawn(piperBinaryPath, [
       "--model",
       piperModelPath,
+      "--sentence-silence",
+      "1",
       "--output_file",
       tempWavFile,
     ]);
@@ -41,16 +45,43 @@ const piperTTS = async (
       }
 
       try {
-        const buffer = fs.readFileSync(tempWavFile);
-        const duration = getWavFileDurationMs(buffer);
+        // get sample rate and channels of the generated wav file
+        const originalBuffer = fs.readFileSync(tempWavFile);
+        const header = originalBuffer.subarray(0, 44);
+        const originalSampleRate = header.readUInt32LE(24);
+        const originalChannels = header.readUInt16LE(22);
 
+        // use sox to convert wav to 24kHz, 16bit, stereo
+        await new Promise<void>((res, rej) => {
+            
+          const soxProcess = spawn("sox", [
+            "-v",
+            "0.9",
+            tempWavFile,
+            "-r",
+            originalSampleRate.toString(),
+            "-c",
+            originalChannels.toString(),
+            convertedWavFile,
+          ]);
+
+          soxProcess.on("close", (soxCode: number) => {
+            if (soxCode !== 0) {
+              console.error(`Sox process exited with code ${soxCode}`);
+              rej(new Error(`Sox process exited with code ${soxCode}`));
+            } else {
+              // Replace original file with converted file
+              fs.unlinkSync(tempWavFile);
+              res();
+            }
+          });
+        });
+
+        const duration = (await getAudioDurationInSeconds(convertedWavFile)) * 1000;
         // Clean up temp file
-        fs.unlinkSync(tempWavFile);
-
-        // remove wav header, otherwise playback process will stop automatically
-        const headerSize = 44;
-        const trimmedBuffer = buffer.subarray(headerSize);
-        resolve({ data: trimmedBuffer, duration });
+        // fs.unlinkSync(convertedWavFile);
+        
+        resolve({ data: convertedWavFile, duration });
       } catch (error) {
         // reject(error);
         console.log("Error processing Piper output:", `"${text}"`, error);
