@@ -32,7 +32,7 @@ export class StreamResponser {
     this.textCallback = textCallback;
   }
 
-  private playAudioInOrder = async (answerId: number): Promise<void> => {
+  private playAudioInOrder = async (): Promise<void> => {
     let currentIndex = 0;
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
@@ -60,17 +60,10 @@ export class StreamResponser {
         this.speakArray = [];
       }
     };
-    if (this.answerId !== answerId) {
-      return;
-    }
     playNext();
   };
 
-  partial = (text: string, answerId: number): void => {
-    if (answerId < this.answerId) {
-      return;
-    }
-    this.answerId = answerId;
+  partial = (text: string): void => {
     this.partialContent += text;
     // replace newlines with spaces
     this.partialContent = this.partialContent.replace(/\n/g, " ");
@@ -86,7 +79,7 @@ export class StreamResponser {
         ...filteredSentences.map((item) =>
           this.ttsFunc(item).finally(() => {
             if (!this.isStartSpeak) {
-              this.playAudioInOrder(answerId);
+              this.playAudioInOrder();
               this.isStartSpeak = true;
             }
           })
@@ -96,11 +89,7 @@ export class StreamResponser {
     this.partialContent = remaining;
   };
 
-  endPartial = (answerId: number): void => {
-    if (answerId < this.answerId) {
-      return;
-    }
-    this.answerId = answerId;
+  endPartial = (): void => {
     if (this.partialContent) {
       this.parsedSentences.push(this.partialContent);
       this.sentencesCallback?.(this.parsedSentences);
@@ -114,7 +103,7 @@ export class StreamResponser {
         this.speakArray.push(
           this.ttsFunc(text).finally(() => {
             if (!this.isStartSpeak) {
-              this.playAudioInOrder(answerId);
+              this.playAudioInOrder();
               this.isStartSpeak = true;
             }
           })
