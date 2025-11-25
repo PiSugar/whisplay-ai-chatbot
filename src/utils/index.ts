@@ -121,12 +121,13 @@ export function getWavFileDurationMs(buffer: Buffer<ArrayBuffer>): number {
   const header = buffer.subarray(0, 44);
   const channels = header.readUInt16LE(22); // 通道数
   const sampleRate = header.readUInt32LE(24); // 采样率
-  const byteRate = header.readUInt32LE(28); // 字节率
+  const sampleWidth = header.readUInt16LE(34) / 8; // 每个采样字节数（位深度除以8）
   const body = buffer.subarray(44);
 
   return getPcmWavDurationMs(body, {
-    sampleRate: sampleRate,
-    channels: channels,
+    sampleRate,
+    channels,
+    sampleWidth,
   });
 }
 
@@ -197,7 +198,7 @@ export const getRecordFileDurationMs = async (
     if (format === "wav") {
       return getWavFileDurationMs(data);
     } else if (format === "mp3") {
-      return await mp3Duration(data) * 1000;
+      return (await mp3Duration(data)) * 1000;
     }
   } catch (error) {
     return 0;

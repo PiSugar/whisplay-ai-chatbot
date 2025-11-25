@@ -10,6 +10,18 @@ dotenv.config();
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
+
+const getSampleRate = (server: TTSServer): number => {
+  if (server === TTSServer.gemini) {
+    return 24000;
+  }
+  if (server === TTSServer.piper) {
+    // medium - 22.05Khz 
+    return 22050;
+  }
+  return 24000;
+};
+
 export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(asrServer)
   ? "wav"
   : "mp3";
@@ -21,7 +33,7 @@ function startPlayerProcess() {
       "-t",
       "raw", // raw format
       "-b",
-      "16", // 16-bit
+      '' + getSampleRate(ttsServer),
       "-e",
       "signed-integer", // signed PCM
       "-r",
