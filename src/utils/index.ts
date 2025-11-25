@@ -119,12 +119,15 @@ export function getPcmWavDurationMs(
 export function getWavFileDurationMs(buffer: Buffer<ArrayBuffer>): number {
   // WAV 文件头部信息在前 44 字节
   const header = buffer.subarray(0, 44);
-  // const channels = header.readUInt16LE(22); // 通道数
-  // const sampleRate = header.readUInt32LE(24); // 采样率
+  const channels = header.readUInt16LE(22); // 通道数
+  const sampleRate = header.readUInt32LE(24); // 采样率
   const byteRate = header.readUInt32LE(28); // 字节率
-  const dataLength = buffer.length - 44; // 音频数据长度
-  const durationSeconds = dataLength / byteRate;
-  return Math.round(durationSeconds * 1000);
+  const body = buffer.subarray(44);
+
+  return getPcmWavDurationMs(body, {
+    sampleRate: sampleRate,
+    channels: channels,
+  });
 }
 
 export const killAllProcesses = (pid: number) => {
