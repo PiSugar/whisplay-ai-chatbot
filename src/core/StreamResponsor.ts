@@ -32,7 +32,7 @@ export class StreamResponser {
     this.textCallback = textCallback;
   }
 
-  private playAudioInOrder = async (): Promise<void> => {
+  private playAudioInOrder = async (answerId: number): Promise<void> => {
     let currentIndex = 0;
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
@@ -60,6 +60,9 @@ export class StreamResponser {
         this.speakArray = [];
       }
     };
+    if (this.answerId !== answerId) {
+      return;
+    }
     playNext();
   };
 
@@ -83,7 +86,7 @@ export class StreamResponser {
         ...filteredSentences.map((item) =>
           this.ttsFunc(item).finally(() => {
             if (!this.isStartSpeak) {
-              this.playAudioInOrder();
+              this.playAudioInOrder(answerId);
               this.isStartSpeak = true;
             }
           })
@@ -111,7 +114,7 @@ export class StreamResponser {
         this.speakArray.push(
           this.ttsFunc(text).finally(() => {
             if (!this.isStartSpeak) {
-              this.playAudioInOrder();
+              this.playAudioInOrder(answerId);
               this.isStartSpeak = true;
             }
           })
