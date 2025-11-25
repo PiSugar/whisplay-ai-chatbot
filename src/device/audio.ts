@@ -152,6 +152,7 @@ const playAudioData = (
   }
   // play wav file using aplay
   if (typeof resAudioData === "string") {
+    const filePath = resAudioData;
     return Promise.race([
       new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -161,11 +162,7 @@ const playAudioData = (
       new Promise<void>((resolve, reject) => {
         console.log("Playback duration:", audioDuration);
         player.isPlaying = true;
-        const process = spawn("aplay", [
-          resAudioData,
-          "-D",
-          `hw:${soundCardIndex},0`,
-        ]);
+        const process = spawn("play", [filePath]);
         process.on("close", (code: number) => {
           player.isPlaying = false;
           if (code !== 0) {
@@ -181,7 +178,7 @@ const playAudioData = (
       console.error("Audio playback error:", error);
     });
   }
-  
+
   // play mp3 buffer using mpg123
   const audioBuffer = Buffer.from(resAudioData as any, "base64");
   return new Promise((resolve, reject) => {
