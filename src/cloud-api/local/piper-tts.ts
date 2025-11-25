@@ -45,7 +45,7 @@ const piperTTS = async (
       }
 
       try {
-        // 使用sox将文件转为采样率24000Hz的双声道WAV文件
+        // use sox to convert wav to 24kHz, 16bit, stereo
         await new Promise<void>((res, rej) => {
             
           const soxProcess = spawn("sox", [
@@ -55,7 +55,7 @@ const piperTTS = async (
             "-r",
             "24000",
             "-c",
-            "1",
+            "2",
             convertedWavFile,
           ]);
 
