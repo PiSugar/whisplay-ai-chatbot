@@ -13,14 +13,12 @@ export class StreamResponser {
   private sentencesCallback?: SentencesCallback;
   private textCallback?: TextCallback;
   private partialContent: string = "";
-  private isStartSpeak: boolean = false;
   private playEndResolve: () => void = () => {};
   private speakArray: Promise<{
     data: Buffer;
     duration: number;
   }>[] = [];
   private parsedSentences: string[] = [];
-  private answerId: number = 0;
 
   constructor(
     ttsFunc: TTSFunc,
@@ -55,7 +53,6 @@ export class StreamResponser {
           `Play all audio completed. Total: ${this.speakArray.length}`
         );
         this.playEndResolve();
-        this.isStartSpeak = false;
         this.speakArray.length = 0;
         this.speakArray = [];
       }
@@ -75,12 +72,12 @@ export class StreamResponser {
       const filteredSentences = sentences
         .map(purifyTextForTTS)
         .filter((item) => item !== "");
+      const length = this.speakArray.length;
       this.speakArray.push(
-        ...filteredSentences.map((item) =>
+        ...filteredSentences.map((item, index) =>
           this.ttsFunc(item).finally(() => {
-            if (!this.isStartSpeak) {
+            if (length === 0 && index === 0) {
               this.playAudioInOrder();
-              this.isStartSpeak = true;
             }
           })
         )
@@ -100,11 +97,11 @@ export class StreamResponser {
       );
       if (this.partialContent.trim() !== "") {
         const text = purifyTextForTTS(this.partialContent);
+        const isStart = this.speakArray.length === 0;
         this.speakArray.push(
           this.ttsFunc(text).finally(() => {
-            if (!this.isStartSpeak) {
+            if (!isStart) {
               this.playAudioInOrder();
-              this.isStartSpeak = true;
             }
           })
         );
@@ -124,11 +121,9 @@ export class StreamResponser {
   stop = (): void => {
     this.speakArray = [];
     this.speakArray.length = 0;
-    this.isStartSpeak = false;
     this.partialContent = "";
     this.parsedSentences.length = 0;
     this.playEndResolve();
-    this.answerId = 0;
     stopPlaying();
   };
 }
