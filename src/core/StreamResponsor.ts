@@ -4,7 +4,7 @@ import { playAudioData, stopPlaying } from "../device/audio";
 
 dotenv.config();
 
-type TTSFunc = (text: string) => Promise<{ data: string; duration: number }>;
+type TTSFunc = (text: string) => Promise<{ data: Buffer; duration: number }>;
 type SentencesCallback = (sentences: string[]) => void;
 type TextCallback = (text: string) => void;
 
@@ -16,7 +16,7 @@ export class StreamResponser {
   private isStartSpeak: boolean = false;
   private playEndResolve: () => void = () => {};
   private speakArray: Promise<{
-    data: string;
+    data: Buffer;
     duration: number;
   }>[] = [];
   private parsedSentences: string[] = [];

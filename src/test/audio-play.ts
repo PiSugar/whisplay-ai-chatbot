@@ -25,7 +25,7 @@ const playAllWavFiles = async () => {
     const duration = (await getAudioDurationInSeconds(filePath)) * 1000;
     const headerSize = 44;
     const trimmedBuffer = buffer.subarray(headerSize);
-    await playAudioData(trimmedBuffer.toString("base64"), duration);
+    await playAudioData(trimmedBuffer, duration);
   }
 };
 

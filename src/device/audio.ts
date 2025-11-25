@@ -142,14 +142,14 @@ setTimeout(() => {
 }, 5000);
 
 const playAudioData = (
-  resAudioData: string,
+  resAudioData: Buffer,
   audioDuration: number
 ): Promise<void> => {
   if (isEmpty(resAudioData) || audioDuration <= 0) {
     console.log("No audio data to play, skipping playback.");
     return Promise.resolve();
   }
-  const audioBuffer = Buffer.from(resAudioData, "base64");
+  const audioBuffer = Buffer.from(resAudioData as any, "base64");
   return new Promise((resolve, reject) => {
     console.log("Playback duration:", audioDuration);
     player.isPlaying = true;
