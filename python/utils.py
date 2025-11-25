@@ -112,7 +112,7 @@ class EmojiUtils:
     filename = EmojiUtils.emoji_to_filename(char)
     path = os.path.join("emoji_svg", filename)
     if not os.path.exists(path):
-      print(f"[警告] 找不到 SVG 图标: {path}")
+      # print(f"[警告] 找不到 SVG 图标: {path}")
       return None
     try:
       png_bytes = cairosvg.svg2png(url=path, output_width=size, output_height=size)
