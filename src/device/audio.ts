@@ -33,11 +33,11 @@ function startPlayerProcess() {
       "-t",
       "raw", // raw format
       "-b",
-      '' + getSampleRate(ttsServer),
+      "16", // 16-bit
       "-e",
       "signed-integer", // signed PCM
       "-r",
-      "24000", // sample rate
+      '' + getSampleRate(ttsServer), // sample rate
       "-c",
       "1", // mono
       "-", // read from stdin
