@@ -139,6 +139,7 @@ export class StreamResponser {
     this.partialContent = "";
     this.parsedSentences.length = 0;
     this.playEndResolve();
+    this.answerId = 0;
     stopPlaying();
   };
 }
