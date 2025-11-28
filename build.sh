@@ -4,6 +4,13 @@ NVM_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/nvm/v$NVM_VERSION.tar
 NPM_REGISTRY="https://registry.npmmirror.com"
 NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v18.19.1.sh"
 
+# if file use_npm exists and is true, use npm
+if [ -f "use_npm" ]; then
+  use_npm=true
+else
+  use_npm=false
+fi
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -17,5 +24,12 @@ fi
 
 source ~/.bashrc
 
-yarn --registry=$NPM_REGISTRY
-yarn build
+if [ "$use_npm" = true ]; then
+  echo "Using npm to build the project."
+  npm install --registry=$NPM_REGISTRY
+  npm run build
+else
+  echo "Using yarn to build the project."
+  yarn --registry=$NPM_REGISTRY
+  yarn build
+fi

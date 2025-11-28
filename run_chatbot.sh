@@ -53,7 +53,20 @@ if [ "$serve_ollama" = true ]; then
   ollama serve &
 fi
 
-SOUND_CARD_INDEX=$card_index yarn start
+# if file use_npm exists and is true, use npm
+if [ -f "use_npm" ]; then
+  use_npm=true
+else
+  use_npm=false
+fi
+
+if [ "$use_npm" = true ]; then
+  echo "Using npm to start the application..."
+  SOUND_CARD_INDEX=$card_index npm start
+else
+  echo "Using yarn to start the application..."
+  SOUND_CARD_INDEX=$card_index yarn start
+fi
 
 # After the service ends, perform cleanup
 echo "Cleaning up after service..."
