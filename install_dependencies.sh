@@ -30,7 +30,8 @@ pip install -r requirements.txt --break-system-packages
 # download fonts and emojis
 wget https://cdn.pisugar.com/EchoView/NotoSansSC-Bold.ttf
 wget https://cdn.pisugar.com/EchoView/emoji_svg.zip
-unzip emoji_svg.zip 
+# overwrite if exists
+unzip -o emoji_svg.zip
 cd ..
 
 
