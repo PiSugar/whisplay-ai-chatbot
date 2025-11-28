@@ -19,6 +19,7 @@ export class StreamResponser {
     duration: number;
   }>[] = [];
   private parsedSentences: string[] = [];
+  private isPlaying: boolean = false;
 
   constructor(
     ttsFunc: TTSFunc,
@@ -31,9 +32,11 @@ export class StreamResponser {
   }
 
   private playAudioInOrder = async (): Promise<void> => {
+    if (this.isPlaying) return;
     let currentIndex = 0;
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
+        this.isPlaying = true;
         try {
           const { data: audio, duration } = await this.speakArray[currentIndex];
           console.log(
@@ -55,6 +58,7 @@ export class StreamResponser {
         this.playEndResolve();
         this.speakArray.length = 0;
         this.speakArray = [];
+        this.isPlaying = false;
       }
     };
     playNext();
@@ -97,10 +101,9 @@ export class StreamResponser {
       );
       if (this.partialContent.trim() !== "") {
         const text = purifyTextForTTS(this.partialContent);
-        const isStart = this.speakArray.length === 0;
         this.speakArray.push(
           this.ttsFunc(text).finally(() => {
-            if (!isStart) {
+            if (!this.isPlaying) {
               this.playAudioInOrder();
             }
           })
@@ -124,6 +127,7 @@ export class StreamResponser {
     this.partialContent = "";
     this.parsedSentences.length = 0;
     this.playEndResolve();
+    this.isPlaying = false;
     stopPlaying();
   };
 }
