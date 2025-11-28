@@ -10,3 +10,5 @@ dist
 python/__pycache__/
 chatbot.log
 use_ollama
+use_npm
+package-lock.json

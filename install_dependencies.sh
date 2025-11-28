@@ -4,6 +4,13 @@ NVM_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/nvm/v$NVM_VERSION.tar
 NPM_REGISTRY="https://registry.npmmirror.com"
 NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v20.19.5.sh"
 
+# read parameters --use-npm
+if [ -f "use_npm" ]; then
+  use_npm=true
+else
+  use_npm=false
+fi
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -140,7 +147,7 @@ if ! command_exists npm; then
 fi
 
 # check if yarn is installed
-if ! command_exists yarn; then
+if [ "$use_npm" = false ] && ! command_exists yarn; then
     echo "yarn is not installed. Installing yarn..."
     npm config set registry $NPM_REGISTRY
     npm install -g yarn
@@ -160,4 +167,10 @@ fi
 #sudo ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npx" "/usr/local/bin/npx"
 
 echo "Installing Node.js dependencies..."
-yarn
+if [ "$use_npm" = true ]; then
+    echo "Using npm to install dependencies."
+    npm i --registry=$NPM_REGISTRY
+else
+    echo "Using yarn to install dependencies."
+    yarn --registry=$NPM_REGISTRY
+fi
