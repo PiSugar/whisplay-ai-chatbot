@@ -32,6 +32,7 @@ export class StreamResponser {
   }
 
   private playAudioInOrder = async (): Promise<void> => {
+    if (this.isPlaying) return;
     let currentIndex = 0;
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
