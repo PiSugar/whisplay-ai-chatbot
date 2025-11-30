@@ -103,7 +103,9 @@ The chatbot saves conversation history and generated images in the `data` folder
 
 ## Enclosure
 
-[Whisplay Chatbot Case](https://github.com/PiSugar/suit-cases/tree/main/pisugar3-whisplay-chatbot)
+[Whisplay Chatbot Case for Pi02](https://github.com/PiSugar/suit-cases/tree/main/pisugar3-whisplay-chatbot)
+[Whisplay Chatbot Case for Pi5](https://github.com/PiSugar/suit-cases/tree/main/pi5-whisplay-chatbot)
+
 
 ## Goals
 
