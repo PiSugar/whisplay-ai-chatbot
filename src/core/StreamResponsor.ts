@@ -63,7 +63,6 @@ export class StreamResponser {
         this.playEndResolve();
         this.speakArray.length = 0;
         this.speakArray = [];
-        this.isPlaying = false;
       }
     };
     playNext();
@@ -133,7 +132,6 @@ export class StreamResponser {
     this.parsedSentences.length = 0;
     this.isPlaying = false;
     this.playEndResolve();
-    this.isPlaying = false;
     stopPlaying();
   };
 }
