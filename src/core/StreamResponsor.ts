@@ -32,7 +32,11 @@ export class StreamResponser {
   }
 
   private playAudioInOrder = async (): Promise<void> => {
-    if (this.isPlaying) return;
+    // Prevent multiple concurrent calls
+    if (this.isPlaying) {
+      console.log("Audio playback already in progress, skipping duplicate call");
+      return;
+    }
     let currentIndex = 0;
     const playNext = async () => {
       if (currentIndex < this.speakArray.length) {
@@ -55,6 +59,7 @@ export class StreamResponser {
         console.log(
           `Play all audio completed. Total: ${this.speakArray.length}`
         );
+        this.isPlaying = false;
         this.playEndResolve();
         this.speakArray.length = 0;
         this.speakArray = [];
@@ -126,6 +131,7 @@ export class StreamResponser {
     this.speakArray.length = 0;
     this.partialContent = "";
     this.parsedSentences.length = 0;
+    this.isPlaying = false;
     this.playEndResolve();
     this.isPlaying = false;
     stopPlaying();
