@@ -69,9 +69,9 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialThinkingCallback?: (partialThinking: string) => void,
   invokeFunctionCallback?: (functionName: string, result?: string) => void
 ): Promise<void> => {
-  if (shouldResetChatHistory()) {
-    resetChatHistory();
-  }
+  // if (shouldResetChatHistory()) {
+  //   resetChatHistory();
+  // }
   updateLastMessageTime();
   messages.push(...(inputMessages as OllamaMessage[]));
   let endResolve: () => void = () => {};
@@ -104,15 +104,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           temperature: llm8850llmTemprature,
           "top-k": llm8850llmTopK,
         },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
       )
       .catch((err) => {
         console.error("Error starting generate session:", err.message);
       });
+
+    
 
     // Poll for partial response /api/generate_provider
     responseInterval = setInterval(async () => {
