@@ -10,9 +10,11 @@ const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
 
-export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper, ASRServer.llm8850whisper].includes(
-  asrServer
-)
+export const recordFileFormat = [
+  ASRServer.vosk,
+  ASRServer.whisper,
+  ASRServer.llm8850whisper,
+].includes(asrServer)
   ? "wav"
   : "mp3";
 
@@ -105,20 +107,22 @@ const recordAudioManually = (
       "16000",
       outputPath,
     ]);
-    
+
     recordingProcess.on("error", (err) => {
       killAllRecordingProcesses();
       reject(err);
     });
-    
+
     recordingProcess.stderr?.on("data", (data) => {
       console.error(data.toString());
     });
     recordingProcessList.push(recordingProcess);
     stopFunc = () => {
       killAllRecordingProcesses();
-      resolve(outputPath);
     };
+    recordingProcess.on("exit", () => {
+      resolve(outputPath);
+    });
   });
   return {
     result,
