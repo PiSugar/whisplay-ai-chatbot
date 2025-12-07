@@ -89,25 +89,30 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   // const functionCallsPackages: OllamaFunctionCall[][] = [];
 
   try {
-    if (responseInterval) clearInterval(responseInterval);
-    await axios.get(`${llm8850llmEndpoint}/api/stop`).catch((err) => {
-      console.error("Error stopping previous session:", err.message);
-    });
-    await axios.post(
-      `${llm8850llmEndpoint}/api/generate`,
-      {
-        prompt: inputMessages[0]?.content || "",
-        temperature: llm8850llmTemprature,
-        "top-k": llm8850llmTopK,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
+    if (responseInterval) {
+      clearInterval(responseInterval);
+      await axios.get(`${llm8850llmEndpoint}/api/stop`).catch((err) => {
+        console.error("Error stopping previous session:", err.message);
+      });
+    }
+
+    await axios
+      .post(
+        `${llm8850llmEndpoint}/api/generate`,
+        {
+          prompt: inputMessages[0]?.content || "",
+          temperature: llm8850llmTemprature,
+          "top-k": llm8850llmTopK,
         },
-      }
-    ).catch((err) => {
-      console.error("Error starting generate session:", err.message);
-    });
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      )
+      .catch((err) => {
+        console.error("Error starting generate session:", err.message);
+      });
 
     // Poll for partial response /api/generate_provider
     responseInterval = setInterval(async () => {
