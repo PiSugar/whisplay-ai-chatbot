@@ -143,7 +143,7 @@ export const killAllProcesses = (pid: number) => {
     // 给父进程和所有子进程发送 kill 信号
     const allPids = [pid, ...childPids];
     allPids.forEach((childPid) => {
-      exec(`kill -9 ${childPid}`, (err, stdout, stderr) => {
+      exec(`kill -2 ${childPid}`, (err, stdout, stderr) => {
         if (err) {
           console.error(`Error killing process ${childPid}:`, stderr);
         } else {
