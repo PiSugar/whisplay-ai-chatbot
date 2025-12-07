@@ -16,7 +16,7 @@ export const recognizeAudio = async (
   return axios.post<WhisperResponse>(
     whisperServiceUrl,
     {
-      file_path: audioFilePath,
+      filePath: audioFilePath,
     },
     {
       headers: {
