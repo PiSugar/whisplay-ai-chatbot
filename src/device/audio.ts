@@ -11,7 +11,7 @@ const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
 
-export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(
+export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper, ASRServer.llm8850whisper].includes(
   asrServer
 )
   ? "wav"
