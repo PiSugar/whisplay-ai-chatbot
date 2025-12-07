@@ -18,6 +18,11 @@ export const recognizeAudio = async (
     {
       file_path: audioFilePath,
     },
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
   ).then(response => {
     if (response.data && response.data.recognition) {
       return response.data.recognition;
