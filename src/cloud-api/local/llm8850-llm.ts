@@ -90,8 +90,10 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
   try {
     if (responseInterval) clearInterval(responseInterval);
-    await axios.get(`${llm8850llmEndpoint}/api/stop`, {});
-    const response = await axios.post(
+    await axios.get(`${llm8850llmEndpoint}/api/stop`).catch((err) => {
+      console.error("Error stopping previous session:", err.message);
+    });
+    await axios.post(
       `${llm8850llmEndpoint}/api/generate`,
       {
         prompt: inputMessages[0]?.content || "",
@@ -103,7 +105,9 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           "Content-Type": "application/json",
         },
       }
-    );
+    ).catch((err) => {
+      console.error("Error starting generate session:", err.message);
+    });
 
     // Poll for partial response /api/generate_provider
     responseInterval = setInterval(async () => {
@@ -112,7 +116,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         response: string;
       }>(`${llm8850llmEndpoint}/api/generate_provider`);
       if (partialResponse.data.response) {
-        const { done, response } = partialResponse.data;
+        let { done, response } = partialResponse.data;
+        if (!llm8850enableThinking) {
+          response = response.replace("<think>", "");
+          response = response.replace("</think>", "");
+        }
         partialCallback(response);
         partialAnswer += response;
         if (done) {
