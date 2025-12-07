@@ -1,6 +1,5 @@
 import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop, set } from "lodash";
-import { killAllProcesses } from "../utils";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
 import { ASRServer, TTSServer } from "../type";
@@ -54,7 +53,7 @@ const killAllRecordingProcesses = (): void => {
     console.log("Killing recording process", child.pid);
     try {
       child.stdin?.end();
-      killAllProcesses(child.pid!);
+      child.kill("SIGINT");
     } catch (e) {}
   });
   recordingProcessList.length = 0;
@@ -95,15 +94,27 @@ const recordAudioManually = (
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
-    const recordingProcess = exec(
-      `sox -t alsa default -t ${recordFileFormat} -c 1 -r 16000 ${outputPath}`,
-      (err, stdout, stderr) => {
-        if (err) {
-          killAllRecordingProcesses();
-          reject(stderr);
-        }
-      }
-    );
+    const recordingProcess = spawn("sox", [
+      "-t",
+      "alsa",
+      "default",
+      "-t",
+      recordFileFormat,
+      "-c",
+      "1",
+      "-r",
+      "16000",
+      outputPath,
+    ]);
+    
+    recordingProcess.on("error", (err) => {
+      killAllRecordingProcesses();
+      reject(err);
+    });
+    
+    recordingProcess.stderr?.on("data", (data) => {
+      console.error(data.toString());
+    });
     recordingProcessList.push(recordingProcess);
     stopFunc = () => {
       killAllRecordingProcesses();
