@@ -28,6 +28,7 @@ export enum LLMServer {
   ollama = "ollama",
   gemini = "gemini",
   grok = "grok",
+  llm8850 = "llm8850",
 }
 
 export enum TTSServer {

@@ -37,6 +37,10 @@ import {
   chatWithLLMStream as GrokLLMStream,
   resetChatHistory as GrokResetChatHistory,
 } from "./grok/grok-llm";
+import {
+  chatWithLLMStream as LLM8850LLMStream,
+  resetChatHistory as LLM8850ResetChatHistory,
+} from "./local/llm8850-llm";
 import VolcengineTTS from "./volcengine/volcengine-tts";
 import OpenAITTS from "./openai/openai-tts";
 import geminiTTS from "./gemini/gemini-tts";
@@ -128,9 +132,13 @@ switch (llmServer) {
     chatWithLLMStream = GrokLLMStream;
     resetChatHistory = GrokResetChatHistory;
     break;
+  case LLMServer.llm8850:
+    chatWithLLMStream = LLM8850LLMStream;
+    resetChatHistory = LLM8850ResetChatHistory;
+    break;
   default:
     console.warn(
-      `unknown llm server: ${llmServer}, should be volcengine/openai/gemini/ollama/grok`
+      `unknown llm server: ${llmServer}, should be volcengine/openai/gemini/ollama/grok/llm8850`
     );
     break;
 }
