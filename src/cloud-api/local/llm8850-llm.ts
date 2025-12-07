@@ -86,6 +86,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   });
   let partialAnswer = "";
   let partialThinking = "";
+  let isThinking = false;
   // const functionCallsPackages: OllamaFunctionCall[][] = [];
 
   try {
@@ -97,19 +98,14 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     }
 
     await axios
-      .post(
-        `${llm8850llmEndpoint}/api/generate`,
-        {
-          prompt: inputMessages[0]?.content || "",
-          temperature: llm8850llmTemprature,
-          "top-k": llm8850llmTopK,
-        },
-      )
+      .post(`${llm8850llmEndpoint}/api/generate`, {
+        prompt: inputMessages[0]?.content || "",
+        temperature: llm8850llmTemprature,
+        "top-k": llm8850llmTopK,
+      })
       .catch((err) => {
         console.error("Error starting generate session:", err.message);
       });
-
-    
 
     // Poll for partial response /api/generate_provider
     responseInterval = setInterval(async () => {
@@ -119,12 +115,58 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       }>(`${llm8850llmEndpoint}/api/generate_provider`);
       if (partialResponse.data.response) {
         let { done, response } = partialResponse.data;
-        if (!llm8850enableThinking) {
+        if (llm8850enableThinking) {
+          // Parse thinking tags
+          const thinkStart = response.indexOf("<think>");
+          const thinkEnd = response.indexOf("</think>");
+
+          if (thinkStart !== -1 && thinkEnd !== -1) {
+            // Both tags present
+            const thinkingContent = response.substring(
+              thinkStart + 7,
+              thinkEnd
+            );
+            partialThinking += thinkingContent;
+            if (partialThinkingCallback) {
+              partialThinkingCallback(thinkingContent);
+            }
+            response =
+              response.substring(0, thinkStart) +
+              response.substring(thinkEnd + 8);
+          } else if (thinkStart !== -1) {
+            // Only start tag, everything after is thinking
+            const thinkingContent = response.substring(thinkStart + 7);
+            partialThinking += thinkingContent;
+            if (partialThinkingCallback) {
+              partialThinkingCallback(thinkingContent);
+            }
+            response = response.substring(0, thinkStart);
+            isThinking = true;
+          } else if (thinkEnd !== -1) {
+            // Only end tag, everything before is thinking
+            const thinkingContent = response.substring(0, thinkEnd);
+            partialThinking += thinkingContent;
+            if (partialThinkingCallback) {
+              partialThinkingCallback(thinkingContent);
+            }
+            response = response.substring(thinkEnd + 8);
+            isThinking = false;
+          } else if (isThinking) {
+            // Currently in thinking mode, all content is thinking
+            partialThinking += response;
+            if (partialThinkingCallback) {
+              partialThinkingCallback(response);
+            }
+            response = "";
+          }
+        } else {
           response = response.replace("<think>", "");
           response = response.replace("</think>", "");
         }
-        partialCallback(response);
-        partialAnswer += response;
+        if (response) {
+          partialCallback(response);
+          partialAnswer += response;
+        }
         if (done) {
           if (responseInterval) {
             clearInterval(responseInterval);
