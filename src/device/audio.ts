@@ -52,7 +52,6 @@ const killAllRecordingProcesses = (): void => {
   recordingProcessList.forEach((child) => {
     console.log("Killing recording process", child.pid);
     try {
-      child.stdin?.end();
       child.kill("SIGINT");
     } catch (e) {}
   });
