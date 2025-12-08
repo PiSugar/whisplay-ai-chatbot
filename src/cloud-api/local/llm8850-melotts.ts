@@ -10,7 +10,7 @@ const melottsUrl =
   process.env.MELO_TTS_URL || "http://localhost:8802/synthesize";
 
 const meloTTS = async (
-  text: string
+  sentence: string
 ): Promise<{ data: Buffer | string; duration: number }> => {
   return new Promise((resolve, reject) => {
     const now = Date.now();
@@ -20,7 +20,7 @@ const meloTTS = async (
         success: boolean;
         error?: string;
       }>(melottsUrl, {
-        text: text,
+        sentence,
         outputPath: tempWavFile,
       })
       .then(async (response) => {
