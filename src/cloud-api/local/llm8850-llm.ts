@@ -45,6 +45,8 @@ const resetChatHistory = (): void => {
     system_prompt: `${systemPrompt}${
       !llm8850enableThinking ? "/no_think" : ""
     }`,
+  }).catch(err => {
+    console.error("Error resetting chat history on LLM8850 server:", err.message);
   });
   if (responseInterval) {
     clearInterval(responseInterval);
