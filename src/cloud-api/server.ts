@@ -44,13 +44,14 @@ import {
 import VolcengineTTS from "./volcengine/volcengine-tts";
 import OpenAITTS from "./openai/openai-tts";
 import geminiTTS from "./gemini/gemini-tts";
+import piperTTS from "./local/piper-tts";
+import LLM8850MeloTTS from "./local/llm8850-melotts";
 import {
   ChatWithLLMStreamFunction,
   RecognizeAudioFunction,
   ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
-import piperTTS from "./local/piper-tts";
 
 dotenv.config();
 
@@ -159,9 +160,12 @@ switch (ttsServer) {
   case TTSServer.piper:
     ttsProcessor = piperTTS;
     break;
+  case TTSServer.llm8850melotts:
+    ttsProcessor = LLM8850MeloTTS;
+    break;
   default:
     console.warn(
-      `unknown tts server: ${ttsServer}, should be volcengine/tencent/openai/gemini/piper`
+      `unknown tts server: ${ttsServer}, should be volcengine/tencent/openai/gemini/piper/llm8850melotts`
     );
     break;
 }

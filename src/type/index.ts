@@ -37,6 +37,7 @@ export enum TTSServer {
   tencent = "tencent",
   gemini = "gemini",
   piper = "piper",
+  llm8850melotts = "llm8850melotts",
 }
 
 export enum ImageGenerationServer {
