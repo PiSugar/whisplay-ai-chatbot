@@ -16,6 +16,7 @@ After=network.target
 User=pi
 WorkingDirectory=/home/pi/whisplay-ai-chatbot
 ExecStart=bash /home/pi/whisplay-ai-chatbot/run_chatbot.sh
+Restart=on-failure
 StandardOutput=append:/home/pi/whisplay-ai-chatbot/chatbot.log
 StandardError=append:/home/pi/whisplay-ai-chatbot/chatbot.log
 
