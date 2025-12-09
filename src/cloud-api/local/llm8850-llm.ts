@@ -114,7 +114,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       const partialResponse = await axios.get<{
         done: boolean;
         response: string;
-      }>(`${llm8850llmEndpoint}/api/generate_provider`);
+      }>(`${llm8850llmEndpoint}/api/generate_provider`).catch((err) => {
+        console.error("Error getting partial response:", err.message);
+        return null;
+      });
+      if (!partialResponse) {
+        return;
+      }
       if (partialResponse.data.response) {
         let { done, response } = partialResponse.data;
         if (llm8850enableThinking) {
