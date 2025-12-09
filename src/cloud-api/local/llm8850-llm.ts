@@ -174,6 +174,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             clearInterval(responseInterval);
             responseInterval = null;
           }
+          // Check for SetKVCache failed error to reset chat history
+          // the context may be full, please reset
+          if (partialAnswer.includes('SetKVCache failed')) {
+            resetChatHistory();
+          }
           endResolve();
           endCallback();
         }
