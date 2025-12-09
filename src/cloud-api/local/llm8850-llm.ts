@@ -41,13 +41,18 @@ const messages: OllamaMessage[] = [
 let responseInterval: NodeJS.Timeout | null = null;
 
 const resetChatHistory = (): void => {
-  axios.post(`${llm8850llmEndpoint}/api/reset`, {
-    system_prompt: `${systemPrompt}${
-      !llm8850enableThinking ? "/no_think" : ""
-    }`,
-  }).catch(err => {
-    console.error("Error resetting chat history on LLM8850 server:", err.message);
-  });
+  axios
+    .post(`${llm8850llmEndpoint}/api/reset`, {
+      system_prompt: `${systemPrompt}${
+        !llm8850enableThinking ? "/no_think" : ""
+      }`,
+    })
+    .catch((err) => {
+      console.error(
+        "Error resetting chat history on LLM8850 server:",
+        err.message
+      );
+    });
   if (responseInterval) {
     clearInterval(responseInterval);
     responseInterval = null;
@@ -111,66 +116,61 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
     // Poll for partial response /api/generate_provider
     responseInterval = setInterval(async () => {
-      const partialResponse = await axios.get<{
-        done: boolean;
-        response: string;
-      }>(`${llm8850llmEndpoint}/api/generate_provider`).catch((err) => {
-        console.error("Error getting partial response:", err.message);
-        return null;
-      });
+      const partialResponse = await axios
+        .get<{
+          done: boolean;
+          response: string;
+        }>(`${llm8850llmEndpoint}/api/generate_provider`)
+        .catch((err) => {
+          console.error("Error getting partial response:", err.message);
+          return null;
+        });
       if (!partialResponse) {
         return;
       }
       if (partialResponse.data.response) {
         let { done, response } = partialResponse.data;
-        if (llm8850enableThinking) {
-          // Parse thinking tags
-          const thinkStart = response.indexOf("<think>");
-          const thinkEnd = response.indexOf("</think>");
+        // Parse thinking tags
+        const thinkStart = response.indexOf("<think>");
+        const thinkEnd = response.indexOf("</think>");
 
-          if (thinkStart !== -1 && thinkEnd !== -1) {
-            // Both tags present
-            const thinkingContent = response.substring(
-              thinkStart + 7,
-              thinkEnd
-            );
-            partialThinking += thinkingContent;
-            if (partialThinkingCallback) {
-              partialThinkingCallback(thinkingContent);
-            }
-            response =
-              response.substring(0, thinkStart) +
-              response.substring(thinkEnd + 8);
-          } else if (thinkStart !== -1) {
-            // Only start tag, everything after is thinking
-            const thinkingContent = response.substring(thinkStart + 7);
-            partialThinking += thinkingContent;
-            if (partialThinkingCallback) {
-              partialThinkingCallback(thinkingContent);
-            }
-            response = response.substring(0, thinkStart);
-            isThinking = true;
-          } else if (thinkEnd !== -1) {
-            // Only end tag, everything before is thinking
-            const thinkingContent = response.substring(0, thinkEnd);
-            partialThinking += thinkingContent;
-            if (partialThinkingCallback) {
-              partialThinkingCallback(thinkingContent);
-            }
-            response = response.substring(thinkEnd + 8);
-            isThinking = false;
-          } else if (isThinking) {
-            // Currently in thinking mode, all content is thinking
-            partialThinking += response;
-            if (partialThinkingCallback) {
-              partialThinkingCallback(response);
-            }
-            response = "";
+        if (thinkStart !== -1 && thinkEnd !== -1) {
+          // Both tags present
+          const thinkingContent = response.substring(thinkStart + 7, thinkEnd);
+          partialThinking += thinkingContent;
+          if (partialThinkingCallback) {
+            partialThinkingCallback(thinkingContent);
           }
-        } else {
-          response = response.replace("<think>", "");
-          response = response.replace("</think>", "");
+          response =
+            response.substring(0, thinkStart) +
+            response.substring(thinkEnd + 8);
+        } else if (thinkStart !== -1) {
+          // Only start tag, everything after is thinking
+          const thinkingContent = response.substring(thinkStart + 7);
+          partialThinking += thinkingContent;
+          if (partialThinkingCallback) {
+            partialThinkingCallback(thinkingContent);
+          }
+          response = response.substring(0, thinkStart);
+          isThinking = true;
+        } else if (thinkEnd !== -1) {
+          // Only end tag, everything before is thinking
+          const thinkingContent = response.substring(0, thinkEnd);
+          partialThinking += thinkingContent;
+          if (partialThinkingCallback) {
+            partialThinkingCallback(thinkingContent);
+          }
+          response = response.substring(thinkEnd + 8);
+          isThinking = false;
+        } else if (isThinking) {
+          // Currently in thinking mode, all content is thinking
+          partialThinking += response;
+          if (partialThinkingCallback) {
+            partialThinkingCallback(response);
+          }
+          response = "";
         }
+
         if (response) {
           partialCallback(response);
           partialAnswer += response;
@@ -182,7 +182,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           }
           // Check for SetKVCache failed error to reset chat history
           // the context may be full, please reset
-          if (partialAnswer.includes('SetKVCache failed')) {
+          if (partialAnswer.includes("SetKVCache failed")) {
             resetChatHistory();
           }
           endResolve();
