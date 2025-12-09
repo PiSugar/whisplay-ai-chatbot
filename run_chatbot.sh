@@ -38,6 +38,13 @@ if [ -f ".env" ]; then
     SERVE_OLLAMA=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
     export SERVE_OLLAMA
   fi
+  # CUSTOM_FONT_PATH for displaying text on screen
+  if grep -Eq '^[[:space:]]*CUSTOM_FONT_PATH[[:space:]]*=' .env; then
+    val=$(grep -E '^[[:space:]]*CUSTOM_FONT_PATH[[:space:]]*=' .env | tail -n1 | cut -d'=' -f2-)
+    # trim whitespace and surrounding quotes
+    CUSTOM_FONT_PATH=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+    export CUSTOM_FONT_PATH
+  fi
   echo ".env variables loaded."
   # check if SERVE_OLLAMA is set to true
   if [ "$SERVE_OLLAMA" = "true" ]; then

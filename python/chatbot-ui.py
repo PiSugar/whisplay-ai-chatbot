@@ -463,8 +463,12 @@ def start_socket_server(render_thread, host='0.0.0.0', port=12345):
 if __name__ == "__main__":
     whisplay = WhisplayBoard()
     print(f"[LCD] Initialization finished: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
+    
+    # read CUSTOM_FONT_PATH from environment variable
+    custom_font_path = os.getenv("CUSTOM_FONT_PATH", None)
+    
     # start render thread
-    render_thread = RenderThread(whisplay, "NotoSansSC-Bold.ttf", fps=30)
+    render_thread = RenderThread(whisplay, custom_font_path or "NotoSansSC-Bold.ttf", fps=30)
     render_thread.start()
     start_socket_server(render_thread, host='0.0.0.0', port=12345)
     
