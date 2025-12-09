@@ -41,13 +41,18 @@ const messages: OllamaMessage[] = [
 let responseInterval: NodeJS.Timeout | null = null;
 
 const resetChatHistory = (): void => {
-  axios.post(`${llm8850llmEndpoint}/api/reset`, {
-    system_prompt: `${systemPrompt}${
-      !llm8850enableThinking ? "/no_think" : ""
-    }`,
-  }).catch(err => {
-    console.error("Error resetting chat history on LLM8850 server:", err.message);
-  });
+  axios
+    .post(`${llm8850llmEndpoint}/api/reset`, {
+      system_prompt: `${systemPrompt}${
+        !llm8850enableThinking ? "/no_think" : ""
+      }`,
+    })
+    .catch((err) => {
+      console.error(
+        "Error resetting chat history on LLM8850 server:",
+        err.message
+      );
+    });
   if (responseInterval) {
     clearInterval(responseInterval);
     responseInterval = null;
@@ -111,13 +116,15 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
     // Poll for partial response /api/generate_provider
     responseInterval = setInterval(async () => {
-      const partialResponse = await axios.get<{
-        done: boolean;
-        response: string;
-      }>(`${llm8850llmEndpoint}/api/generate_provider`).catch((err) => {
-        console.error("Error getting partial response:", err.message);
-        return null;
-      });
+      const partialResponse = await axios
+        .get<{
+          done: boolean;
+          response: string;
+        }>(`${llm8850llmEndpoint}/api/generate_provider`)
+        .catch((err) => {
+          console.error("Error getting partial response:", err.message);
+          return null;
+        });
       if (!partialResponse) {
         return;
       }
@@ -182,7 +189,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           }
           // Check for SetKVCache failed error to reset chat history
           // the context may be full, please reset
-          if (partialAnswer.includes('SetKVCache failed')) {
+          if (partialAnswer.includes("SetKVCache failed")) {
             resetChatHistory();
           }
           endResolve();
