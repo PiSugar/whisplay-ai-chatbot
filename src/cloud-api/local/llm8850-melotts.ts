@@ -6,8 +6,7 @@ import axios from "axios";
 
 dotenv.config();
 
-const melottsUrl =
-  process.env.MELO_TTS_URL || "http://localhost:8802/synthesize";
+const melottsHost = process.env.MELO_TTS_HOST || "http://localhost:8802";
 
 let currentRequest: Promise<boolean> | null = null;
 let currentRequestResolve: ((value: boolean) => void) | null = null;
@@ -23,16 +22,23 @@ const meloTTS = async (
   });
   return new Promise((resolve, reject) => {
     const now = Date.now();
+    const timeoutId = setTimeout(() => {
+      console.error("MeloTTS request timed out, restarting service.");
+      axios.post(melottsHost + "/restart").catch((error) => {
+        console.error("Error restarting MeloTTS service:", error);
+      });
+    }, 5000);
     const tempWavFile = path.join(ttsDir, `melotts_${now}.wav`);
     axios
       .post<{
         success: boolean;
         error?: string;
-      }>(melottsUrl, {
+      }>(melottsHost + "/synthesize", {
         sentence,
         outputPath: tempWavFile,
       })
       .then(async (response) => {
+        clearTimeout(timeoutId);
         if (response.data && response.data.success) {
           resolve({
             data: tempWavFile,

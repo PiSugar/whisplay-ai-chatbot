@@ -3,8 +3,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const whisperServiceUrl =
-  process.env.WHISPER_SERVICE_URL || "http://localhost:8801/recognize";
+const whisperServiceHost =
+  process.env.WHISPER_SERVICE_HOST || "http://localhost:8801";
 
 interface WhisperResponse {
   filePath: string;
@@ -15,17 +15,9 @@ export const recognizeAudio = async (
   audioFilePath: string
 ): Promise<string> => {
   return axios
-    .post<WhisperResponse>(
-      whisperServiceUrl,
-      {
-        filePath: audioFilePath,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    )
+    .post<WhisperResponse>(whisperServiceHost + "/recognize", {
+      filePath: audioFilePath,
+    })
     .then((response) => {
       if (response.data && response.data.recognition) {
         return response.data.recognition;
