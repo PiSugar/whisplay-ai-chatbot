@@ -3,6 +3,7 @@ import { getAudioDurationInSeconds } from "get-audio-duration";
 import dotenv from "dotenv";
 import { ttsDir } from "../../utils/dir";
 import axios from "axios";
+import { TTSResult } from "../../type";
 
 dotenv.config();
 
@@ -13,7 +14,7 @@ let currentRequestResolve: ((value: boolean) => void) | null = null;
 
 const meloTTS = async (
   sentence: string
-): Promise<{ data: Buffer | string; duration: number }> => {
+): Promise<TTSResult> => {
   if (currentRequest) {
     await currentRequest;
   }
@@ -41,7 +42,7 @@ const meloTTS = async (
         clearTimeout(timeoutId);
         if (response.data && response.data.success) {
           resolve({
-            data: tempWavFile,
+            filePath: tempWavFile,
             duration: (await getAudioDurationInSeconds(tempWavFile)) * 1000,
           });
         } else {
@@ -49,7 +50,7 @@ const meloTTS = async (
             "Invalid response from MeloTTS service:",
             response.data?.error || "Unknown error"
           );
-          resolve({ data: Buffer.from([]), duration: 0 });
+          resolve({ duration: 0 });
         }
       })
       .finally(() => {
@@ -61,7 +62,7 @@ const meloTTS = async (
       })
       .catch((error) => {
         console.error("Error calling MeloTTS service:", error);
-        resolve({ data: Buffer.from([]), duration: 0 });
+        resolve({ duration: 0 });
       });
   });
 };
