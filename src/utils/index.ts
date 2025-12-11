@@ -258,3 +258,16 @@ export function savePcmAsWav(
   writeFileSync(outputPath, wavBuffer);
   console.log("Saved WAV:", outputPath);
 }
+
+// judge string is a file path
+export function isAudioFilePath(str: string): boolean {
+  // Simple check: if the string contains path separators or ends with common audio file extensions
+  const audioExtensions = [".wav", ".mp3"];
+  const lowerCaseString = str.toLowerCase();
+  for (const ext of audioExtensions) {
+    if (lowerCaseString.endsWith(ext)) {
+      return true;
+    }
+  }
+  return false;
+}
