@@ -3,6 +3,7 @@ import { isEmpty, noop, set } from "lodash";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
 import { ASRServer, TTSServer } from "../type";
+import { isFilePath } from "../utils";
 
 dotenv.config();
 
@@ -165,7 +166,7 @@ const playAudioData = (
     return Promise.resolve();
   }
   // play wav file using aplay
-  if (typeof resAudioData === "string") {
+  if (typeof resAudioData === "string" && isFilePath(resAudioData)) {
     const filePath = resAudioData;
     return Promise.race([
       new Promise<void>((resolve) => {
