@@ -4,6 +4,7 @@ import zlib from "zlib";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import { byteDanceAccessToken, byteDanceAppId } from "./volcengine";
+import { ASRServer } from "../../type";
 
 dotenv.config();
 
@@ -227,32 +228,45 @@ class VolcengineAsrClient {
   }
 }
 
-const client = new VolcengineAsrClient({
-  appid: byteDanceAppId,
-  token: byteDanceAccessToken,
-  cluster: "volcengine_input_common",
-  uid: "01",
-});
+const asrServer: ASRServer = (
+  process.env.ASR_SERVER || ""
+).toLowerCase() as ASRServer;
+
+const client =
+  asrServer === ASRServer.volcengine && byteDanceAppId && byteDanceAccessToken
+    ? new VolcengineAsrClient({
+        appid: byteDanceAppId,
+        token: byteDanceAccessToken,
+        cluster: "volcengine_input_common",
+        uid: "01",
+      })
+    : null;
 
 let recognizeResolve: (value: string) => void = () => "";
 let timingStart = false;
 
-client.onOpen = () => {
-  console.log("ASR WebSocket connection established");
-};
+if (client) {
+  client.onOpen = () => {
+    console.log("ASR WebSocket connection established");
+  };
 
-client.onMessage = (data) => {
-  const astText = data?.result?.[0]?.text || "";
-  if (timingStart) {
-    console.timeEnd("Audio recognition");
-    timingStart = false;
-  }
-  console.log("Recognition result:", astText);
-  recognizeResolve(astText);
-};
+  client.onMessage = (data) => {
+    const astText = data?.result?.[0]?.text || "";
+    if (timingStart) {
+      console.timeEnd("Audio recognition");
+      timingStart = false;
+    }
+    console.log("Recognition result:", astText);
+    recognizeResolve(astText);
+  };
+}
 
 export const recognizeAudio = (audioPath: string): Promise<string> => {
   console.time("Audio recognition");
+  if (!client) {
+    console.error("Volcengine ASR client is not initialized.");
+    return Promise.resolve("");
+  }
   timingStart = true;
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(audioPath)) {
