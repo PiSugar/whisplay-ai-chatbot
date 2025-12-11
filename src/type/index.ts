@@ -116,3 +116,10 @@ export enum ToolReturnTag {
   Error = "[error]",
   Response = "[response]", // use as assistant response
 }
+
+export type TTSResult = {
+  filePath?: string;
+  base64?: string;
+  buffer?: Buffer;
+  duration: number;
+};

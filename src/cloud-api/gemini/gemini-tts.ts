@@ -9,16 +9,17 @@ import {
   gemini,
 } from "./gemini";
 import dotenv from "dotenv";
+import { TTSResult } from "../../type";
 
 dotenv.config();
 
 const geminiTTS = async (
   text: string
-): Promise<{ data: Buffer | string; duration: number; }> => {
+): Promise<TTSResult> => {
   try {
     if (!gemini) {
       console.error("Google Gemini API key is not set.");
-      return { data: Buffer.from([]), duration: 0 };
+      return { duration: 0 };
     }
 
     const response = await gemini.models.generateContent({
@@ -43,7 +44,7 @@ const geminiTTS = async (
 
     if (!audioData) {
       console.error("No audio content received from Gemini TTS");
-      return { data: Buffer.from([]), duration: 0 };
+      return { duration: 0 };
     }
 
     const buffer = Buffer.from(audioData, "base64");
@@ -53,12 +54,12 @@ const geminiTTS = async (
     savePcmAsWav(buffer, filePath, 24000, 1);
 
     return {
-      data: filePath,
+      filePath,
       duration: await getAudioDurationInSeconds(filePath) * 1000, // add 800ms buffer to avoid cut-off
     };
   } catch (error) {
     console.error("Gemini TTS error:", error);
-    return { data: Buffer.from([]), duration: 0 };
+    return { duration: 0 };
   }
 };
 

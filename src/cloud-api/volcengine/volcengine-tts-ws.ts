@@ -3,6 +3,7 @@ import zlib from "zlib";
 import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
 import { byteDanceAccessToken, byteDanceAppId, byteDanceVoiceType } from "./volcengine";
+import { TTSResult } from "../../type";
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ interface SynthesizeResponse {
   duration: number;
 }
 
-let cb: (response: SynthesizeResponse) => void = () => {};
+let cb: (response: TTSResult) => void = () => {};
 
 const client = new WebSocket(api_url, {
   headers: { Authorization: `Bearer ${byteDanceAccessToken}` },
@@ -68,7 +69,7 @@ client.on("message", (data: WebSocket.Data) => {
     console.error(`Error message size: ${msg_size} bytes`);
     console.error(`Error message: ${error_msg}`);
     client.close();
-    cb({ data: "", duration: 0 });
+    cb({ duration: 0 });
     return;
   } else if (message_type === 0xc) {
     payload = payload.slice(4);
@@ -82,7 +83,7 @@ client.on("message", (data: WebSocket.Data) => {
     done = true;
   }
 
-  cb({ data: payload, duration: 200 });
+  cb({ buffer: payload, duration: 200 });
 });
 
 client.on("error", (err: Error) => {
@@ -116,6 +117,7 @@ function synthesizeSpeech(text: string): Promise<SynthesizeResponse> {
 
   const submit_request_json = JSON.parse(JSON.stringify(request_json));
   let payload_bytes = Buffer.from(JSON.stringify(submit_request_json));
+  // @ts-ignore
   payload_bytes = zlib.gzipSync(payload_bytes); // If no compression, comment this line
   const full_client_request = Buffer.concat([
     default_header,
@@ -127,6 +129,7 @@ function synthesizeSpeech(text: string): Promise<SynthesizeResponse> {
   client.send(full_client_request);
 
   return new Promise((resolve) => {
+    // @ts-ignore
     cb = resolve;
   });
 }

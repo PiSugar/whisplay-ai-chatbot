@@ -2,8 +2,7 @@ import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop, set } from "lodash";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
-import { ASRServer, TTSServer } from "../type";
-import { isAudioFilePath } from "../utils";
+import { ASRServer, TTSResult, TTSServer } from "../type";
 
 dotenv.config();
 
@@ -157,17 +156,14 @@ setTimeout(() => {
   player.process = startPlayerProcess();
 }, 5000);
 
-const playAudioData = (
-  resAudioData: Buffer | string,
-  audioDuration: number
-): Promise<void> => {
-  if (isEmpty(resAudioData) || audioDuration <= 0) {
+const playAudioData = (params: TTSResult): Promise<void> => {
+  const { duration: audioDuration, filePath, base64, buffer } = params;
+  if (audioDuration <= 0 || (!filePath && !base64 && !buffer)) {
     console.log("No audio data to play, skipping playback.");
     return Promise.resolve();
   }
   // play wav file using aplay
-  if (typeof resAudioData === "string" && isAudioFilePath(resAudioData)) {
-    const filePath = resAudioData;
+  if (filePath) {
     return Promise.race([
       new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -195,8 +191,8 @@ const playAudioData = (
   }
 
   // play mp3 buffer using mpg123
-  const audioBuffer = Buffer.from(resAudioData as any, "base64");
   return new Promise((resolve, reject) => {
+    const audioBuffer = base64 ? Buffer.from(base64, "base64") : buffer;
     console.log("Playback duration:", audioDuration);
     player.isPlaying = true;
     setTimeout(() => {

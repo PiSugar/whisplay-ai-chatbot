@@ -3,8 +3,6 @@ import { ttsDir } from "../utils/dir";
 // list all wav files in ttsDir
 import fs from "fs";
 import path from "path";
-import { playAudioData } from "../device/audio";
-import getAudioDurationInSeconds from "get-audio-duration";
 import { spawn } from "child_process";
 
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
