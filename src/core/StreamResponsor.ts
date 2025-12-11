@@ -1,10 +1,11 @@
 import { purifyTextForTTS, splitSentences } from "../utils";
 import dotenv from "dotenv";
 import { playAudioData, stopPlaying } from "../device/audio";
+import { TTSResult } from "../type";
 
 dotenv.config();
 
-type TTSFunc = (text: string) => Promise<{ data: Buffer; duration: number }>;
+type TTSFunc = (text: string) => Promise<TTSResult>;
 type SentencesCallback = (sentences: string[]) => void;
 type TextCallback = (text: string) => void;
 
@@ -14,10 +15,7 @@ export class StreamResponser {
   private textCallback?: TextCallback;
   private partialContent: string = "";
   private playEndResolve: () => void = () => {};
-  private speakArray: Promise<{
-    data: Buffer;
-    duration: number;
-  }>[] = [];
+  private speakArray: Promise<TTSResult>[] = [];
   private parsedSentences: string[] = [];
   private isPlaying: boolean = false;
 
@@ -42,11 +40,11 @@ export class StreamResponser {
       if (currentIndex < this.speakArray.length) {
         this.isPlaying = true;
         try {
-          const { data: audio, duration } = await this.speakArray[currentIndex];
+          const playParams = await this.speakArray[currentIndex];
           console.log(
             `Playing audio ${currentIndex + 1}/${this.speakArray.length}`
           );
-          await playAudioData(audio, duration);
+          await playAudioData(playParams);
         } catch (error) {
           console.error("Audio playback error:", error);
         }

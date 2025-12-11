@@ -4,6 +4,7 @@ import { getAudioDurationInSeconds } from "get-audio-duration";
 import { spawn } from "child_process";
 import dotenv from "dotenv";
 import { ttsDir } from "../../utils/dir";
+import { TTSResult } from "../../type";
 
 dotenv.config();
 
@@ -13,7 +14,7 @@ const piperModelPath =
 
 const piperTTS = async (
   text: string
-): Promise<{ data: Buffer | string; duration: number }> => {
+): Promise<TTSResult> => {
   return new Promise((resolve, reject) => {
     const now = Date.now();
     const tempWavFile = path.join(ttsDir, `piper_${now}.wav`);
@@ -34,13 +35,13 @@ const piperTTS = async (
       if (code !== 0) {
         // reject(new Error(`Piper process exited with code ${code}`));
         console.error(`Piper process exited with code ${code}`);
-        resolve({ data: Buffer.from([]), duration: 0 });
+        resolve({ duration: 0 });
         return;
       }
 
       if (fs.existsSync(tempWavFile) === false) {
         console.log("Piper output file not found:", tempWavFile);
-        resolve({ data: Buffer.from([]), duration: 0 });
+        resolve({ duration: 0 });
         return;
       }
 
@@ -81,17 +82,17 @@ const piperTTS = async (
         // Clean up temp file
         // fs.unlinkSync(convertedWavFile);
         
-        resolve({ data: convertedWavFile, duration });
+        resolve({ filePath: convertedWavFile, duration });
       } catch (error) {
         // reject(error);
         console.log("Error processing Piper output:", `"${text}"`, error);
-        resolve({ data: Buffer.from([]), duration: 0 });
+        resolve({ duration: 0 });
       }
     });
 
     piperProcess.on("error", (error: any) => {
       console.log("Piper process error:", `"${text}"`, error);
-      resolve({ data: Buffer.from([]), duration: 0 });
+      resolve({ duration: 0 });
     });
   });
 };

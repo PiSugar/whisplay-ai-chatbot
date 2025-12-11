@@ -1,6 +1,7 @@
 import mp3Duration from "mp3-duration";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import dotenv from "dotenv";
+import { TTSResult } from "../../type";
 
 dotenv.config();
 
@@ -9,10 +10,10 @@ const openAiVoiceType = process.env.OPENAI_VOICE_TYPE || "nova"; // Optional: al
 
 const openaiTTS = async (
   text: string
-): Promise<{ data: Buffer, duration: number }> => {
+): Promise<TTSResult> => {
   if (!openai) {
     console.error("OpenAI API key is not set.");
-    return { data: Buffer.from([]), duration: 0 };
+    return { duration: 0 };
   }
   const mp3 = await openai.audio.speech.create({
     model: openAiVoiceModel,
@@ -23,11 +24,11 @@ const openaiTTS = async (
     return null;
   });
   if (!mp3) {
-    return { data: Buffer.from([]), duration: 0 };
+    return { duration: 0 };
   }
   const buffer = Buffer.from(await mp3.arrayBuffer());
   const duration = await mp3Duration(buffer);
-  return { data: buffer, duration: duration * 1000 };
+  return { buffer, duration: duration * 1000 };
 };
 
 export default openaiTTS;

@@ -6,6 +6,7 @@ import {
   byteDanceAppId,
   byteDanceVoiceType,
 } from "./volcengine";
+import { TTSResult } from "../../type";
 
 dotenv.config();
 
@@ -31,17 +32,12 @@ interface Payload {
   };
 }
 
-interface TTSResponse {
-  data: any;
-  duration: number;
-}
-
 const volcengineTTS = async (
   text: string
-): Promise<TTSResponse | undefined> => {
+): Promise<TTSResult> => {
   if (!byteDanceAppId || !byteDanceAccessToken) {
     console.error("ByteDance App ID or Access Token is not set.");
-    return;
+    return { duration: 0 };
   }
   const uuid = uuidv4();
   console.time(`合成语音${uuid}`);
@@ -80,13 +76,14 @@ const volcengineTTS = async (
       { headers }
     );
     console.timeEnd(`合成语音${uuid}`);
-    return { data: res.data.data, duration: res.data.addition.duration };
+    return { buffer: Buffer.from(res.data.data, "base64"), duration: res.data.addition.duration };
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
       console.error(`合成语音${uuid}失败：`, err.response?.data || err.message);
     } else {
       console.error(`合成语音${uuid}失败：`, err);
     }
+    return { duration: 0 };
   }
 };
 
