@@ -7,24 +7,34 @@ sudo systemctl set-default multi-user.target
 echo "Setting up the chatbot service..."
 
 sudo bash -c 'cat > /etc/systemd/system/chatbot.service <<EOF
-[Service]
-Environment="PATH=/usr/local/bin:/usr/bin:/bin:/home/pi/.local/bin"
 [Unit]
 Description=Chatbot Service
-After=network.target
+After=network.target sound.target
+Wants=sound.target
+
 [Service]
+Type=simple
 User=pi
+Group=audio
+SupplementaryGroups=audio
+
 WorkingDirectory=/home/pi/whisplay-ai-chatbot
-ExecStart=bash /home/pi/whisplay-ai-chatbot/run_chatbot.sh
+ExecStart=/bin/bash /home/pi/whisplay-ai-chatbot/run_chatbot.sh
+
+# Environment variables (ALSA / mpg123 are very important)
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/home/pi/.local/bin
+Environment=HOME=/home/pi
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+# Make sure the service has access to audio devices
+PrivateDevices=no
+
 StandardOutput=append:/home/pi/whisplay-ai-chatbot/chatbot.log
 StandardError=append:/home/pi/whisplay-ai-chatbot/chatbot.log
+
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
 EOF'
-
-echo "Chatbot service file created."
-echo "Enabling and starting the chatbot service..."
-
-sudo systemctl enable chatbot.service
-sudo systemctl start chatbot.service
