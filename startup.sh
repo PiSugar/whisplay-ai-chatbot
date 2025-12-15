@@ -23,5 +23,8 @@ StandardError=append:/home/pi/whisplay-ai-chatbot/chatbot.log
 WantedBy=multi-user.target
 EOF'
 
+echo "Chatbot service file created."
+echo "Enabling and starting the chatbot service..."
+
 sudo systemctl enable chatbot.service
 sudo systemctl start chatbot.service
