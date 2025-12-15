@@ -38,3 +38,9 @@ RestartSec=2
 [Install]
 WantedBy=multi-user.target
 EOF'
+
+echo "Chatbot service file created."
+echo "Enabling and starting the chatbot service..."
+
+sudo systemctl enable chatbot.service
+sudo systemctl start chatbot.service
