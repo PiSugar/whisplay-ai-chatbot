@@ -4,7 +4,11 @@ from io import BytesIO
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import cairosvg
-import cv2
+
+try:
+  import cv2 as cv
+except ImportError:
+  cv = None
 
 class ColorUtils:
   @staticmethod
@@ -85,7 +89,13 @@ class ImageUtils:
   @staticmethod
   def convertCameraFrameToRGB565(frame: np.ndarray, width: int, height: int):
     # Resize frame to fit the display
-    frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_NEAREST)
+    if cv is not None:
+      frame = cv.resize(frame, (width, height), interpolation=cv.INTER_NEAREST)
+    else:
+      pil_img = Image.fromarray(frame)
+      pil_img = pil_img.resize((width, height), Image.NEAREST)
+      frame = np.array(pil_img)
+    # Convert to RGB565
     r = (frame[:, :, 0] >> 3).astype(np.uint16)  # 5 bit
     g = (frame[:, :, 1] >> 2).astype(np.uint16)  # 6 bit
     b = (frame[:, :, 2] >> 3).astype(np.uint16)  # 5 bit
