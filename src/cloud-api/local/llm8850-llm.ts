@@ -16,7 +16,7 @@ dotenv.config();
 
 // LLM8850 LLM configuration
 const llm8850llmEndpoint =
-  process.env.LLM8850_LLM_ENDPOINT || "http://localhost:8000";
+  process.env.LLM8850_LLM_HOST || "http://localhost:8000";
 const llm8850llmTemprature = parseFloat(
   process.env.LLM8850_LLM_TEMPERATURE || "0.7"
 );

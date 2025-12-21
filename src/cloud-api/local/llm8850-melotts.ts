@@ -7,7 +7,7 @@ import { TTSResult } from "../../type";
 
 dotenv.config();
 
-const melottsHost = process.env.MELO_TTS_HOST || "http://localhost:8802";
+const melottsHost = process.env.LLM8850_MELOTTS_HOST || "http://localhost:8802";
 
 let currentRequest: Promise<boolean> | null = null;
 let currentRequestResolve: ((value: boolean) => void) | null = null;

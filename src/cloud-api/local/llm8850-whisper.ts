@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const whisperServiceHost =
-  process.env.WHISPER_SERVICE_HOST || "http://localhost:8801";
+  process.env.LLM8850_WHISPER_HOST || "http://localhost:8801";
 
 interface WhisperResponse {
   filePath: string;
