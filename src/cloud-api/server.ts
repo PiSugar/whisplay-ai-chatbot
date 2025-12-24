@@ -16,6 +16,7 @@ import { recognizeAudio as OpenAIASR } from "./openai/openai-asr";
 import { recognizeAudio as GeminiASR } from "./gemini/gemini-asr";
 import { recognizeAudio as VoskASR } from "./local/vosk-asr";
 import { recognizeAudio as WisperASR } from "./local/whisper-asr";
+import { recognizeAudio as LLM8850WhisperASR } from "./local/llm8850-whisper";
 import {
   chatWithLLMStream as VolcengineLLMStream,
   resetChatHistory as VolcengineResetChatHistory,
@@ -36,16 +37,21 @@ import {
   chatWithLLMStream as GrokLLMStream,
   resetChatHistory as GrokResetChatHistory,
 } from "./grok/grok-llm";
+import {
+  chatWithLLMStream as LLM8850LLMStream,
+  resetChatHistory as LLM8850ResetChatHistory,
+} from "./local/llm8850-llm";
 import VolcengineTTS from "./volcengine/volcengine-tts";
 import OpenAITTS from "./openai/openai-tts";
 import geminiTTS from "./gemini/gemini-tts";
+import piperTTS from "./local/piper-tts";
+import LLM8850MeloTTS from "./local/llm8850-melotts";
 import {
   ChatWithLLMStreamFunction,
   RecognizeAudioFunction,
   ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
-import piperTTS from "./local/piper-tts";
 
 dotenv.config();
 
@@ -96,9 +102,12 @@ switch (asrServer) {
   case ASRServer.whisper:
     recognizeAudio = WisperASR;
     break;
+  case ASRServer.llm8850whisper:
+    recognizeAudio = LLM8850WhisperASR;
+    break;
   default:
     console.warn(
-      `unknown asr server: ${asrServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI/VOSK/WHISPER`
+      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/llm8850whisper`
     );
     break;
 }
@@ -124,9 +133,13 @@ switch (llmServer) {
     chatWithLLMStream = GrokLLMStream;
     resetChatHistory = GrokResetChatHistory;
     break;
+  case LLMServer.llm8850:
+    chatWithLLMStream = LLM8850LLMStream;
+    resetChatHistory = LLM8850ResetChatHistory;
+    break;
   default:
     console.warn(
-      `unknown llm server: ${llmServer}, should be VOLCENGINE/OPENAI/GEMINI/OLLAMA/GROK`
+      `unknown llm server: ${llmServer}, should be volcengine/openai/gemini/ollama/grok/llm8850`
     );
     break;
 }
@@ -147,9 +160,12 @@ switch (ttsServer) {
   case TTSServer.piper:
     ttsProcessor = piperTTS;
     break;
+  case TTSServer.llm8850melotts:
+    ttsProcessor = LLM8850MeloTTS;
+    break;
   default:
     console.warn(
-      `unknown tts server: ${ttsServer}, should be VOLCENGINE/TENCENT/OPENAI/GEMINI/PIPER`
+      `unknown tts server: ${ttsServer}, should be volcengine/tencent/openai/gemini/piper/llm8850melotts`
     );
     break;
 }

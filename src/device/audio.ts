@@ -1,6 +1,5 @@
 import { exec, spawn, ChildProcess } from "child_process";
 import { isEmpty, noop, set } from "lodash";
-import { killAllProcesses } from "../utils";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
 import { ASRServer, TTSResult, TTSServer } from "../type";
@@ -11,9 +10,11 @@ const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 
 const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
 
-export const recordFileFormat = [ASRServer.vosk, ASRServer.whisper].includes(
-  asrServer
-)
+export const recordFileFormat = [
+  ASRServer.vosk,
+  ASRServer.whisper,
+  ASRServer.llm8850whisper,
+].includes(asrServer)
   ? "wav"
   : "mp3";
 
@@ -53,8 +54,7 @@ const killAllRecordingProcesses = (): void => {
   recordingProcessList.forEach((child) => {
     console.log("Killing recording process", child.pid);
     try {
-      child.stdin?.end();
-      killAllProcesses(child.pid!);
+      child.kill("SIGINT");
     } catch (e) {}
   });
   recordingProcessList.length = 0;
@@ -65,7 +65,7 @@ const recordAudio = (
   duration: number = 10
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const cmd = `sox -t alsa default -t ${recordFileFormat} ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
+    const cmd = `sox -t alsa default -t ${recordFileFormat} -c 1 -r 16000 ${outputPath} silence 1 0.1 60% 1 1.0 60%`;
     console.log(`Starting recording, maximum ${duration} seconds...`);
     const recordingProcess = exec(cmd, (err, stdout, stderr) => {
       currentRecordingReject = reject;
@@ -95,20 +95,34 @@ const recordAudioManually = (
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
-    const recordingProcess = exec(
-      `sox -t alsa default -t ${recordFileFormat} ${outputPath}`,
-      (err, stdout, stderr) => {
-        if (err) {
-          killAllRecordingProcesses();
-          reject(stderr);
-        }
-      }
-    );
+    const recordingProcess = spawn("sox", [
+      "-t",
+      "alsa",
+      "default",
+      "-t",
+      recordFileFormat,
+      "-c",
+      "1",
+      "-r",
+      "16000",
+      outputPath,
+    ]);
+
+    recordingProcess.on("error", (err) => {
+      killAllRecordingProcesses();
+      reject(err);
+    });
+
+    recordingProcess.stderr?.on("data", (data) => {
+      console.error(data.toString());
+    });
     recordingProcessList.push(recordingProcess);
     stopFunc = () => {
       killAllRecordingProcesses();
-      resolve(outputPath);
     };
+    recordingProcess.on("exit", () => {
+      resolve(outputPath);
+    });
   });
   return {
     result,
