@@ -113,5 +113,22 @@ sudo bash startup.sh
 
 After setting up the service, you can set the `LLM8850_LLM_HOST` variable in the `.env` file to point to your LLM8850 Qwen3 LLM service.
 
+### Environment Configuration
 
+After setting up the three services above, you need to configure the environment variables in the `.env` file.
 
+```
+ASR_SERVER=llm8850_whisper
+LLM_SERVER=llm8850_llm
+TTS_SERVER=llm8850_melotts
+
+# default settings for LLM8850 services, you can change them if needed
+LLM8850_LLM_HOST=http://localhost:8000
+LLM8850_LLM_TEMPERATURE=0.7
+LLM8850_WHISPER_HOST=http://localhost:8801
+LLM8850_MELOTTS_HOST=http://localhost:8802
+```
+
+### Note
+
+The services need some time to initialize when system boots up. Even when the screen shows that the chatbot is ready, the LLM8850 services may not be ready yet. So please wait for a while (about one minute) after system startup before talking to the chatbot.
