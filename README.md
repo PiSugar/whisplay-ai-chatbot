@@ -105,8 +105,15 @@ The chatbot saves conversation history and generated images in the `data` folder
 
 [Whisplay Chatbot Case for Pi02](https://github.com/PiSugar/suit-cases/tree/main/pisugar3-whisplay-chatbot)
 
-[Whisplay Chatbot Case for Pi5](https://github.com/PiSugar/suit-cases/tree/main/pi5-whisplay-chatbot)
+[Whisplay Chatbot Case (FDM) for Pi02](https://github.com/PiSugar/suit-cases/tree/main/pisugar3-whisplay-chatbot-fdm)
 
+[Whisplay Chatbot Case (FDM) for Pi5](https://github.com/PiSugar/suit-cases/tree/main/pi5-whisplay-chatbot)
+
+## LLM8850 Support
+
+If you have a LLM8850 AI Accelerator, you can set up the LLM8850 services for local ASR, TTS, and LLM API to enable offline capabilities.
+
+Please refer to the [LLM8850 Integration Guide](README-llm8850.md) for detailed setup instructions.
 
 ## Goals
 
@@ -121,6 +128,10 @@ The chatbot saves conversation history and generated images in the `data` folder
 - Add Google Gemini API support ✅
 - Add Grok API support ✅
 - RPI camera support ✅
+- Support LLM8850 whisper ✅
+- Support LLM8850 melottsTTS ✅
+- Support LLM8850 Qwen3 llm api (not support tool) ✅
+- Support LLM8850 SmolVLM2
 - Support speaker recognition
 
 ## License
