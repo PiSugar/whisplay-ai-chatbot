@@ -36,6 +36,15 @@ Follow the instructions of the [official document](https://docs.m5stack.com/en/g
 
 Since the project should be run on two separate parts: model api server and tokenizer server, I created a simple script to start both servers easily, and also a startup script to run the servers on system boot.
 
+- Clone the official Repository:
+
+```bash
+git clone https://huggingface.co/AXERA-TECH/Qwen3-1.7B
+cd Qwen3-1.7B
+pip install transformers jinja2 --break-system-packages
+chmod +x main_api_axcl_aarch64
+```
+
 - Create a `serve.sh` to the project folder with the following content:
 
 ```bash
@@ -113,6 +122,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable $SERVICE_NAME.service
 sudo systemctl start $SERVICE_NAME.service
 ```
+
 
 Then run the following command to set up the startup service:
 
