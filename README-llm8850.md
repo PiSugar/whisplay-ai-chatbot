@@ -12,6 +12,8 @@ sudo apt update
 sudo apt install -y cmake
 ```
 
+Follow the instructions in the [official document](https://docs.m5stack.com/en/guide/ai_accelerator/llm-8850/m5_llm_8850_software_install) to install the drivers for LLM8850.
+
 ### LLM8850 Whisper ASR
 
 The [demo project](https://github.com/ml-inory/whisper.axcl) provides a local whisper ASR running on LLM8850. However, it's a one-time use command line tool, which will take about 8 seconds to initialize the model each time.
