@@ -138,7 +138,7 @@ After setting up the three services above, you need to configure the environment
 
 ```
 ASR_SERVER=llm8850_whisper
-LLM_SERVER=llm8850_llm
+LLM_SERVER=llm8850
 TTS_SERVER=llm8850_melotts
 
 # default settings for LLM8850 services, you can change them if needed
