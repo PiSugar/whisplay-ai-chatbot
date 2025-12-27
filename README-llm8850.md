@@ -3,12 +3,21 @@
 This section explains how to set up and integrate the LLM8850 local services (Whisper ASR, Melotts TTS, and Qwen3 LLM API) with the Whisplay AI Chatbot.
 I did some modifications on the LLM8850 demo project to make it easier to integrate with the Whisplay AI Chatbot.
 
+### Prerequisites
+
+The building of the LLM8850 projects requires `cmake`. You can install it using the following commands:
+
+```bash
+sudo apt update
+sudo apt install -y cmake
+```
+
 ### LLM8850 Whisper ASR
 
 The [demo project](https://github.com/ml-inory/whisper.axcl) provides a local whisper ASR running on LLM8850. However, it's a one-time use command line tool, which will take about 8 seconds to initialize the model each time.
 I modified the code to run a local web service for ASR, so the model is loaded only once. And it takes less than one second to process each sentence after that.
 
-Check out this link: https://github.com/PiSugar/whisper.axcl
+- Check out this link: https://github.com/PiSugar/whisper.axcl
 
 Plese follow the instructions in the README file to set up the LLM8850 whisper service. After that, you can set the `LLM8850_WHISPER_HOST` variable in the `.env` file to point to your LLM8850 whisper service.
 
@@ -17,7 +26,7 @@ Plese follow the instructions in the README file to set up the LLM8850 whisper s
 The [demo project](https://github.com/ml-inory/melotts.axcl) provides a local melotts TTS running on LLM8850. It has the same issue as the whisper demo project.
 I also did similar modifications to run a local web service for TTS.
 
-Check out this link: https://github.com/PiSugar/melotts.axcl
+- Check out this link: https://github.com/PiSugar/melotts.axcl
 
 Please follow the instructions in the README file to set up the LLM8850 melotts TTS service. After that, you can set the `LLM8850_MELOTTS_HOST` variable in the `.env` file to point to your LLM8850 melotts TTS service.
 
@@ -27,7 +36,7 @@ Follow the instructions of the [official document](https://docs.m5stack.com/en/g
 
 Since the project should be run on two separate parts: model api server and tokenizer server, I created a simple script to start both servers easily, and also a startup script to run the servers on system boot.
 
-Create a `serve.sh` to the project folder with the following content:
+- Create a `serve.sh` to the project folder with the following content:
 
 ```bash
 #!/bin/bash
@@ -67,7 +76,7 @@ pkill -f "python qwen3_tokenizer_uid.py --port $PORT"
 exit 0
 ```
 
-Also create a `startup.sh` script with the following content:
+- Also create a `startup.sh` script with the following content:
 
 ```bash
 #!/bin/bash
