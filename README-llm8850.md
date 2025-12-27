@@ -5,14 +5,16 @@ I did some modifications on the LLM8850 demo project to make it easier to integr
 
 ### Prerequisites
 
-The building of the LLM8850 projects requires `cmake`. You can install it using the following commands:
+1. The building of the LLM8850 projects requires `cmake` and `git-lfs`. You can install it using the following commands:
 
 ```bash
 sudo apt update
-sudo apt install -y cmake
+sudo apt install -y cmake git-lfs
+git lfs install
 ```
 
-Follow the instructions in the [official document](https://docs.m5stack.com/en/guide/ai_accelerator/llm-8850/m5_llm_8850_software_install) to install the drivers for LLM8850.
+2. Follow the instructions in the [official document](https://docs.m5stack.com/en/guide/ai_accelerator/llm-8850/m5_llm_8850_software_install) to install the drivers for LLM8850.
+
 
 ### LLM8850 Whisper ASR
 
