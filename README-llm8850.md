@@ -36,9 +36,10 @@ Follow the instructions of the [official document](https://docs.m5stack.com/en/g
 
 Since the project should be run on two separate parts: model api server and tokenizer server, I created a simple script to start both servers easily, and also a startup script to run the servers on system boot.
 
-- Clone the official Repository:
+- Clone the official Repository and install dependencies:
 
 ```bash
+cd
 git clone https://huggingface.co/AXERA-TECH/Qwen3-1.7B
 cd Qwen3-1.7B
 pip install transformers jinja2 --break-system-packages
