@@ -137,9 +137,9 @@ After setting up the service, you can set the `LLM8850_LLM_HOST` variable in the
 After setting up the three services above, you need to configure the environment variables in the `.env` file.
 
 ```
-ASR_SERVER=llm8850_whisper
+ASR_SERVER=llm8850whisper
 LLM_SERVER=llm8850
-TTS_SERVER=llm8850_melotts
+TTS_SERVER=llm8850melotts
 
 # default settings for LLM8850 services, you can change them if needed
 LLM8850_LLM_HOST=http://localhost:8000
