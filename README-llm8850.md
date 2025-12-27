@@ -1,7 +1,11 @@
 # Integrate LLM8850 Local Services
 
 This section explains how to set up and integrate the LLM8850 local services (Whisper ASR, Melotts TTS, and Qwen3 LLM API) with the Whisplay AI Chatbot.
-I did some modifications on the LLM8850 demo project to make it easier to integrate with the Whisplay AI Chatbot.
+
+We did some modifications on the LLM8850 demo project to make it easier to integrate with the Whisplay AI Chatbot.
+
+<img width="800" alt="chatbot-structure" src="https://github.com/user-attachments/assets/30b9aebe-96d5-4e82-abbb-acb6cea0360d" />
+
 
 ### Prerequisites
 
@@ -19,7 +23,8 @@ git lfs install
 ### LLM8850 Whisper ASR
 
 The [demo project](https://github.com/ml-inory/whisper.axcl) provides a local whisper ASR running on LLM8850. However, it's a one-time use command line tool, which will take about 8 seconds to initialize the model each time.
-I modified the code to run a local web service for ASR, so the model is loaded only once. And it takes less than one second to process each sentence after that.
+
+We modified the code to run a local web service for ASR, so the model is loaded only once. And it takes less than one second to process each sentence after that.
 
 - Check out this link: https://github.com/PiSugar/whisper.axcl
 
@@ -28,7 +33,7 @@ Plese follow the instructions in the README file to set up the LLM8850 whisper s
 ### LLM8850 Melotts TTS
 
 The [demo project](https://github.com/ml-inory/melotts.axcl) provides a local melotts TTS running on LLM8850. It has the same issue as the whisper demo project.
-I also did similar modifications to run a local web service for TTS.
+We also did similar modifications to run a local web service for TTS.
 
 - Check out this link: https://github.com/PiSugar/melotts.axcl
 
