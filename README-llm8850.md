@@ -22,7 +22,7 @@ git lfs install
 
 ### LLM8850 Whisper ASR
 
-The [demo project](https://github.com/ml-inory/whisper.axcl) provides a local whisper ASR running on LLM8850. However, it's a one-time use command line tool, which will take about 8 seconds to initialize the model each time.
+The [demo project](https://github.com/ml-inory/whisper.axcl) provides a local whisper ASR running on LLM8850. However, it's a one-time use command line tool, which will take about 10 seconds to initialize the model each time.
 
 We modified the code to run a local web service for ASR, so the model is loaded only once. And it takes less than one second to process each sentence after that.
 
