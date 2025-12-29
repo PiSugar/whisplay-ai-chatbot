@@ -6,6 +6,7 @@ We did some modifications on the LLM8850 demo project to make it easier to integ
 
 <img width="800" alt="chatbot-structure" src="https://github.com/user-attachments/assets/30b9aebe-96d5-4e82-abbb-acb6cea0360d" />
 
+Video tutorial: https://www.youtube.com/watch?v=IuTD5OMaVVU
 
 ### Prerequisites
 
