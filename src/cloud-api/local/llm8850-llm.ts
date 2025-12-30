@@ -27,7 +27,7 @@ const llmServer = (
 const llm8850enableThinking =
   (process.env.LLM8850_ENABLE_THINKING || "false").toLowerCase() === "true";
 
-const chatHistoryFileName = `ollama_chat_history_${moment().format(
+const chatHistoryFileName = `llm8850_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss"
 )}.json`;
 
@@ -191,6 +191,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           // the context may be full, please reset
           if (partialAnswer.includes("SetKVCache failed")) {
             resetChatHistory();
+          }
+          if (partialAnswer) {
+            messages.push({
+              role: "assistant",
+              content: partialAnswer,
+            });
           }
           endResolve();
           endCallback();
