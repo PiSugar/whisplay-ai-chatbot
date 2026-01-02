@@ -38,7 +38,9 @@ const meloTTS = async (
         error?: string;
       }>(melottsHost + "/synthesize", {
         sentence,
-        outputPath: tempWavFile,
+        // for compatibility with older meloTTS servers
+        output_path: tempWavFile,
+        base64: true,
       })
       .then(async (response) => {
         clearTimeout(timeoutId);
