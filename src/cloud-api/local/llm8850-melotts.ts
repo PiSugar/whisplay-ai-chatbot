@@ -1,4 +1,5 @@
-import * as path from "path";
+import path from "path";
+import fs from "fs";
 import { getAudioDurationInSeconds } from "get-audio-duration";
 import dotenv from "dotenv";
 import { ttsDir } from "../../utils/dir";
@@ -33,14 +34,24 @@ const meloTTS = async (
     axios
       .post<{
         success: boolean;
+        base64?: string;
         error?: string;
       }>(melottsHost + "/synthesize", {
         sentence,
-        outputPath: tempWavFile,
+        // for compatibility with older meloTTS servers
+        output_path: tempWavFile,
+        base64: true,
       })
       .then(async (response) => {
         clearTimeout(timeoutId);
         if (response.data && response.data.success) {
+          if (!fs.existsSync(tempWavFile)) {
+            const { base64 } = response.data;
+            if (base64) {
+              const buffer = Buffer.from(base64, "base64");
+              fs.writeFileSync(tempWavFile, buffer);
+            }
+          }
           resolve({
             filePath: tempWavFile,
             duration: (await getAudioDurationInSeconds(tempWavFile)) * 1000,

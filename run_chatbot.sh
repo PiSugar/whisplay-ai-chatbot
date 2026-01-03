@@ -21,39 +21,53 @@ echo "PATH: $PATH"
 echo "Python version: $(python3 --version)" 
 echo "Node version: $(node --version)"
 sleep 5
-# Adjust volume
-amixer -c $card_index set Speaker 114
+
 # Start the service
 echo "Starting Node.js application..."
 cd $working_dir
 
+get_env_value() {
+  if grep -Eq "^[[:space:]]*$1[[:space:]]*=" .env; then
+    val=$(grep -E "^[[:space:]]*$1[[:space:]]*=" .env | tail -n1 | cut -d'=' -f2-)
+    # trim whitespace and surrounding quotes
+    echo "$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
+  else
+    echo ""
+  fi
+}
+
 # load .env variables, exclude comments and empty lines
 # check if .env file exists
+initial_volume_level=114
 serve_ollama=false
 if [ -f ".env" ]; then
   # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
-  if grep -Eq '^[[:space:]]*SERVE_OLLAMA[[:space:]]*=' .env; then
-    val=$(grep -E '^[[:space:]]*SERVE_OLLAMA[[:space:]]*=' .env | tail -n1 | cut -d'=' -f2-)
-    # trim whitespace and surrounding quotes
-    SERVE_OLLAMA=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
-    export SERVE_OLLAMA
-  fi
-  # CUSTOM_FONT_PATH for displaying text on screen
-  if grep -Eq '^[[:space:]]*CUSTOM_FONT_PATH[[:space:]]*=' .env; then
-    val=$(grep -E '^[[:space:]]*CUSTOM_FONT_PATH[[:space:]]*=' .env | tail -n1 | cut -d'=' -f2-)
-    # trim whitespace and surrounding quotes
-    CUSTOM_FONT_PATH=$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
-    export CUSTOM_FONT_PATH
-  fi
+  SERVE_OLLAMA=$(get_env_value "SERVE_OLLAMA")
+  [ -n "$SERVE_OLLAMA" ] && export SERVE_OLLAMA
+  
+  CUSTOM_FONT_PATH=$(get_env_value "CUSTOM_FONT_PATH")
+  [ -n "$CUSTOM_FONT_PATH" ] && export CUSTOM_FONT_PATH
+
+  INITIAL_VOLUME_LEVEL=$(get_env_value "INITIAL_VOLUME_LEVEL")
+  [ -n "$INITIAL_VOLUME_LEVEL" ] && export INITIAL_VOLUME_LEVEL
+
   echo ".env variables loaded."
+
   # check if SERVE_OLLAMA is set to true
   if [ "$SERVE_OLLAMA" = "true" ]; then
     serve_ollama=true
+  fi
+
+  if [ -n "$INITIAL_VOLUME_LEVEL" ]; then
+    initial_volume_level=$INITIAL_VOLUME_LEVEL
   fi
 else
   echo ".env file not found, please create one based on .env.template."
   exit 1
 fi
+
+# Adjust initial volume
+amixer -c $card_index set Speaker $initial_volume_level
 
 if [ "$serve_ollama" = true ]; then
   echo "Starting Ollama server..."
