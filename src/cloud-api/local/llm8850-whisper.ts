@@ -1,5 +1,6 @@
 import axios from "axios";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
 
@@ -14,9 +15,13 @@ interface WhisperResponse {
 export const recognizeAudio = async (
   audioFilePath: string
 ): Promise<string> => {
+  const audioData = fs.readFileSync(audioFilePath);
+  const base64Audio = audioData.toString("base64");
+  
   return axios
     .post<WhisperResponse>(whisperServiceHost + "/recognize", {
       filePath: audioFilePath,
+      base64: base64Audio,
     })
     .then((response) => {
       if (response.data && response.data.recognition) {
