@@ -26,9 +26,9 @@ sleep 5
 echo "Starting Node.js application..."
 cd $working_dir
 
-get_env_value(var_name) {
-  if grep -Eq "^[[:space:]]*$var_name[[:space:]]*=" .env; then
-    val=$(grep -E "^[[:space:]]*$var_name[[:space:]]*=" .env | tail -n1 | cut -d'=' -f2-)
+get_env_value() {
+  if grep -Eq "^[[:space:]]*$1[[:space:]]*=" .env; then
+    val=$(grep -E "^[[:space:]]*$1[[:space:]]*=" .env | tail -n1 | cut -d'=' -f2-)
     # trim whitespace and surrounding quotes
     echo "$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
   else
