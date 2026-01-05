@@ -57,7 +57,8 @@ export const recognizeAudio = async (
     );
     body.filePath = audioFilePath;
   }
-
+  const timeTag = "[FasterWhisper ASR]";
+  console.time(timeTag);
   return axios
     .post<FasterWhisperResponse>(
       `http://${fasterWhisperHost}:${fasterWhisperPort}/recognize`,
@@ -74,6 +75,9 @@ export const recognizeAudio = async (
     .catch((error) => {
       console.error("Error calling Whisper service:", error);
       return "";
+    })
+    .finally(() => {
+      console.timeEnd(timeTag);
     });
 };
 
