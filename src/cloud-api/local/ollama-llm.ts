@@ -18,7 +18,10 @@ import {
 import { ChatWithLLMStreamFunction } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
 import moment from "moment";
-import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
+import {
+  extractToolResponse,
+  stimulateStreamResponse,
+} from "../../config/common";
 
 dotenv.config();
 
@@ -27,6 +30,21 @@ const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
 const enableThinking = process.env.ENABLE_THINKING === "true";
+
+const llmServer = process.env.LLM_SERVER || "";
+
+if (llmServer.trim().toLowerCase() === "ollama") {
+  // initialize request to ollama server with empty prompt, to load the model into memory
+  axios
+    .post(`${ollamaEndpoint}/api/generate`, {
+      model: ollamaModel,
+      prompt: "",
+      stream: false,
+    })
+    .catch((err) => {
+      console.error("Error initializing Ollama model:", err.message);
+    });
+}
 
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss"
