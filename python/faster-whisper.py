@@ -5,6 +5,8 @@ import os
 from flask import Flask, request, jsonify
 from faster_whisper import WhisperModel
 import argparse
+import signal
+import sys
 
 # ---------- Configuration ----------
 MODEL_NAME = "tiny"      # tiny / base
@@ -98,12 +100,18 @@ def recognize():
       except:
         pass
 
+def shutdown(sig, frame):
+    print("Shutting down python server...")
+    sys.exit(0)
 
 # ---------- Startup ----------
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Faster Whisper API Server')
   parser.add_argument('--port', type=int, default=8000, help='Port to run the server on')
   args = parser.parse_args()
+  
+  signal.signal(signal.SIGTERM, shutdown)
+  signal.signal(signal.SIGINT, shutdown)
   
   app.run(
     host="0.0.0.0",
