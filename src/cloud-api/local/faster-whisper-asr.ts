@@ -16,10 +16,17 @@ const fasterWhisperRequestType =
 let pyProcess: any = null;
 const asrServer = process.env.ASR_SERVER || "";
 
-if (asrServer.trim().toLowerCase() === ASRServer.fasterwhisper) {
+if (
+  asrServer.trim().toLowerCase() === ASRServer.fasterwhisper &&
+  ["localhost", "0.0.0.0", "127.0.0.1"].includes(fasterWhisperHost)
+) {
   pyProcess = spawn(
     "python3",
-    [resolve(__dirname, "../../../python/faster-whisper.py")],
+    [
+      resolve(__dirname, "../../../python/faster-whisper.py"),
+      "--port",
+      fasterWhisperPort,
+    ],
     {
       detached: true,
       stdio: "inherit",
@@ -35,7 +42,6 @@ interface FasterWhisperResponse {
 export const recognizeAudio = async (
   audioFilePath: string
 ): Promise<string> => {
-
   const body: any = {};
   if (fasterWhisperRequestType === "filePath") {
     body.filePath = audioFilePath;
