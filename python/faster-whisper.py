@@ -113,6 +113,8 @@ if __name__ == "__main__":
   signal.signal(signal.SIGTERM, shutdown)
   signal.signal(signal.SIGINT, shutdown)
   
+  print(f"[STARTING] Starting Faster Whisper server on port {args.port}...")
+  
   app.run(
     host="0.0.0.0",
     port=args.port,
