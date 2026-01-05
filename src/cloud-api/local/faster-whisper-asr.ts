@@ -19,7 +19,7 @@ const asrServer = process.env.ASR_SERVER || "";
 if (asrServer.trim().toLowerCase() === ASRServer.fasterwhisper) {
   pyProcess = spawn(
     "python3",
-    [resolve(__dirname, "../../python/faster-whisper.py")],
+    [resolve(__dirname, "../../../python/faster-whisper.py")],
     {
       detached: true,
       stdio: "inherit",
