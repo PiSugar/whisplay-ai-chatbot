@@ -9,13 +9,17 @@ import signal
 import sys
 
 # ---------- Configuration ----------
-MODEL_NAME = os.getenv("FASTER_WHISPER_MODEL_SIZE", "tiny")     # tiny / base
-LOCAL_FILES_ONLY = os.getenv("FASTER_WHISPER_LOCAL_FILES_ONLY", "true") == "true"
+MODEL_NAME = os.getenv("FASTER_WHISPER_MODEL_SIZE_OR_PATH", "tiny")     # tiny / base
 DEVICE = "cpu"
 COMPUTE_TYPE = "int8"    # Pi must use int8
 
 # ---------- Initialization ----------
 app = Flask(__name__)
+
+# create model folder if not exists
+model_dir = os.getenv("FASTER_WHISPER_DOWNLOAD_ROOT", "/home/pi/models")
+if not os.path.exists(model_dir):
+    os.makedirs(model_dir)
 
 t0 = time.perf_counter()
 print("[INIT] Loading whisper model...")
@@ -24,7 +28,7 @@ model = WhisperModel(
   device=DEVICE,
   cpu_threads=3,   # Limit CPU threads for Pi
   compute_type=COMPUTE_TYPE,
-  local_files_only=LOCAL_FILES_ONLY
+  download_root=model_dir,
 )
 t1 = time.perf_counter()
 print(f"[INIT] Model loaded in {round(t1 - t0, 2)} seconds")
