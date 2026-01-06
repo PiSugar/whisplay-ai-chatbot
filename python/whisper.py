@@ -3,27 +3,21 @@ import time
 import tempfile
 import os
 from flask import Flask, request, jsonify
-from faster_whisper import WhisperModel
+import whisper
 import argparse
 import signal
 import sys
 
 # ---------- Configuration ----------
-MODEL_NAME = "tiny"      # tiny / base
+MODEL_NAME = "tiny"      # tiny / base / small / medium / large
 DEVICE = "cpu"
-COMPUTE_TYPE = "int8"    # Pi must use int8
 
 # ---------- Initialization ----------
 app = Flask(__name__)
 
 t0 = time.perf_counter()
 print("[INIT] Loading whisper model...")
-model = WhisperModel(
-  MODEL_NAME,
-  device=DEVICE,
-  cpu_threads=3,   # Limit CPU threads for Pi
-  compute_type=COMPUTE_TYPE,
-)
+model = whisper.load_model(MODEL_NAME, device=DEVICE)
 t1 = time.perf_counter()
 print(f"[INIT] Model loaded in {round(t1 - t0, 2)} seconds")
 
@@ -74,19 +68,19 @@ def recognize():
       audio_path = temp_file
 
     # 2. Transcribe using file path
-    segments, info = model.transcribe(
+    result = model.transcribe(
       audio_path,
       language=language,
-      vad_filter=True
+      fp16=False  # Use fp16=False for CPU
     )
 
-    text = "".join(seg.text for seg in segments).strip()
+    text = result["text"].strip()
 
     t1 = time.perf_counter()
 
     return jsonify({
       "recognition": text,
-      "language": info.language,
+      "language": result["language"],
       "time_cost": round(t1 - t0, 3)
     })
 
@@ -107,14 +101,14 @@ def shutdown(sig, frame):
 
 # ---------- Startup ----------
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description='Faster Whisper API Server')
-  parser.add_argument('--port', type=int, default=8803, help='Port to run the server on')
+  parser = argparse.ArgumentParser(description='Whisper API Server')
+  parser.add_argument('--port', type=int, default=8804, help='Port to run the server on')
   args = parser.parse_args()
   
   signal.signal(signal.SIGTERM, shutdown)
   signal.signal(signal.SIGINT, shutdown)
   
-  print(f"[STARTING] Starting Faster Whisper server on port {args.port}...")
+  print(f"[STARTING] Starting Whisper server on port {args.port}...")
   
   app.run(
     host="0.0.0.0",
