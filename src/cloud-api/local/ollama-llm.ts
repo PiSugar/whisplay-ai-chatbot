@@ -61,7 +61,7 @@ const keepAliveOllama = () => {
       ],
       options: {
         temperature: 0.7,
-        num_predict: 1,
+        num_predict: 20,
       },
       stream: false,
     })
