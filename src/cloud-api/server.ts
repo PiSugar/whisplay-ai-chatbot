@@ -111,7 +111,7 @@ switch (asrServer) {
     break;
   default:
     console.warn(
-      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/llm8850whisper`
+      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/llm8850whisper/fasterwhisper`
     );
     break;
 }

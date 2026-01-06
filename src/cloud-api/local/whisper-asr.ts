@@ -58,8 +58,7 @@ export const recognizeAudio = async (
     if (language) {
       params.push("--language", language);
     }
-    const timeTag = "[whisper transcribe]";
-    console.time(timeTag);
+    
     const child = spawn("whisper", params);
 
     let stdout = "";
@@ -107,14 +106,11 @@ export const recognizeAudio = async (
       const finalTrim = finalTranscription.trim();
 
       if (finalTrim) {
-        // cleanup
-        console.timeEnd(timeTag);
         resolve(finalTrim);
         return;
       }
 
       // No stdout content; do not read/write .txt files — just resolve empty string
-      console.timeEnd(timeTag);
       resolve("");
     });
   });
