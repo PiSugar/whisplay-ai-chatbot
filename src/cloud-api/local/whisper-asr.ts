@@ -1,12 +1,11 @@
-import fs, { readFileSync } from "fs";
+import { readFileSync } from "fs";
 import { ChildProcess, spawn } from "child_process";
 import { ASRServer } from "../../type";
-import { asrDir } from "../../utils/dir";
 import { resolve } from "path";
 import axios from "axios";
+import { defaultPortMap } from "./common";
 
-const whisperModelSize = process.env.WHISPER_MODEL_SIZE || "tiny";
-const whisperPort = process.env.WHISPER_PORT || "8804";
+const whisperPort = process.env.WHISPER_PORT || defaultPortMap.whisper.toString();
 const whisperHost = process.env.WHISPER_HOST || "localhost";
 const whisperLanguage = process.env.WHISPER_LANGUAGE || "";
 const whisperRequestType = process.env.WHISPER_REQUEST_TYPE || "filePath";

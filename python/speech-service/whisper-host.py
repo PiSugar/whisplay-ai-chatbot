@@ -9,7 +9,7 @@ import signal
 import sys
 
 # ---------- Configuration ----------
-MODEL_NAME = "tiny"      # tiny / base / small / medium / large
+MODEL_NAME = os.getenv("WHISPER_MODEL_SIZE", "tiny")  # tiny / base / small / medium / large
 DEVICE = "cpu"
 
 # ---------- Initialization ----------

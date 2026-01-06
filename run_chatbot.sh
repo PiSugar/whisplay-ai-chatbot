@@ -51,6 +51,12 @@ if [ -f ".env" ]; then
   INITIAL_VOLUME_LEVEL=$(get_env_value "INITIAL_VOLUME_LEVEL")
   [ -n "$INITIAL_VOLUME_LEVEL" ] && export INITIAL_VOLUME_LEVEL
 
+  WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
+  [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
+
+  FASTER_WHISPER_MODEL_SIZE=$(get_env_value "FASTER_WHISPER_MODEL_SIZE")
+  [ -n "$FASTER_WHISPER_MODEL_SIZE" ] && export FASTER_WHISPER_MODEL_SIZE
+
   echo ".env variables loaded."
 
   # check if SERVE_OLLAMA is set to true

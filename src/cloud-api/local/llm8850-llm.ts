@@ -11,12 +11,13 @@ import { LLMServer, Message, OllamaMessage } from "../../type";
 import { ChatWithLLMStreamFunction } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
 import moment from "moment";
+import { defaultPortMap } from "./common";
 
 dotenv.config();
 
 // LLM8850 LLM configuration
 const llm8850llmEndpoint =
-  process.env.LLM8850_LLM_HOST || "http://localhost:8000";
+  process.env.LLM8850_LLM_HOST || `http://localhost:${defaultPortMap.llm8850llm}`;
 const llm8850llmTemprature = parseFloat(
   process.env.LLM8850_LLM_TEMPERATURE || "0.7"
 );

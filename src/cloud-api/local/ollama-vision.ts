@@ -4,10 +4,11 @@ import dotenv from "dotenv";
 import { getLatestShowedImage, showLatestCapturedImg } from "../../utils/image";
 import { get } from "lodash";
 import { readFileSync } from "fs";
+import { defaultPortMap } from "./common";
 
 dotenv.config();
 
-const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
+const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || `http://localhost:${defaultPortMap.ollama}`;
 const ollamaVisionModel = process.env.OLLAMA_VISION_MODEL || "qwen3-vl:2b";
 
 export const addOllamaVisionTool = (visionTools: LLMTool[]) => {

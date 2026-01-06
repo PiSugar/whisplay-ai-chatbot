@@ -9,7 +9,7 @@ import signal
 import sys
 
 # ---------- Configuration ----------
-MODEL_NAME = "tiny"      # tiny / base
+MODEL_NAME = os.getenv("FASTER_WHISPER_MODEL_SIZE", "tiny")     # tiny / base
 DEVICE = "cpu"
 COMPUTE_TYPE = "int8"    # Pi must use int8
 

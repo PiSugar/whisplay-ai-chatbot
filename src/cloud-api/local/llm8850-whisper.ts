@@ -1,11 +1,13 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import fs from "fs";
+import { defaultPortMap } from "./common";
 
 dotenv.config();
 
 const whisperServiceHost =
-  process.env.LLM8850_WHISPER_HOST || "http://localhost:8801";
+  process.env.LLM8850_WHISPER_HOST ||
+  `http://localhost:${defaultPortMap.llm8850whisper}`;
 
 interface WhisperResponse {
   filePath: string;
@@ -17,7 +19,7 @@ export const recognizeAudio = async (
 ): Promise<string> => {
   const audioData = fs.readFileSync(audioFilePath);
   const base64Audio = audioData.toString("base64");
-  
+
   return axios
     .post<WhisperResponse>(whisperServiceHost + "/recognize", {
       filePath: audioFilePath,

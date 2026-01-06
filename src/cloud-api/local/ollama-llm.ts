@@ -22,11 +22,12 @@ import {
   extractToolResponse,
   stimulateStreamResponse,
 } from "../../config/common";
+import { defaultPortMap } from "./common";
 
 dotenv.config();
 
 // Ollama LLM configuration
-const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
+const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || `http://localhost:${defaultPortMap.ollama}`;
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
 const ollamaPredictNum = process.env.OLLAMA_PREDICT_NUM ? parseInt(process.env.OLLAMA_PREDICT_NUM) : undefined;

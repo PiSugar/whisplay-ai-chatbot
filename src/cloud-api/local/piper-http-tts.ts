@@ -5,13 +5,16 @@ import { ChildProcess, spawn } from "child_process";
 import dotenv from "dotenv";
 import { ttsDir } from "../../utils/dir";
 import { TTSResult, TTSServer } from "../../type";
+import { defaultPortMap } from "./common";
 
 dotenv.config();
 
 const piperHttpHost = process.env.PIPER_HTTP_HOST || "localhost";
-const piperHttpPort = process.env.PIPER_HTTP_PORT || "8805";
+const piperHttpPort = process.env.PIPER_HTTP_PORT || defaultPortMap.piperHttp.toString();
 const piperHttpModel =
   process.env.PIPER_HTTP_MODEL || "en_US-amy-medium";
+const piperHttpLengthScale =
+  process.env.PIPER_HTTP_LENGTH_SCALE || "1";
 
 const ttsServer = (process.env.TTS_SERVER || "").toLowerCase();
 
@@ -60,7 +63,7 @@ const piperHttpTTS = async (
       "-H",
       "Content-Type: application/json",
       "-d",
-      `{ "text": "${escapedText}" }`,
+      `{ "text": "${escapedText}", "length_scale": ${piperHttpLengthScale} }`,
       "-o",
       tempWavFile,
       `${piperHttpHost}:${piperHttpPort}`
