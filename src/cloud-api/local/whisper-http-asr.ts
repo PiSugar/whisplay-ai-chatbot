@@ -7,7 +7,7 @@ import { defaultPortMap } from "./common";
 
 const whisperPort = process.env.WHISPER_PORT || defaultPortMap.whisper.toString();
 const whisperHost = process.env.WHISPER_HOST || "localhost";
-const whisperLanguage = process.env.WHISPER_LANGUAGE || "";
+const whisperLanguage = process.env.WHISPER_LANGUAGE;
 const whisperRequestType = process.env.WHISPER_REQUEST_TYPE || "filePath";
 
 const asrServer = (process.env.ASR_SERVER || "").toLowerCase() as ASRServer;
