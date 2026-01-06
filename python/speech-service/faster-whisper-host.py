@@ -17,7 +17,6 @@ COMPUTE_TYPE = "int8"    # Pi must use int8
 app = Flask(__name__)
 
 # create model folder if not exists
-model_dir = os.getenv("FASTER_WHISPER_DOWNLOAD_ROOT", "/home/pi/models")
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 
@@ -28,7 +27,6 @@ model = WhisperModel(
   device=DEVICE,
   cpu_threads=3,   # Limit CPU threads for Pi
   compute_type=COMPUTE_TYPE,
-  download_root=model_dir,
 )
 t1 = time.perf_counter()
 print(f"[INIT] Model loaded in {round(t1 - t0, 2)} seconds")
