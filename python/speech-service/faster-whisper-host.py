@@ -23,6 +23,7 @@ model = WhisperModel(
   device=DEVICE,
   cpu_threads=3,   # Limit CPU threads for Pi
   compute_type=COMPUTE_TYPE,
+  download_root="~/.cache/huggingface"
 )
 t1 = time.perf_counter()
 print(f"[INIT] Model loaded in {round(t1 - t0, 2)} seconds")
