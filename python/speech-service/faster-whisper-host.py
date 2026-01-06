@@ -16,10 +16,6 @@ COMPUTE_TYPE = "int8"    # Pi must use int8
 # ---------- Initialization ----------
 app = Flask(__name__)
 
-# create model folder if not exists
-if not os.path.exists(model_dir):
-    os.makedirs(model_dir)
-
 t0 = time.perf_counter()
 print("[INIT] Loading whisper model...")
 model = WhisperModel(
