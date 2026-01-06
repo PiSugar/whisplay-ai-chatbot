@@ -29,6 +29,10 @@ if (ttsServer === TTSServer.piperhttp) {
         "piper.http_server",
         "-m",
         piperHttpModel,
+        "--port",
+        piperHttpPort,
+        "--host",
+        piperHttpHost,
       ],
       {
         detached: true,
