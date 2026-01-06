@@ -1,5 +1,5 @@
 import fs, { readFileSync } from "fs";
-import { spawn } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import { ASRServer } from "../../type";
 import { asrDir } from "../../utils/dir";
 import { resolve } from "path";
@@ -9,8 +9,7 @@ const whisperModelSize = process.env.WHISPER_MODEL_SIZE || "tiny";
 const whisperPort = process.env.WHISPER_PORT || "8804";
 const whisperHost = process.env.WHISPER_HOST || "localhost";
 const whisperLanguage = process.env.WHISPER_LANGUAGE || "";
-const whisperRequestType =
-  process.env.WHISPER_REQUEST_TYPE || "filePath";
+const whisperRequestType = process.env.WHISPER_REQUEST_TYPE || "filePath";
 
 const asrServer = (process.env.ASR_SERVER || "").toLowerCase() as ASRServer;
 
@@ -29,30 +28,27 @@ export const checkWhisperInstallation = (): boolean => {
   return true;
 };
 
+let pyProcess: ChildProcess | null = null;
 if (asrServer === ASRServer.whisper) {
   checkWhisperInstallation();
-}
-
-
-
-let pyProcess: any = null;
-
-if (
-  asrServer.trim().toLowerCase() === ASRServer.whisper &&
-  ["localhost", "0.0.0.0", "127.0.0.1"].includes(whisperHost)
-) {
-  pyProcess = spawn(
-    "python3",
-    [
-      resolve(__dirname, "../../../python/speech-service/whisper-host.py"),
-      "--port",
-      whisperPort,
-    ],
-    {
-      detached: true,
-      stdio: "inherit",
-    }
-  );
+  if (
+    isWhisperInstall &&
+    ["localhost", "0.0.0.0", "127.0.0.1"].includes(whisperHost)
+  ) {
+    console.log("Starting Whisper server at port", whisperPort);
+    pyProcess = spawn(
+      "python3",
+      [
+        resolve(__dirname, "../../../python/speech-service/whisper-host.py"),
+        "--port",
+        whisperPort,
+      ],
+      {
+        detached: true,
+        stdio: "inherit",
+      }
+    );
+  }
 }
 
 interface WhisperResponse {
@@ -93,13 +89,13 @@ export const recognizeAudio = async (
     .catch((error) => {
       console.error("Error calling Whisper service:", error);
       return "";
-    })
+    });
 };
 
 function cleanup() {
   if (pyProcess && !pyProcess.killed) {
     console.log("Killing python server...");
-    process.kill(-pyProcess.pid, "SIGTERM");
+    process.kill(-pyProcess.pid!, "SIGTERM");
   }
 }
 
