@@ -20,7 +20,7 @@ export enum ASRServer {
   vosk = "vosk",
   whisper = "whisper",
   llm8850whisper = "llm8850whisper",
-  fasterwhisper = "fasterwhisper",
+  fasterwhisper = "faster-whisper",
 }
 
 export enum LLMServer {

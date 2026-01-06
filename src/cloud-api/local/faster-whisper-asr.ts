@@ -4,7 +4,6 @@ import { resolve } from "path";
 import { ASRServer } from "../../type";
 import { spawn } from "child_process";
 import { readFileSync } from "fs";
-// import fs from "fs";
 
 dotenv.config();
 
