@@ -37,6 +37,7 @@ const keepAliveOllama = () => {
   axios
     .post(`${ollamaEndpoint}/api/generate`, {
       model: ollamaModel,
+      keep_alive: -1,
       prompt: "",
       stream: false,
     })
@@ -111,6 +112,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         stream: true,
         options: {
           temperature: 0.7,
+          num_predict: 64,
         },
         tools: ollamaEnableTools ? llmTools : [],
       },
