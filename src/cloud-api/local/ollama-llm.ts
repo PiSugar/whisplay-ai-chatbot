@@ -54,6 +54,10 @@ const keepAliveOllama = () => {
           role: "system",
           content: systemPrompt,
         },
+        {
+          role: "user",
+          content: "Hello",
+        }
       ],
       options: {
         temperature: 0.7,
