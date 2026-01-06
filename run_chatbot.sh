@@ -71,6 +71,7 @@ amixer -c $card_index set Speaker $initial_volume_level
 
 if [ "$serve_ollama" = true ]; then
   echo "Starting Ollama server..."
+  export OLLAMA_KEEP_ALIVE=-1 # ensure Ollama server stays alive
   ollama serve &
 fi
 
