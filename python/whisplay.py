@@ -143,9 +143,13 @@ class WhisplayBoard:
 
     def _send_data(self, data):
         GPIO.output(self.DC_PIN, GPIO.HIGH)
-        max_chunk = 4096
-        for i in range(0, len(data), max_chunk):
-            self.spi.writebytes(data[i : i + max_chunk])
+        try:
+            self.spi.writebytes2(data)
+        except AttributeError:
+            max_chunk = 4096
+            for i in range(0, len(data), max_chunk):
+                self.spi.writebytes(data[i : i + max_chunk])
+
 
     def set_window(self, x0, y0, x1, y1, use_horizontal=0):
         if use_horizontal in (0, 1):
