@@ -54,16 +54,14 @@ const keepAliveOllama = () => {
           role: "system",
           content: systemPrompt,
         },
-        {
-          role: "user",
-          content: "Hello",
-        }
       ],
       options: {
         temperature: 0.7,
-        num_predict: 20,
+        num_predict: 1,
       },
+      think: false,
       stream: false,
+      tools: ollamaEnableTools ? llmTools : [],
     })
     .then((response) => {
       console.log("Ollama keep-alive response:", response.data);
