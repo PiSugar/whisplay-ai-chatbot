@@ -44,7 +44,7 @@ if (
   pyProcess = spawn(
     "python3",
     [
-      resolve(__dirname, "../../../python/whisper.py"),
+      resolve(__dirname, "../../../python/speech-service/whisper.py"),
       "--port",
       whisperPort,
     ],
