@@ -19,6 +19,7 @@ export enum ASRServer {
   gemini = "gemini",
   vosk = "vosk",
   whisper = "whisper",
+  whisperhttp = "whisper-http",
   llm8850whisper = "llm8850whisper",
   fasterwhisper = "faster-whisper",
 }
