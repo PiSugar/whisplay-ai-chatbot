@@ -33,8 +33,7 @@ const enableThinking = process.env.ENABLE_THINKING === "true";
 
 const llmServer = process.env.LLM_SERVER || "";
 
-if (llmServer.trim().toLowerCase() === "ollama") {
-  // initialize request to ollama server with empty prompt, to load the model into memory
+const keepAliveOllama = () => {
   axios
     .post(`${ollamaEndpoint}/api/generate`, {
       model: ollamaModel,
@@ -44,6 +43,14 @@ if (llmServer.trim().toLowerCase() === "ollama") {
     .catch((err) => {
       console.error("Error initializing Ollama model:", err.message);
     });
+};
+
+if (llmServer.trim().toLowerCase() === "ollama") {
+  // initialize request to ollama server with empty prompt, to load the model into memory
+  keepAliveOllama();
+  setInterval(() => {
+    keepAliveOllama();
+  }, 5 * 60 * 1000); // every 5 minutes
 }
 
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
