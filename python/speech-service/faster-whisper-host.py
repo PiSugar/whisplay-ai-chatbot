@@ -10,6 +10,7 @@ import sys
 
 # ---------- Configuration ----------
 MODEL_NAME = os.getenv("FASTER_WHISPER_MODEL_SIZE", "tiny")     # tiny / base
+LOCAL_FILES_ONLY = os.getenv("FASTER_WHISPER_LOCAL_FILES_ONLY", "true") == "true"
 DEVICE = "cpu"
 COMPUTE_TYPE = "int8"    # Pi must use int8
 
@@ -23,7 +24,7 @@ model = WhisperModel(
   device=DEVICE,
   cpu_threads=3,   # Limit CPU threads for Pi
   compute_type=COMPUTE_TYPE,
-  download_root="~/.cache/huggingface"
+  local_files_only=LOCAL_FILES_ONLY
 )
 t1 = time.perf_counter()
 print(f"[INIT] Model loaded in {round(t1 - t0, 2)} seconds")
