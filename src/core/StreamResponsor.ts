@@ -24,7 +24,12 @@ export class StreamResponser {
     sentencesCallback?: SentencesCallback,
     textCallback?: TextCallback
   ) {
-    this.ttsFunc = (text) => ttsFunc(text);
+    this.ttsFunc = async (text) => {
+      console.time("[TTS time]");
+      const result = await ttsFunc(text);
+      console.timeEnd("[TTS time]");
+      return result;
+    };
     this.sentencesCallback = sentencesCallback;
     this.textCallback = textCallback;
   }
@@ -32,7 +37,9 @@ export class StreamResponser {
   private playAudioInOrder = async (): Promise<void> => {
     // Prevent multiple concurrent calls
     if (this.isPlaying) {
-      console.log("Audio playback already in progress, skipping duplicate call");
+      console.log(
+        "Audio playback already in progress, skipping duplicate call"
+      );
       return;
     }
     let currentIndex = 0;

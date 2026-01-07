@@ -51,6 +51,12 @@ if [ -f ".env" ]; then
   INITIAL_VOLUME_LEVEL=$(get_env_value "INITIAL_VOLUME_LEVEL")
   [ -n "$INITIAL_VOLUME_LEVEL" ] && export INITIAL_VOLUME_LEVEL
 
+  WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
+  [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
+
+  FASTER_WHISPER_MODEL_SIZE=$(get_env_value "FASTER_WHISPER_MODEL_SIZE")
+  [ -n "$FASTER_WHISPER_MODEL_SIZE" ] && export FASTER_WHISPER_MODEL_SIZE
+
   echo ".env variables loaded."
 
   # check if SERVE_OLLAMA is set to true
@@ -71,6 +77,7 @@ amixer -c $card_index set Speaker $initial_volume_level
 
 if [ "$serve_ollama" = true ]; then
   echo "Starting Ollama server..."
+  export OLLAMA_KEEP_ALIVE=-1 # ensure Ollama server stays alive
   ollama serve &
 fi
 

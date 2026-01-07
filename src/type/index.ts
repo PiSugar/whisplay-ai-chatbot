@@ -19,7 +19,9 @@ export enum ASRServer {
   gemini = "gemini",
   vosk = "vosk",
   whisper = "whisper",
+  whisperhttp = "whisper-http",
   llm8850whisper = "llm8850whisper",
+  fasterwhisper = "faster-whisper",
 }
 
 export enum LLMServer {
@@ -37,6 +39,7 @@ export enum TTSServer {
   tencent = "tencent",
   gemini = "gemini",
   piper = "piper",
+  piperhttp = "piper-http",
   llm8850melotts = "llm8850melotts",
 }
 

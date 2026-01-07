@@ -18,15 +18,22 @@ import {
 import { ChatWithLLMStreamFunction } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
 import moment from "moment";
-import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
+import {
+  extractToolResponse,
+  stimulateStreamResponse,
+} from "../../config/common";
+import { defaultPortMap } from "./common";
 
 dotenv.config();
 
 // Ollama LLM configuration
-const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
+const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || `http://localhost:${defaultPortMap.ollama}`;
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
+const ollamaPredictNum = process.env.OLLAMA_PREDICT_NUM ? parseInt(process.env.OLLAMA_PREDICT_NUM) : undefined;
 const enableThinking = process.env.ENABLE_THINKING === "true";
+
+const llmServer = process.env.LLM_SERVER || "";
 
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss"
@@ -38,6 +45,37 @@ const messages: OllamaMessage[] = [
     content: systemPrompt,
   },
 ];
+
+const keepAliveOllama = () => {
+  axios
+    .post(`${ollamaEndpoint}/api/chat`, {
+      model: ollamaModel,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+      ],
+      options: {
+        temperature: 0.7,
+        num_predict: 1,
+      },
+      think: false,
+      stream: false,
+      tools: ollamaEnableTools ? llmTools : [],
+    })
+    .then((response) => {
+      console.log("Ollama keep-alive response:", response.data);
+    })
+    .catch((err) => {
+      console.error("Error initializing Ollama model:", err.message);
+    });
+};
+
+if (llmServer.trim().toLowerCase() === "ollama") {
+  // initialize request to ollama server with empty prompt, to load the model into memory
+  keepAliveOllama();
+}
 
 const resetChatHistory = (): void => {
   messages.length = 0;
@@ -86,6 +124,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         stream: true,
         options: {
           temperature: 0.7,
+          num_predict: ollamaPredictNum,
         },
         tools: ollamaEnableTools ? llmTools : [],
       },

@@ -13,6 +13,8 @@ const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
 export const recordFileFormat = [
   ASRServer.vosk,
   ASRServer.whisper,
+  ASRServer.whisperhttp,
+  ASRServer.fasterwhisper,
   ASRServer.llm8850whisper,
 ].includes(asrServer)
   ? "wav"

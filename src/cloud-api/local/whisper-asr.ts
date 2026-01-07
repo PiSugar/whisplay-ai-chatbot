@@ -3,7 +3,7 @@ import { spawn } from "child_process";
 import { ASRServer } from "../../type";
 import { asrDir } from "../../utils/dir";
 
-const modelSize = process.env.WHISPER_MODEL_SIZE || "tiny";
+const modelSize = process.env.WHISPER_MODEL_SIZE_OR_PATH || process.env.WHISPER_MODEL_SIZE || "tiny";
 const language = process.env.WHISPER_LANGUAGE || "";
 const asrServer = (process.env.ASR_SERVER || "").toLowerCase() as ASRServer;
 

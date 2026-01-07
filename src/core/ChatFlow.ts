@@ -71,7 +71,10 @@ class ChatFlow {
       console.log("Record audio too short, skipping recognition.");
       return Promise.resolve("");
     }
-    return recognizeAudio(path);
+    console.time(`[ASR time]`);
+    const result = await recognizeAudio(path);
+    console.timeEnd(`[ASR time]`);
+    return result;
   }
 
   partialThinkingCallback = (

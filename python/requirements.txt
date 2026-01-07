@@ -3,3 +3,4 @@ cairosvg
 numpy
 spidev
 opencv-python-headless
+Flask
