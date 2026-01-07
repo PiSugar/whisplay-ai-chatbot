@@ -28,8 +28,8 @@ echo "Installing Python dependencies..."
 cd python
 pip install -r requirements.txt --break-system-packages
 # download fonts and emojis
-wget https://cdn.pisugar.com/EchoView/NotoSansSC-Bold.ttf
-wget https://cdn.pisugar.com/EchoView/emoji_svg.zip
+wget -O NotoSansSC-Bold.ttf https://cdn.pisugar.com/EchoView/NotoSansSC-Bold.ttf
+wget -O emoji_svg.zip https://cdn.pisugar.com/EchoView/emoji_svg.zip
 # overwrite if exists
 unzip -o emoji_svg.zip
 cd ..
