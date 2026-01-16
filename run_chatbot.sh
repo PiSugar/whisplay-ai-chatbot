@@ -78,7 +78,7 @@ amixer -c $card_index set Speaker $initial_volume_level
 if [ "$serve_ollama" = true ]; then
   echo "Starting Ollama server..."
   export OLLAMA_KEEP_ALIVE=-1 # ensure Ollama server stays alive
-  ollama serve &
+  OLLAMA_HOST=0.0.0.0:11434 ollama serve &
 fi
 
 # if file use_npm exists and is true, use npm
