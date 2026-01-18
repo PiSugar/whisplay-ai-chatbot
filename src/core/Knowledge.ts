@@ -10,10 +10,10 @@ export async function createKnowledgeCollection() {
   // delete existing collection if any
   await vectorDB.deleteCollection(collectionName);
 
-  // get all .txt files in knowledgeDir
+  // get all .txt and .md files in knowledgeDir
   const files = fs
     .readdirSync(knowledgeDir)
-    .filter((file) => file.endsWith(".txt"));
+    .filter((file) => file.endsWith(".txt") || file.endsWith(".md"));
 
   // clear existing collection
   await vectorDB.createCollection(collectionName, 1536, "Cosine");
