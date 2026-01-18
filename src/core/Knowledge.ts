@@ -32,7 +32,7 @@ export async function createKnowledgeCollection() {
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       const embedding = await embedText(chunk);
-
+      console.log(`Embedding chunk ${i + 1}/${chunks.length} of file ${file}`);
       await vectorDB.upsertPoints(collectionName, [
         {
           id: uuidv4(),
