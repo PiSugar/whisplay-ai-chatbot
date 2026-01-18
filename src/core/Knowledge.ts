@@ -17,7 +17,7 @@ export async function createKnowledgeCollection() {
     .filter((file) => file.endsWith(".txt") || file.endsWith(".md"));
 
   // clear existing collection
-  await vectorDB.createCollection(collectionName, 1536, "Cosine");
+  await vectorDB.createCollection(collectionName, 768, "Cosine");
 
   if (!files.length) {
     console.log("No knowledge files found to index.");
