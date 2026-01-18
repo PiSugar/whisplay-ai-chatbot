@@ -250,6 +250,7 @@ export default class VectorDB implements VectorDBClass {
     vectorSize: number,
     distance: "Cosine" | "Dot" | "Euclid"
   ) => {
+    console.log("Create collection:", collectionName);
     await this.client.createCollection(collectionName, {
       vectors: {
         size: vectorSize,
@@ -263,6 +264,7 @@ export default class VectorDB implements VectorDBClass {
       if (!collections.includes(collectionName)) {
           return;
       }
+      console.log("Delete collection:", collectionName);
       await this.client.deleteCollection(collectionName)
   }
 
