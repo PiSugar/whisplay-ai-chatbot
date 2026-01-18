@@ -10,9 +10,6 @@ const cleanDataFolderOnStart =
 function ensureDirExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    console.log(`created directory: ${dirPath}`);
-  } else {
-    console.log(`directory exists: ${dirPath}`);
   }
 }
 

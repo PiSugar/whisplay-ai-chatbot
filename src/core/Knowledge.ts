@@ -2,6 +2,7 @@ import { vectorDB, embedText } from "../cloud-api/knowledge";
 import { knowledgeDir } from "../utils/dir";
 import fs from "fs";
 import { chunkText } from "../utils/knowledge";
+import { v4 as uuidv4 } from "uuid";
 
 const collectionName = "whisplay_knowledge";
 
@@ -34,9 +35,9 @@ export async function createKnowledgeCollection() {
 
       await vectorDB.upsertPoints(collectionName, [
         {
-          id: `${file}_chunk_${i}`,
+          id: uuidv4(),
           vector: embedding,
-          payload: { content: chunk },
+          payload: { content: chunk, source: file, chunkIndex: i},
         },
       ]);
     }
