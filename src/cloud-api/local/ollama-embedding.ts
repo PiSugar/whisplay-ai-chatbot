@@ -7,12 +7,12 @@ const embeddingServer = (process.env.EMBEDDING_SERVER || "ollama").toLowerCase()
 
 if (embeddingServer === "ollama") {
   // wake request to prevent cold start
-  axios.post(`${ollamaEndpoint}/api/embeddings`, {
+  axios.post(`${ollamaEndpoint}/api/embed`, {
     model: ollamaEmbeddingModel,
     input: "wake up",
   })
   .then((res) => {
-    console.log('[embedding wake request]', res);
+    console.log('[embedding wake request]', res.data);
   })
   .catch(() => {
     // ignore errors
@@ -21,7 +21,7 @@ if (embeddingServer === "ollama") {
 
 export const embedText = async (text: string): Promise<number[]> => {
   try {
-    const response = await axios.post(`${ollamaEndpoint}/api/embeddings`, {
+    const response = await axios.post(`${ollamaEndpoint}/api/embed`, {
       model: ollamaEmbeddingModel,
       input: text,
     });
