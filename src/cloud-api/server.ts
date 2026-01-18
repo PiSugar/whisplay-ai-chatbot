@@ -55,6 +55,8 @@ import {
   ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
+import VectorDB from "./local/qdrant-vectordb";
+import { embedText as ollamaEmbedText } from "./local/ollama-embedding";
 
 dotenv.config();
 
@@ -116,7 +118,7 @@ switch (asrServer) {
     break;
   default:
     console.warn(
-      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/whisper-http/llm8850whisper/fasterwhisper`
+      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/whisper-http/llm8850whisper/fasterwhisper`,
     );
     break;
 }
@@ -148,7 +150,7 @@ switch (llmServer) {
     break;
   default:
     console.warn(
-      `unknown llm server: ${llmServer}, should be volcengine/openai/gemini/ollama/grok/llm8850`
+      `unknown llm server: ${llmServer}, should be volcengine/openai/gemini/ollama/grok/llm8850`,
     );
     break;
 }
@@ -177,9 +179,20 @@ switch (ttsServer) {
     break;
   default:
     console.warn(
-      `unknown tts server: ${ttsServer}, should be volcengine/tencent/openai/gemini/piper/piper-http/llm8850melotts`
+      `unknown tts server: ${ttsServer}, should be volcengine/tencent/openai/gemini/piper/piper-http/llm8850melotts`,
     );
     break;
 }
 
-export { recognizeAudio, chatWithLLMStream, ttsProcessor, resetChatHistory };
+// TODO
+const vectorDB = new VectorDB();
+const embedText = ollamaEmbedText;
+
+export {
+  recognizeAudio,
+  chatWithLLMStream,
+  ttsProcessor,
+  resetChatHistory,
+  vectorDB,
+  embedText,
+};

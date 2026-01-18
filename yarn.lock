@@ -172,6 +172,19 @@
   resolved "https://registry.npmmirror.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
 
+"@qdrant/js-client-rest@^1.16.2":
+  version "1.16.2"
+  resolved "https://registry.npmmirror.com/@qdrant/js-client-rest/-/js-client-rest-1.16.2.tgz#cde87aa44288a46048076153b38ee1dcaf742385"
+  integrity sha512-Zm4wEZURrZ24a+Hmm4l1QQYjiz975Ep3vF0yzWR7ICGcxittNz47YK2iBOk8kb8qseCu8pg7WmO1HOIsO8alvw==
+  dependencies:
+    "@qdrant/openapi-typescript-fetch" "1.2.6"
+    undici "^6.0.0"
+
+"@qdrant/openapi-typescript-fetch@1.2.6":
+  version "1.2.6"
+  resolved "https://registry.npmmirror.com/@qdrant/openapi-typescript-fetch/-/openapi-typescript-fetch-1.2.6.tgz#c2682a9fa26ded86384f421c991f6c461785af7e"
+  integrity sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==
+
 "@tootallnate/once@2":
   version "2.0.0"
   resolved "https://registry.npmmirror.com/@tootallnate/once/-/once-2.0.0.tgz#f544a148d3ab35801c1f633a7441fd87c2e484bf"
@@ -1343,6 +1356,11 @@ undici-types@~7.14.0:
   version "7.14.0"
   resolved "https://registry.npmmirror.com/undici-types/-/undici-types-7.14.0.tgz#4c037b32ca4d7d62fae042174604341588bc0840"
   integrity sha512-QQiYxHuyZ9gQUIrmPo3IA+hUl4KYk8uSA7cHrcKd/l3p1OTpZcM0Tbp9x7FAtXdAYhlasd60ncPpgu6ihG6TOA==
+
+undici@^6.0.0:
+  version "6.23.0"
+  resolved "https://registry.npmmirror.com/undici/-/undici-6.23.0.tgz#7953087744d9095a96f115de3140ca3828aff3a4"
+  integrity sha512-VfQPToRA5FZs/qJxLIinmU59u0r7LXqoJkCzinq3ckNJp3vKEh7jTWN589YQ5+aoAC/TGRLyJLCPKcLQbM8r9g==
 
 undici@^7.16.0:
   version "7.16.0"
