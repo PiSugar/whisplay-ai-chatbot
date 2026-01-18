@@ -1,4 +1,4 @@
-import { vectorDB, embedText } from "../cloud-api/server";
+import { vectorDB, embedText } from "../cloud-api/knowledge";
 import { knowledgeDir } from "../utils/dir";
 import fs from "fs";
 import { chunkText } from "../utils/knowledge";

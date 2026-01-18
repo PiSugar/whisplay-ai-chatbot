@@ -55,8 +55,7 @@ import {
   ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
-import VectorDB from "./local/qdrant-vectordb";
-import { embedText as ollamaEmbedText } from "./local/ollama-embedding";
+import { vectorDB, embedText } from "./knowledge";
 
 dotenv.config();
 
@@ -183,10 +182,6 @@ switch (ttsServer) {
     );
     break;
 }
-
-// TODO
-const vectorDB = new VectorDB();
-const embedText = ollamaEmbedText;
 
 export {
   recognizeAudio,
