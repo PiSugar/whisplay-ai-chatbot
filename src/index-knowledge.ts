@@ -1,7 +1,4 @@
 import { createKnowledgeCollection } from "./core/Knowledge";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 createKnowledgeCollection()
   .catch((e) => {
