@@ -14,6 +14,8 @@ export async function createKnowledgeCollection() {
   // get dimension of embeddings
   const dimension = await embedText("test").then(embedding => embedding.length);
 
+  console.log(`Creating knowledge collection with dimension: ${dimension}`);
+
   // get all .txt and .md files in knowledgeDir
   const files = fs
     .readdirSync(knowledgeDir)
