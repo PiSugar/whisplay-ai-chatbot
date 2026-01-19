@@ -53,7 +53,7 @@ const piperHttpTTS = async (
     const tempWavFile = path.join(ttsDir, `piper_http_${now}.wav`);
     const convertedWavFile = path.join(ttsDir, `piper_http_${now}_converted.wav`);
 
-    // curl -X POST -H 'Content-Type: application/json' -d '{ "text": "This is a test." }' -o test.wav localhost:5000
+    // curl -X POST -H 'Content-Type: application/json' -d '{ "text": "This is a test." }' -o test.wav localhost:8805
     // text may contain double quotes, need to escape them
     const escapedText = text.replace(/"/g, '\\"');
 

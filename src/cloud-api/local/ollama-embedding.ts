@@ -10,6 +10,7 @@ if (embeddingServer === "ollama") {
   axios.post(`${ollamaEndpoint}/api/embed`, {
     model: ollamaEmbeddingModel,
     input: "wake up",
+    keep_alive: -1,
   })
   .then((res) => {
     console.log('[embedding wake request]', res.data);
@@ -24,6 +25,7 @@ export const embedText = async (text: string): Promise<number[]> => {
     const response = await axios.post(`${ollamaEndpoint}/api/embed`, {
       model: ollamaEmbeddingModel,
       input: text,
+      keep_alive: -1,
     });
 
     if (
