@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
+const ollamaEndpoint = process.env.OLLAMA_EMBEDDING_ENDPOINT || process.env.OLLAMA_ENDPOINT || "http://localhost:11434";
 const ollamaEmbeddingModel =
   process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text";
 const embeddingServer = (process.env.EMBEDDING_SERVER || "ollama").toLowerCase().trim();

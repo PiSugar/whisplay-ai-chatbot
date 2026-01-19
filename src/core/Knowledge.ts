@@ -7,12 +7,13 @@ import { v4 as uuidv4 } from "uuid";
 const collectionName = "whisplay_knowledge";
 
 export async function createKnowledgeCollection() {
-
   // delete existing collection if any
   await vectorDB.deleteCollection(collectionName);
 
   // get dimension of embeddings
-  const dimension = await embedText("test").then(embedding => embedding.length);
+  const dimension = await embedText("test").then(
+    (embedding) => embedding.length,
+  );
 
   console.log(`Creating knowledge collection with dimension: ${dimension}`);
 
@@ -42,7 +43,7 @@ export async function createKnowledgeCollection() {
         {
           id: uuidv4(),
           vector: embedding,
-          payload: { content: chunk, source: file, chunkIndex: i},
+          payload: { content: chunk, source: file, chunkIndex: i },
         },
       ]);
     }
@@ -62,15 +63,25 @@ export async function retrieveKnowledgeByIds(ids: string[]) {
 }
 
 export async function getSystemPromptWithKnowledge(query: string) {
-  const results = await queryKnowledgeBase(query, 1);
+  let results: {
+    id: number | string;
+    score: number;
+    payload?: { [key: string]: unknown } | Record<string, unknown> | undefined | null;
+  }[] = [];
+  try {
+    results = await queryKnowledgeBase(query, 1);
+  } catch (error) {
+    console.error("Error querying knowledge base:", error);
+    return "";
+  }
   if (results.length === 0) {
-    return ""
+    return "";
   }
   const topResult = results[0];
   const knowledgeId = topResult.id as string;
   const knowledgeData = await retrieveKnowledgeByIds([knowledgeId]);
   if (knowledgeData.length === 0) {
-    return ""
+    return "";
   }
   const knowledgeContent = knowledgeData[0].payload!.content;
   return `Use the following knowledge to assist in answering the question:\n\n${knowledgeContent}\n\n`;
