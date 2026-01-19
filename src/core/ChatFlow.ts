@@ -4,7 +4,7 @@ import {
   getRecordFileDurationMs,
   splitSentences,
 } from "./../utils/index";
-import { get, noop } from "lodash";
+import { compact, get, noop } from "lodash";
 import {
   onButtonPressed,
   onButtonReleased,
@@ -23,6 +23,12 @@ import { extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
 import { cameraDir, recordingsDir } from "../utils/dir";
 import { getLatestDisplayImg, setLatestCapturedImg } from "../utils/image";
+import dotEnv from "dotenv";
+import { getSystemPromptWithKnowledge } from "./Knowledge";
+
+dotEnv.config();
+
+const enableRAG = process.env.ENABLE_RAG === "true";
 
 class ChatFlow {
   currentFlowName: string = "";
@@ -59,7 +65,7 @@ class ChatFlow {
           text: text || undefined,
           scroll_speed: 3,
         });
-      }
+      },
     );
     if (options?.enableCamera) {
       this.enableCamera = true;
@@ -77,9 +83,7 @@ class ChatFlow {
     return result;
   }
 
-  partialThinkingCallback = (
-    partialThinking: string,
-  ): void => {
+  partialThinkingCallback = (partialThinking: string): void => {
     this.partialThinking += partialThinking;
     const { sentences, remaining } = splitSentences(this.partialThinking);
     if (sentences.length > 0) {
@@ -108,7 +112,7 @@ class ChatFlow {
         // camera mode
         if (this.enableCamera) {
           const captureImgPath = `${cameraDir}/capture-${moment().format(
-            "YYYYMMDD-HHmmss"
+            "YYYYMMDD-HHmmss",
           )}.jpg`;
           onButtonDoubleClick(() => {
             display({
@@ -141,7 +145,7 @@ class ChatFlow {
         }/user-${Date.now()}.${recordFileFormat}`;
         onButtonPressed(noop);
         const { result, stop } = recordAudioManually(
-          this.currentRecordFilePath
+          this.currentRecordFilePath,
         );
         onButtonReleased(() => {
           stop();
@@ -213,32 +217,47 @@ class ChatFlow {
         } = this.streamResponser;
         this.partialThinking = "";
         this.thinkingSentences = [];
-        chatWithLLMStream(
-          [
-            {
-              role: "user",
-              content: this.asrText,
-            },
-          ],
-          (text) =>
-            currentAnswerId === this.answerId && partial(text),
-          () =>
-            currentAnswerId === this.answerId && endPartial(),
-          (partialThinking) =>
-            currentAnswerId === this.answerId &&
-            this.partialThinkingCallback(partialThinking),
-          (functionName: string, result?: string) => {
-            if (result) {
-              display({
-                text: `[${functionName}]${result}`,
-              });
-            } else {
-              display({
-                text: `Invoking [${functionName}]...`,
-              });
+        [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
+          [enableRAG ? 1 : 0](this.asrText)
+          .then((res: string) => {
+            if (res) {
+              console.log("Retrieved knowledge for RAG:\n", res);
             }
-          }
-        );
+            const prompt: {
+              role: "system" | "user";
+              content: string;
+            }[] = compact([
+              res
+                ? {
+                    role: "system",
+                    content: res,
+                  }
+                : null,
+              {
+                role: "user",
+                content: this.asrText,
+              },
+            ]);
+            chatWithLLMStream(
+              prompt,
+              (text) => currentAnswerId === this.answerId && partial(text),
+              () => currentAnswerId === this.answerId && endPartial(),
+              (partialThinking) =>
+                currentAnswerId === this.answerId &&
+                this.partialThinkingCallback(partialThinking),
+              (functionName: string, result?: string) => {
+                if (result) {
+                  display({
+                    text: `[${functionName}]${result}`,
+                  });
+                } else {
+                  display({
+                    text: `Invoking [${functionName}]...`,
+                  });
+                }
+              },
+            );
+          });
         getPlayEndPromise().then(() => {
           if (this.currentFlowName === "answer") {
             const img = getLatestDisplayImg();

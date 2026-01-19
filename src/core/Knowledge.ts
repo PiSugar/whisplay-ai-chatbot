@@ -11,13 +11,16 @@ export async function createKnowledgeCollection() {
   // delete existing collection if any
   await vectorDB.deleteCollection(collectionName);
 
+  // get dimension of embeddings
+  const dimension = await embedText("test").then(embedding => embedding.length);
+
   // get all .txt and .md files in knowledgeDir
   const files = fs
     .readdirSync(knowledgeDir)
     .filter((file) => file.endsWith(".txt") || file.endsWith(".md"));
 
   // clear existing collection
-  await vectorDB.createCollection(collectionName, 768, "Cosine");
+  await vectorDB.createCollection(collectionName, dimension, "Cosine");
 
   if (!files.length) {
     console.log("No knowledge files found to index.");
@@ -27,7 +30,7 @@ export async function createKnowledgeCollection() {
   for (const file of files) {
     const filePath = `${knowledgeDir}/${file}`;
     const content = fs.readFileSync(filePath, "utf-8");
-    const chunks = chunkText(content);
+    const chunks = chunkText(content, 200, 50);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -54,4 +57,19 @@ export async function queryKnowledgeBase(query: string, topK: number = 3) {
 
 export async function retrieveKnowledgeByIds(ids: string[]) {
   return await vectorDB.retrieve(collectionName, ids);
+}
+
+export async function getSystemPromptWithKnowledge(query: string) {
+  const results = await queryKnowledgeBase(query, 1);
+  if (results.length === 0) {
+    return ""
+  }
+  const topResult = results[0];
+  const knowledgeId = topResult.id;
+  const knowledgeData = await retrieveKnowledgeByIds([knowledgeId]);
+  if (knowledgeData.length === 0) {
+    return ""
+  }
+  const knowledgeContent = knowledgeData[0].payload.content;
+  return `Use the following knowledge to assist in answering the question:\n\n${knowledgeContent}\n\n`;
 }
