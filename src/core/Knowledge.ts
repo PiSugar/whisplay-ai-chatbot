@@ -30,7 +30,7 @@ export async function createKnowledgeCollection() {
   for (const file of files) {
     const filePath = `${knowledgeDir}/${file}`;
     const content = fs.readFileSync(filePath, "utf-8");
-    const chunks = chunkText(content, 200, 50);
+    const chunks = chunkText(content, 500, 80);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
