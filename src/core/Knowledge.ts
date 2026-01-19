@@ -65,11 +65,11 @@ export async function getSystemPromptWithKnowledge(query: string) {
     return ""
   }
   const topResult = results[0];
-  const knowledgeId = topResult.id;
+  const knowledgeId = topResult.id as string;
   const knowledgeData = await retrieveKnowledgeByIds([knowledgeId]);
   if (knowledgeData.length === 0) {
     return ""
   }
-  const knowledgeContent = knowledgeData[0].payload.content;
+  const knowledgeContent = knowledgeData[0].payload!.content;
   return `Use the following knowledge to assist in answering the question:\n\n${knowledgeContent}\n\n`;
 }
