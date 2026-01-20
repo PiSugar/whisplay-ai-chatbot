@@ -1,5 +1,6 @@
 import VectorDB from "./local/qdrant-vectordb";
 import { embedText as ollamaEmbedText } from "./local/ollama-embedding";
+import { EmbeddingServer, VectorDBServer } from "../type";
 
 const embeddingServer = (process.env.EMBEDDING_SERVER || "ollama")
   .toLowerCase()
@@ -12,7 +13,7 @@ const envEnableRAG = (process.env.ENABLE_RAG || "false").toLowerCase() === "true
 let vectorDB: VectorDB = null as any;
 
 switch (vectorDBServer) {
-  case "qdrant":
+  case VectorDBServer.qdrant:
     vectorDB = new VectorDB();
     break;
   default:
@@ -24,7 +25,7 @@ switch (vectorDBServer) {
 let embedText: ((text: string) => Promise<number[]>) = null as any;
 
 switch (embeddingServer) {
-  case "ollama":
+  case EmbeddingServer.ollama:
     embedText = ollamaEmbedText;
     break;
   default:

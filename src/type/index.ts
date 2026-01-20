@@ -43,7 +43,7 @@ export enum TTSServer {
   llm8850melotts = "llm8850melotts",
 }
 
-export enum VectorDB {
+export enum VectorDBServer {
   qdrant = "qdrant",
 }
 
