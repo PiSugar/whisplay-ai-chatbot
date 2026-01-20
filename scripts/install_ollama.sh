@@ -73,26 +73,19 @@ download_and_extract() {
     local filename="$3"
 
     # Check if .tar.zst is available
-    local local_zst="~/${filename}.tar.zst"
-    if [ -f "$local_zst" ]; then
-        if ! available zstd; then
-            error "This version requires zstd for extraction. Please install zstd and try again:
-  - Debian/Ubuntu: sudo apt-get install zstd
-  - RHEL/CentOS/Fedora: sudo dnf install zstd
-  - Arch: sudo pacman -S zstd"
-        fi
-
-        status "Extracting ${local_zst}"
-        # Decompress to stdout and extract into dest_dir (use sudo for tar if needed)
-        zstd -d -c "$local_zst" | $SUDO tar -xf - -C "${dest_dir}"
-        return 0
+    local local_zst="${HOME}/${filename}.tar.zst"
+    if ! available zstd; then
+        error "This version requires zstd for extraction. Please install zstd and try again:
+    - Debian/Ubuntu: sudo apt-get install zstd
+    - RHEL/CentOS/Fedora: sudo dnf install zstd
+    - Arch: sudo pacman -S zstd"
     fi
 
-    # Fall back to .tgz for older versions
-    status "Downloading ${filename}.tgz"
-    curl --fail --show-error --location --progress-bar \
-        "${url_base}/${filename}.tgz${VER_PARAM}" | \
-        $SUDO tar -xzf - -C "${dest_dir}"
+    status "Extracting ${local_zst}"
+    # Decompress to stdout and extract into dest_dir (use sudo for tar if needed)
+    zstd -d -c "$local_zst" | $SUDO tar -xf - -C "${dest_dir}"
+    return 0
+
 }
 
 for BINDIR in /usr/local/bin /usr/bin /bin; do
