@@ -113,7 +113,7 @@ The chatbot saves conversation history and generated images in the `data` folder
 
 If you have a LLM8850 AI Accelerator, you can set up the LLM8850 services for local ASR, TTS, and LLM API to enable offline capabilities.
 
-Please refer to the [LLM8850 Integration Guide](README-llm8850.md) for detailed setup instructions.
+Please refer to the [LLM8850 Integration Guide](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/LLM8850-Integration) for detailed setup instructions.
 
 ## Goals
 
