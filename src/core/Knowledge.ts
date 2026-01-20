@@ -71,13 +71,18 @@ export async function getSystemPromptWithKnowledge(query: string) {
   try {
     results = await queryKnowledgeBase(query, 1);
   } catch (error) {
-    console.error("Error querying knowledge base:", error);
+    console.error("[RAG] Error querying knowledge base:", error);
     return "";
   }
   if (results.length === 0) {
+    console.log("[RAG] No knowledge found.");
     return "";
   }
   const topResult = results[0];
+  if (topResult.score < 0.65) {
+    console.log("[RAG] No relevant knowledge found.");
+    return "";
+  }
   const knowledgeId = topResult.id as string;
   const knowledgeData = await retrieveKnowledgeByIds([knowledgeId]);
   if (knowledgeData.length === 0) {

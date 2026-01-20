@@ -12,14 +12,14 @@ import { llmFuncMap, llmToolsForGemini } from "../../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../../type";
 import { ChatWithLLMStreamFunction } from "../interface";
-import { ToolListUnion, ToolUnion, Part } from "@google/genai";
+import { ToolListUnion, ToolUnion, Part, Content } from "@google/genai";
 import moment from "moment";
 import { chatHistoryDir } from "../../utils/dir";
 
 dotenv.config();
 
 const chatHistoryFileName = `gemini_chat_history_${moment().format(
-  "YYYY-MM-DD_HH-mm-ss"
+  "YYYY-MM-DD_HH-mm-ss",
 )}.json`;
 
 const resetChatHistory = (): void => {
@@ -43,23 +43,28 @@ const convertToolsToGeminiFormat = (tools: LLMTool[]): ToolListUnion => {
   ];
 };
 
-const chat = gemini?.chats.create({
-  model: geminiModel,
-  config: {
-    tools: convertToolsToGeminiFormat(llmToolsForGemini),
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-      role: "system",
+function createGeminiChatInstance(history?: Content[]) {
+  return gemini?.chats.create({
+    model: geminiModel,
+    config: {
+      tools: convertToolsToGeminiFormat(llmToolsForGemini),
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+        role: "system",
+      },
     },
-  },
-});
+    history,
+  })!;
+}
+
+let chat = createGeminiChatInstance();
 
 const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string, result?: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void,
 ): Promise<void> => {
   if (!gemini || !chat) {
     console.error("Google Gemini API key is not set.");
@@ -71,6 +76,17 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
 
+  const chatHistory = chat.getHistory();
+  const knowledgePrompt = inputMessages.find((msg) => msg.role === "system");
+  if (knowledgePrompt) {
+    chatHistory.push({
+      parts: [{ text: knowledgePrompt.content }],
+      role: "system",
+    });
+    // recreate chat instance to include system prompt
+    chat = createGeminiChatInstance(chatHistory);
+  }
+
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
@@ -78,7 +94,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     // save chat history to file
     fs.writeFileSync(
       path.join(chatHistoryDir, chatHistoryFileName),
-      JSON.stringify(chat.getHistory(), null, 2)
+      JSON.stringify(chat.getHistory(), null, 2),
     );
   });
 
@@ -148,7 +164,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           } catch {
             console.error(
               `Error parsing arguments for function ${name}:`,
-              argString
+              argString,
             );
           }
           const func = llmFuncMap[name! as string];
@@ -170,7 +186,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             console.error(`Function ${name} not found`);
             return [id, `Function ${name} not found`];
           }
-        })
+        }),
       );
 
       console.log("call results: ", results);
