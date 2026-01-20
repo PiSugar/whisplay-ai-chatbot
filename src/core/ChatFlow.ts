@@ -25,10 +25,9 @@ import { cameraDir, recordingsDir } from "../utils/dir";
 import { getLatestDisplayImg, setLatestCapturedImg } from "../utils/image";
 import dotEnv from "dotenv";
 import { getSystemPromptWithKnowledge } from "./Knowledge";
+import { enableRAG } from "../cloud-api/knowledge";
 
 dotEnv.config();
-
-const enableRAG = process.env.ENABLE_RAG === "true";
 
 class ChatFlow {
   currentFlowName: string = "";

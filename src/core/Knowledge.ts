@@ -1,12 +1,23 @@
-import { vectorDB, embedText } from "../cloud-api/knowledge";
+import { vectorDB, embedText, enableRAG } from "../cloud-api/knowledge";
 import { knowledgeDir } from "../utils/dir";
 import fs from "fs";
 import { chunkText } from "../utils/knowledge";
 import { v4 as uuidv4 } from "uuid";
 
 const collectionName = "whisplay_knowledge";
+const knowledgeScoreThreshold = parseFloat(
+  process.env.RAG_KNOWLEDGE_SCORE_THRESHOLD || "0.65",
+);
 
 export async function createKnowledgeCollection() {
+
+  if (!enableRAG) {
+    console.log(
+      "[RAG] RAG is disabled. Skipping knowledge collection creation.",
+    );
+    return;
+  }
+
   // delete existing collection if any
   await vectorDB.deleteCollection(collectionName);
 
@@ -66,7 +77,11 @@ export async function getSystemPromptWithKnowledge(query: string) {
   let results: {
     id: number | string;
     score: number;
-    payload?: { [key: string]: unknown } | Record<string, unknown> | undefined | null;
+    payload?:
+      | { [key: string]: unknown }
+      | Record<string, unknown>
+      | undefined
+      | null;
   }[] = [];
   try {
     results = await queryKnowledgeBase(query, 1);
@@ -79,7 +94,7 @@ export async function getSystemPromptWithKnowledge(query: string) {
     return "";
   }
   const topResult = results[0];
-  if (topResult.score < 0.65) {
+  if (topResult.score < knowledgeScoreThreshold) {
     console.log("[RAG] No relevant knowledge found.");
     return "";
   }
