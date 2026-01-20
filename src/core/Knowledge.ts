@@ -95,7 +95,7 @@ export async function getSystemPromptWithKnowledge(query: string) {
   }
   const topResult = results[0];
   if (topResult.score < knowledgeScoreThreshold) {
-    console.log("[RAG] No relevant knowledge found.");
+    console.log("[RAG] Top knowledge score below threshold:", topResult.score);
     return "";
   }
   const knowledgeId = topResult.id as string;
@@ -104,5 +104,5 @@ export async function getSystemPromptWithKnowledge(query: string) {
     return "";
   }
   const knowledgeContent = knowledgeData[0].payload!.content;
-  return `Use the following knowledge to assist in answering the question:\n\n${knowledgeContent}\n\n`;
+  return `Use the following knowledge to assist in answering the question:\n${knowledgeContent}\n`;
 }
