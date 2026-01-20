@@ -2,10 +2,6 @@
 # This script installs Ollama on Linux.
 # It detects the current operating system architecture and installs the appropriate version of Ollama.
 
-# Enable auto-export of variables to ensure proper function behavior
-# This resolves issues related to variable scope in some environments
-set -a
-
 set -eu
 
 red="$( (/usr/bin/tput bold || :; /usr/bin/tput setaf 1 || :) 2>&-)"
@@ -29,32 +25,6 @@ require() {
     done
 
     echo $MISSING
-}
-
-# 改进的代理下载函数
-# 如果下载失败，可尝试替换 https://ghfast.top 为 https://gh-proxy.com，或其他类似 github 加速服务
-download_with_proxy() {
-    local url="$1"
-    local output_file="$2"
-    local github_url=$(curl -s -I "$url" | grep -i Location | awk '{print $2}' | tr -d '\r')
-    local proxy_url="https://gh.pisugar.uk?url=$github_url"
-    local max_retries=3
-    local retry_count=0
-
-    while [ $retry_count -lt $max_retries ]; do
-        if command -v wget >/dev/null 2>&1; then
-            wget -c --tries=3 -O "$output_file" "$proxy_url" && return 0
-        elif curl -L --http1.1 -C - "$proxy_url" -o "$output_file"; then
-            return 0
-        else
-            retry_count=$((retry_count + 1))
-            echo "Download failed. Retrying in 5 seconds... (Attempt $retry_count of $max_retries)"
-            sleep 5
-        fi
-    done
-
-    echo "Download failed after $max_retries attempts."
-    return 1
 }
 
 [ "$(uname -s)" = "Linux" ] || error 'This script is intended to run on Linux only.'
@@ -96,6 +66,35 @@ if [ -n "$NEEDS" ]; then
     exit 1
 fi
 
+# Function to download and extract with fallback from zst to tgz
+download_and_extract() {
+    local url_base="$1"
+    local dest_dir="$2"
+    local filename="$3"
+
+    # Check if .tar.zst is available
+    local local_zst="~/${filename}.tar.zst"
+    if [ -f "$local_zst" ]; then
+        if ! available zstd; then
+            error "This version requires zstd for extraction. Please install zstd and try again:
+  - Debian/Ubuntu: sudo apt-get install zstd
+  - RHEL/CentOS/Fedora: sudo dnf install zstd
+  - Arch: sudo pacman -S zstd"
+        fi
+
+        status "Extracting ${local_zst}"
+        # Decompress to stdout and extract into dest_dir (use sudo for tar if needed)
+        zstd -d -c "$local_zst" | $SUDO tar -xf - -C "${dest_dir}"
+        return 0
+    fi
+
+    # Fall back to .tgz for older versions
+    status "Downloading ${filename}.tgz"
+    curl --fail --show-error --location --progress-bar \
+        "${url_base}/${filename}.tgz${VER_PARAM}" | \
+        $SUDO tar -xzf - -C "${dest_dir}"
+}
+
 for BINDIR in /usr/local/bin /usr/bin /bin; do
     echo $PATH | grep -q $BINDIR && break || continue
 done
@@ -105,54 +104,24 @@ if [ -d "$OLLAMA_INSTALL_DIR/lib/ollama" ] ; then
     status "Cleaning up old version at $OLLAMA_INSTALL_DIR/lib/ollama"
     $SUDO rm -rf "$OLLAMA_INSTALL_DIR/lib/ollama"
 fi
-
 status "Installing ollama to $OLLAMA_INSTALL_DIR"
 $SUDO install -o0 -g0 -m755 -d $BINDIR
 $SUDO install -o0 -g0 -m755 -d "$OLLAMA_INSTALL_DIR/lib/ollama"
+download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}"
 
-status "Downloading Linux ${ARCH} bundle"
-
-# if download_with_proxy "https://ollama.com/download/ollama-linux-${ARCH}.tgz${VER_PARAM}" "$TEMP_DIR/ollama.tgz"; then
-#     $SUDO tar -xzf "$TEMP_DIR/ollama.tgz" -C "$OLLAMA_INSTALL_DIR"
-    
-#     if [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ] ; then
-#         status "Making ollama accessible in the PATH in $BINDIR"
-#         $SUDO ln -sf "$OLLAMA_INSTALL_DIR/ollama" "$BINDIR/ollama"
-#     fi
-# else
-#     error "Failed to download Ollama bundle"
-# fi
-
-if [ -f ~/ollama-linux-arm64.tgz ]; then
-  status "Using local Ollama bundle from ~/ollama-linux-arm64.tgz"
-  $SUDO tar -xzf ~/ollama-linux-arm64.tgz -C "$OLLAMA_INSTALL_DIR"
-  
-  if [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ] ; then
+if [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ] ; then
     status "Making ollama accessible in the PATH in $BINDIR"
     $SUDO ln -sf "$OLLAMA_INSTALL_DIR/ollama" "$BINDIR/ollama"
-  fi
-else
-  error "Local Ollama bundle not found at ~/ollama-linux-arm64.tgz"
 fi
 
 # Check for NVIDIA JetPack systems with additional downloads
 if [ -f /etc/nv_tegra_release ] ; then
     if grep R36 /etc/nv_tegra_release > /dev/null ; then
-        status "Downloading JetPack 6 components"
-        if download_with_proxy "https://ollama.com/download/ollama-linux-${ARCH}-jetpack6.tgz${VER_PARAM}" "$TEMP_DIR/ollama-jetpack.tgz"; then
-            $SUDO tar -xzf "$TEMP_DIR/ollama-jetpack.tgz" -C "$OLLAMA_INSTALL_DIR"
-        else
-            error "Failed to download JetPack 6 components"
-        fi
+        download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}-jetpack6"
     elif grep R35 /etc/nv_tegra_release > /dev/null ; then
-        status "Downloading JetPack 5 components"
-        if download_with_proxy "https://ollama.com/download/ollama-linux-${ARCH}-jetpack5.tgz${VER_PARAM}" "$TEMP_DIR/ollama-jetpack.tgz"; then
-            $SUDO tar -xzf "$TEMP_DIR/ollama-jetpack.tgz" -C "$OLLAMA_INSTALL_DIR"
-        else
-            error "Failed to download JetPack 5 components"
-        fi
+        download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}-jetpack5"
     else
-        warning "Unsupported JetPack version detected. GPU may not be supported"
+        warning "Unsupported JetPack version detected.  GPU may not be supported"
     fi
 fi
 
@@ -162,20 +131,64 @@ install_success() {
 }
 trap install_success EXIT
 
-start_ollama() {
-    if [ -f "$BINDIR/ollama" ]; then
-        status "Starting Ollama..."
-        nohup $BINDIR/ollama serve > /var/log/ollama.log 2>&1 &
-        PID=$!
-        status "Ollama started with PID $PID"
-    else
-        error "Ollama binary not found at $BINDIR/ollama"
+# Everything from this point onwards is optional.
+
+configure_systemd() {
+    if ! id ollama >/dev/null 2>&1; then
+        status "Creating ollama user..."
+        $SUDO useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
     fi
+    if getent group render >/dev/null 2>&1; then
+        status "Adding ollama user to render group..."
+        $SUDO usermod -a -G render ollama
+    fi
+    if getent group video >/dev/null 2>&1; then
+        status "Adding ollama user to video group..."
+        $SUDO usermod -a -G video ollama
+    fi
+
+    status "Adding current user to ollama group..."
+    $SUDO usermod -a -G ollama $(whoami)
+
+    status "Creating ollama systemd service..."
+    cat <<EOF | $SUDO tee /etc/systemd/system/ollama.service >/dev/null
+[Unit]
+Description=Ollama Service
+After=network-online.target
+
+[Service]
+ExecStart=$BINDIR/ollama serve
+User=ollama
+Group=ollama
+Restart=always
+RestartSec=3
+Environment="PATH=$PATH"
+
+[Install]
+WantedBy=default.target
+EOF
+    SYSTEMCTL_RUNNING="$(systemctl is-system-running || true)"
+    case $SYSTEMCTL_RUNNING in
+        running|degraded)
+            status "Enabling and starting ollama service..."
+            $SUDO systemctl daemon-reload
+            $SUDO systemctl enable ollama
+
+            start_service() { $SUDO systemctl restart ollama; }
+            trap start_service EXIT
+            ;;
+        *)
+            warning "systemd is not running"
+            if [ "$IS_WSL2" = true ]; then
+                warning "see https://learn.microsoft.com/en-us/windows/wsl/systemd#how-to-enable-systemd to enable it"
+            fi
+            ;;
+    esac
 }
 
-# Since we're in a container, skip systemd setup and directly start ollama
-status "systemd not available in container. Starting Ollama directly..."
-start_ollama
+if available systemctl; then
+    configure_systemd
+fi
 
 # WSL2 only supports GPUs via nvidia passthrough
 # so check for nvidia-smi to determine if GPU is available
@@ -229,19 +242,14 @@ if ! check_gpu lspci nvidia && ! check_gpu lshw nvidia && ! check_gpu lspci amdg
 fi
 
 if check_gpu lspci amdgpu || check_gpu lshw amdgpu; then
-    status "Downloading Linux ROCm ${ARCH} bundle"
-    if download_with_proxy "https://ollama.com/download/ollama-linux-${ARCH}-rocm.tgz${VER_PARAM}" "$TEMP_DIR/ollama-rocm.tgz"; then
-        $SUDO tar -xzf "$TEMP_DIR/ollama-rocm.tgz" -C "$OLLAMA_INSTALL_DIR"
-        
-        install_success
-        status "AMD GPU ready."
-        exit 0
-    else
-        error "Failed to download AMD GPU bundle"
-    fi
+    download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}-rocm"
+
+    install_success
+    status "AMD GPU ready."
+    exit 0
 fi
 
-CUDA_REPO_ERR_MSG="NVIDIA GPU detected, but your OS and Architecture are not supported by NVIDIA. Please install the CUDA driver manually https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
+CUDA_REPO_ERR_MSG="NVIDIA GPU detected, but your OS and Architecture are not supported by NVIDIA.  Please install the CUDA driver manually https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
 # ref: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#rhel-7-centos-7
 # ref: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#rhel-8-rocky-8
 # ref: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#rhel-9-rocky-9
