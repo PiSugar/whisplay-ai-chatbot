@@ -43,6 +43,14 @@ export enum TTSServer {
   llm8850melotts = "llm8850melotts",
 }
 
+export enum VectorDBServer {
+  qdrant = "qdrant",
+}
+
+export enum EmbeddingServer {
+  ollama = "ollama",
+}
+
 export enum ImageGenerationServer {
   openai = "openai",
   gemini = "gemini",

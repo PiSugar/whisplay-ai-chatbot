@@ -10,9 +10,6 @@ const cleanDataFolderOnStart =
 function ensureDirExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    console.log(`created directory: ${dirPath}`);
-  } else {
-    console.log(`directory exists: ${dirPath}`);
   }
 }
 
@@ -45,3 +42,7 @@ ensureDirExists(imageDir);
 
 export const cameraDir = path.join(dataDir, "camera");
 ensureDirExists(cameraDir);
+
+
+export const knowledgeDir = path.join(__dirname, "../..", "knowledge");
+ensureDirExists(knowledgeDir);

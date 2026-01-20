@@ -107,7 +107,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
     await axios
       .post(`${llm8850llmEndpoint}/api/generate`, {
-        prompt: inputMessages[0]?.content || "",
+        prompt: inputMessages.find(msg => msg.role === "user")?.content || "",
         temperature: llm8850llmTemprature,
         "top-k": llm8850llmTopK,
       })

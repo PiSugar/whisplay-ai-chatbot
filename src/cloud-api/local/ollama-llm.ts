@@ -63,6 +63,7 @@ const keepAliveOllama = () => {
       think: false,
       stream: false,
       tools: ollamaEnableTools ? llmTools : [],
+      keep_alive: -1,
     })
     .then((response) => {
       console.log("Ollama keep-alive response:", response.data);
@@ -127,6 +128,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           num_predict: ollamaPredictNum,
         },
         tools: ollamaEnableTools ? llmTools : [],
+        keep_alive: -1,
       },
       {
         headers: {
