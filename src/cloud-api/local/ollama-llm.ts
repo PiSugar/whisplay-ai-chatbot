@@ -288,11 +288,12 @@ const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
       model: ollamaModel,
       prompt: prompt,
       stream: false,
+      think: false,
     }
   );
 
-  if (response.data && response.data.choices && response.data.choices.length > 0) {
-    const summary = response.data.choices[0].text.trim();
+  if (response.data && response.data.response) {
+    const summary = response.data.response;
     console.log("Ollama summary:", summary);
     return summary;
   } else {
