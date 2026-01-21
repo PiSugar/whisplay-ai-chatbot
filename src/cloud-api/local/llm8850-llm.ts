@@ -26,7 +26,7 @@ const llmServer = (
   process.env.LLM_SERVER || "llm8850"
 ).toLowerCase() as LLMServer;
 const llm8850enableThinking =
-  (process.env.LLM8850_ENABLE_THINKING || "false").toLowerCase() === "true";
+  (process.env.ENABLE_THINKING || "false").toLowerCase() === "true";
 
 const chatHistoryFileName = `llm8850_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss"
@@ -213,4 +213,4 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   return promise;
 };
 
-export { chatWithLLMStream, resetChatHistory };
+export default { chatWithLLMStream, resetChatHistory };

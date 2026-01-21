@@ -1,5 +1,6 @@
 import VectorDB from "./local/qdrant-vectordb";
 import { embedText as ollamaEmbedText } from "./local/ollama-embedding";
+import { summaryTextWithLLM } from "./llm";
 import { EmbeddingServer, VectorDBServer } from "../type";
 
 const embeddingServer = (process.env.EMBEDDING_SERVER || "ollama")
@@ -43,4 +44,4 @@ if (envEnableRAG && (!vectorDB || !embedText)) {
   enableRAG = false;
 }
 
-export { vectorDB, embedText, enableRAG };
+export { vectorDB, embedText, summaryTextWithLLM, enableRAG };

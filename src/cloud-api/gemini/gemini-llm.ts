@@ -213,4 +213,4 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   return promise;
 };
 
-export { chatWithLLMStream, resetChatHistory };
+export default { chatWithLLMStream, resetChatHistory };
