@@ -283,7 +283,7 @@ const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
   const prompt = `Please provide a concise summary for the following text in 50 words or less:\n\n${text}\n\n`;
 
   const response = await axios.post(
-    `${ollamaEndpoint}/api/completions`,
+    `${ollamaEndpoint}/api/generate`,
     {
       model: ollamaModel,
       prompt: prompt,
