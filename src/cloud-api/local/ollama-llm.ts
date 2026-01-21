@@ -278,9 +278,9 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 };
 
 const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
-  text: string,
+  text: string, promptPrefix: string
 ): Promise<string> => {
-  const prompt = `Please provide a concise summary for the following text in 50 words or less:\n\n${text}\n\n`;
+  const prompt = `${promptPrefix}\n\n${text}\n\n`;
 
   const response = await axios.post(
     `${ollamaEndpoint}/api/generate`,

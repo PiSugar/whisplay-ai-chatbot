@@ -8,7 +8,7 @@ export type ChatWithLLMStreamFunction = (
   partialThinkingCallback?: (partialThinking: string) => void,
   invokeFunctionCallback?: (functionName: string, result?: string) => void
 ) => Promise<any>;
-export type SummaryTextWithLLMFunction = (text: string) => Promise<string>;
+export type SummaryTextWithLLMFunction = (text: string, promptPrefix: string) => Promise<string>;
 export type ResetChatHistoryFunction = () => void;
 export type TTSProcessorFunction = (text: string) => Promise<any>;
 

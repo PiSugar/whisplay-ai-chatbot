@@ -8,6 +8,8 @@ const collectionName = "whisplay_knowledge";
 const knowledgeScoreThreshold = parseFloat(
   process.env.RAG_KNOWLEDGE_SCORE_THRESHOLD || "0.65",
 );
+const promptPrefix = process.env.RAG_KNOWLEDGE_SUMMARY_PROMPT_PREFIX || "Please provide a concise summary for the following text in **30 words** or less:";
+const enableKnowledgeSummary = (process.env.ENABLE_KNOWLEDGE_SUMMARY || "").toLowerCase() === "true";
 
 export async function createKnowledgeCollection() {
 
@@ -50,7 +52,7 @@ export async function createKnowledgeCollection() {
       const chunk = chunks[i];
       const embedding = await embedText(chunk);
       console.log(`Embedding chunk ${i + 1}/${chunks.length} of file ${file}`);
-      const summary = await summaryTextWithLLM(chunk);
+      let summary = enableKnowledgeSummary ? await summaryTextWithLLM(chunk, promptPrefix) : "";
       await vectorDB.upsertPoints(collectionName, [
         {
           id: uuidv4(),
