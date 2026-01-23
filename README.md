@@ -133,7 +133,8 @@ Please refer to the [LLM8850 Integration Guide](https://github.com/PiSugar/whisp
 - Support LLM8850 whisper ✅
 - Support LLM8850 melottsTTS ✅
 - Support LLM8850 Qwen3 llm api (not support tool) ✅
-- Support LLM8850 SmolVLM2
+- Support LLM8850 FastVLM
+- Support LLM8850 image generation
 - Support speaker recognition
 
 ## License
