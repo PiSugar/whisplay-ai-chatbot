@@ -75,7 +75,7 @@ pip install -r requirements.txt --break-system-packages
 If you need to update the environment variables, you can edit the `.env` file directly. After making changes, please restart the chatbot service with:
 
 ```bash
-systemctl restart whisplay-ai-chatbot.service
+sudo systemctl restart chatbot.service
 ```
 
 ## Image Generation
