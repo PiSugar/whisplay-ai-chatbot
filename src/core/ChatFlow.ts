@@ -39,6 +39,7 @@ class ChatFlow {
   thinkingSentences: string[] = [];
   answerId: number = 0;
   enableCamera: boolean = false;
+  knowledgePrompts: string[] = [];
 
   constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -219,17 +220,27 @@ class ChatFlow {
         [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
           [enableRAG ? 1 : 0](this.asrText)
           .then((res: string) => {
+            let knowledgePrompt = res;
             if (res) {
               console.log("Retrieved knowledge for RAG:\n", res);
+            }
+            if (this.knowledgePrompts.includes(res)) {
+              console.log(
+                "[RAG] Knowledge prompt already used in this session, skipping to avoid repetition.",
+              );
+              knowledgePrompt = "";
+            }
+            if (knowledgePrompt) {
+              this.knowledgePrompts.push(knowledgePrompt);
             }
             const prompt: {
               role: "system" | "user";
               content: string;
             }[] = compact([
-              res
+              knowledgePrompt
                 ? {
                     role: "system",
-                    content: res,
+                    content: knowledgePrompt,
                   }
                 : null,
               {

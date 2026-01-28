@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./volume/ollama:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=-1
+
+  faster-whisper:
+    build:
+      context: ./faster-whisper-http
+      dockerfile: Dockerfile
+      args:
+        MODEL_SIZE: tiny
+    image: faster-whisper-http
+    container_name: faster-whisper
+    restart: unless-stopped
+    volumes:
+      - ./volume/faster-whisper:/data
+    ports:
+      - "8803:8803"
+
+  piper-http:
+    build:
+      context: ./piper-http
+      dockerfile: Dockerfile
+      args:
+        VOICE_NAME: en_US-amy-medium
+        # uncomment the following line to set HTTPS_PROXY build argument
+        # HTTPS_PROXY: http://host.docker.internal:7890
+    image: piper-http
+    container_name: piper-http
+    restart: unless-stopped
+    ports:
+      - "8805:8805"
+    volumes:
+      - ./volume/piper:/data

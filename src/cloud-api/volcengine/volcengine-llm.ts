@@ -12,7 +12,10 @@ import { combineFunction } from "../../utils";
 import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../../type";
-import { ChatWithLLMStreamFunction } from "../interface";
+import {
+  ChatWithLLMStreamFunction,
+  SummaryTextWithLLMFunction,
+} from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
 
 dotenv.config();
@@ -24,7 +27,7 @@ const doubaoLLMModel =
 const enableThinking = process.env.ENABLE_THINKING === "true";
 
 const chatHistoryFileName = `doubao_chat_history_${moment().format(
-  "YYYY-MM-DD_HH-mm-ss"
+  "YYYY-MM-DD_HH-mm-ss",
 )}.json`;
 
 const messages: Message[] = [
@@ -47,7 +50,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string, result?: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void,
 ): Promise<void> => {
   if (!doubaoAccessToken) {
     console.error("Doubao access token is not set.");
@@ -64,7 +67,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }).finally(() => {
     fs.writeFileSync(
       path.join(chatHistoryDir, chatHistoryFileName),
-      JSON.stringify(messages, null, 2)
+      JSON.stringify(messages, null, 2),
     );
   });
   let partialAnswer = "";
@@ -87,7 +90,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           Authorization: `Bearer ${doubaoAccessToken}`,
         },
         responseType: "stream",
-      }
+      },
     );
 
     response.data.on("data", (chunk: Buffer) => {
@@ -95,7 +98,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       const dataLines = data.split("\n");
       const filteredLines = dataLines.filter((line) => line.trim() !== "");
       const filteredData = filteredLines.map((line) =>
-        line.replace(/^data:\s*/, "")
+        line.replace(/^data:\s*/, ""),
       );
 
       try {
@@ -154,7 +157,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             } catch {
               console.error(
                 `Error parsing arguments for function ${name}:`,
-                argString
+                argString,
               );
             }
             const func = llmFuncMap[name! as string];
@@ -176,7 +179,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               console.error(`Function ${name} not found`);
               return [id, `Function ${name} not found`];
             }
-          })
+          }),
         );
 
         console.log("call results: ", results);
@@ -203,4 +206,48 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   return promise;
 };
 
-export { chatWithLLMStream, resetChatHistory };
+const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
+  text: string,
+  promptPrefix: string,
+): Promise<string> => {
+  if (!doubaoAccessToken) {
+    console.error("Doubao API key is not set. Using original text.");
+    return text;
+  }
+  const response = await axios
+    .post(
+      "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      {
+        model: doubaoLLMModel,
+        messages: [
+          {
+            role: "user",
+            content: `${promptPrefix}\n\n${text}\n\n`,
+          },
+        ],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${doubaoAccessToken}`,
+        },
+      },
+    )
+    .catch((error) => {
+      console.log("Error during Doubao summary request:", error.message);
+      return null;
+    });
+  if (!response) {
+    return text;
+  }
+  const summary = get(response, "data.choices[0].message.content", "");
+  if (summary) {
+    console.log("Doubao summary:", summary);
+    return summary;
+  } else {
+    console.log("No summary returned from Doubao. Using original text.");
+    return text;
+  }
+};
+
+export default { chatWithLLMStream, resetChatHistory };

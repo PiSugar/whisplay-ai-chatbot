@@ -7,6 +7,7 @@ import {
   TTSServer,
   VisionServer,
 } from "../type";
+import { chatWithLLMStream, resetChatHistory } from "./llm";
 import { recognizeAudio as VolcengineASR } from "./volcengine/volcengine-asr";
 import {
   recognizeAudio as TencentASR,
@@ -19,30 +20,6 @@ import { recognizeAudio as WisperASR } from "./local/whisper-asr";
 import { recognizeAudio as WisperHttpASR } from "./local/whisper-http-asr";
 import { recognizeAudio as LLM8850WhisperASR } from "./local/llm8850-whisper";
 import { recognizeAudio as FasterWhisperASR } from "./local/faster-whisper-asr";
-import {
-  chatWithLLMStream as VolcengineLLMStream,
-  resetChatHistory as VolcengineResetChatHistory,
-} from "./volcengine/volcengine-llm";
-import {
-  chatWithLLMStream as OpenAILLMStream,
-  resetChatHistory as OpenAIResetChatHistory,
-} from "./openai/openai-llm";
-import {
-  chatWithLLMStream as OllamaLLMStream,
-  resetChatHistory as OllamaResetChatHistory,
-} from "./local/ollama-llm";
-import {
-  chatWithLLMStream as GeminiLLMStream,
-  resetChatHistory as GeminiResetChatHistory,
-} from "./gemini/gemini-llm";
-import {
-  chatWithLLMStream as GrokLLMStream,
-  resetChatHistory as GrokResetChatHistory,
-} from "./grok/grok-llm";
-import {
-  chatWithLLMStream as LLM8850LLMStream,
-  resetChatHistory as LLM8850ResetChatHistory,
-} from "./local/llm8850-llm";
 import VolcengineTTS from "./volcengine/volcengine-tts";
 import OpenAITTS from "./openai/openai-tts";
 import geminiTTS from "./gemini/gemini-tts";
@@ -50,9 +27,7 @@ import piperTTS from "./local/piper-tts";
 import piperHttpTTS from "./local/piper-http-tts";
 import LLM8850MeloTTS from "./local/llm8850-melotts";
 import {
-  ChatWithLLMStreamFunction,
   RecognizeAudioFunction,
-  ResetChatHistoryFunction,
   TTSProcessorFunction,
 } from "./interface";
 import { vectorDB, embedText } from "./knowledge";
@@ -60,9 +35,7 @@ import { vectorDB, embedText } from "./knowledge";
 dotenv.config();
 
 let recognizeAudio: RecognizeAudioFunction = noop as any;
-let chatWithLLMStream: ChatWithLLMStreamFunction = noop as any;
 let ttsProcessor: TTSProcessorFunction = noop as any;
-let resetChatHistory: ResetChatHistoryFunction = noop as any;
 
 export const asrServer: ASRServer = (
   process.env.ASR_SERVER || ASRServer.tencent
@@ -118,38 +91,6 @@ switch (asrServer) {
   default:
     console.warn(
       `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/whisper-http/llm8850whisper/fasterwhisper`,
-    );
-    break;
-}
-
-switch (llmServer) {
-  case LLMServer.volcengine:
-    chatWithLLMStream = VolcengineLLMStream;
-    resetChatHistory = VolcengineResetChatHistory;
-    break;
-  case LLMServer.openai:
-    chatWithLLMStream = OpenAILLMStream;
-    resetChatHistory = OpenAIResetChatHistory;
-    break;
-  case LLMServer.ollama:
-    chatWithLLMStream = OllamaLLMStream;
-    resetChatHistory = OllamaResetChatHistory;
-    break;
-  case LLMServer.gemini:
-    chatWithLLMStream = GeminiLLMStream;
-    resetChatHistory = GeminiResetChatHistory;
-    break;
-  case LLMServer.grok:
-    chatWithLLMStream = GrokLLMStream;
-    resetChatHistory = GrokResetChatHistory;
-    break;
-  case LLMServer.llm8850:
-    chatWithLLMStream = LLM8850LLMStream;
-    resetChatHistory = LLM8850ResetChatHistory;
-    break;
-  default:
-    console.warn(
-      `unknown llm server: ${llmServer}, should be volcengine/openai/gemini/ollama/grok/llm8850`,
     );
     break;
 }

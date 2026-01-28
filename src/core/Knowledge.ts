@@ -1,4 +1,4 @@
-import { vectorDB, embedText, enableRAG } from "../cloud-api/knowledge";
+import { vectorDB, embedText, summaryTextWithLLM, enableRAG } from "../cloud-api/knowledge";
 import { knowledgeDir } from "../utils/dir";
 import fs from "fs";
 import { chunkText } from "../utils/knowledge";
@@ -8,6 +8,8 @@ const collectionName = "whisplay_knowledge";
 const knowledgeScoreThreshold = parseFloat(
   process.env.RAG_KNOWLEDGE_SCORE_THRESHOLD || "0.65",
 );
+const promptPrefix = process.env.RAG_KNOWLEDGE_SUMMARY_PROMPT_PREFIX || "Please provide a concise summary for the following text in **30 words** or less:";
+const enableKnowledgeSummary = (process.env.ENABLE_KNOWLEDGE_SUMMARY || "").toLowerCase() === "true";
 
 export async function createKnowledgeCollection() {
 
@@ -50,11 +52,12 @@ export async function createKnowledgeCollection() {
       const chunk = chunks[i];
       const embedding = await embedText(chunk);
       console.log(`Embedding chunk ${i + 1}/${chunks.length} of file ${file}`);
+      let summary = enableKnowledgeSummary ? await summaryTextWithLLM(chunk, promptPrefix) : "";
       await vectorDB.upsertPoints(collectionName, [
         {
           id: uuidv4(),
           vector: embedding,
-          payload: { content: chunk, source: file, chunkIndex: i },
+          payload: { content: chunk, summary, source: file, chunkIndex: i },
         },
       ]);
     }
@@ -95,7 +98,7 @@ export async function getSystemPromptWithKnowledge(query: string) {
   }
   const topResult = results[0];
   if (topResult.score < knowledgeScoreThreshold) {
-    console.log("[RAG] No relevant knowledge found.");
+    console.log("[RAG] Top knowledge score below threshold:", topResult.score);
     return "";
   }
   const knowledgeId = topResult.id as string;
@@ -103,6 +106,6 @@ export async function getSystemPromptWithKnowledge(query: string) {
   if (knowledgeData.length === 0) {
     return "";
   }
-  const knowledgeContent = knowledgeData[0].payload!.content;
-  return `Use the following knowledge to assist in answering the question:\n\n${knowledgeContent}\n\n`;
+  const knowledgeContent = knowledgeData[0].payload!.summary || knowledgeData[0].payload!.content;
+  return `Use the following knowledge to assist in answering the question:\n${knowledgeContent}\n`;
 }

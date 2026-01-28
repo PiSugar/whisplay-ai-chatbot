@@ -15,7 +15,7 @@ import {
   OllamaMessage,
   ToolReturnTag,
 } from "../../type";
-import { ChatWithLLMStreamFunction } from "../interface";
+import { ChatWithLLMStreamFunction, SummaryTextWithLLMFunction } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
 import moment from "moment";
 import {
@@ -27,16 +27,19 @@ import { defaultPortMap } from "./common";
 dotenv.config();
 
 // Ollama LLM configuration
-const ollamaEndpoint = process.env.OLLAMA_ENDPOINT || `http://localhost:${defaultPortMap.ollama}`;
+const ollamaEndpoint =
+  process.env.OLLAMA_ENDPOINT || `http://localhost:${defaultPortMap.ollama}`;
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
-const ollamaPredictNum = process.env.OLLAMA_PREDICT_NUM ? parseInt(process.env.OLLAMA_PREDICT_NUM) : undefined;
+const ollamaPredictNum = process.env.OLLAMA_PREDICT_NUM
+  ? parseInt(process.env.OLLAMA_PREDICT_NUM)
+  : undefined;
 const enableThinking = process.env.ENABLE_THINKING === "true";
 
 const llmServer = process.env.LLM_SERVER || "";
 
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
-  "YYYY-MM-DD_HH-mm-ss"
+  "YYYY-MM-DD_HH-mm-ss",
 )}.json`;
 
 const messages: OllamaMessage[] = [
@@ -91,7 +94,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string, result?: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void,
 ): Promise<void> => {
   if (shouldResetChatHistory()) {
     resetChatHistory();
@@ -105,7 +108,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     // save chat history to file
     fs.writeFileSync(
       path.join(chatHistoryDir, chatHistoryFileName),
-      JSON.stringify(messages, null, 2)
+      JSON.stringify(messages, null, 2),
     );
   });
   let partialAnswer = "";
@@ -135,7 +138,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           "Content-Type": "application/json",
         },
         responseType: "stream",
-      }
+      },
     );
 
     response.data.on("data", (chunk: Buffer) => {
@@ -181,7 +184,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       }));
       console.log(
         "functionCallsPackages: ",
-        JSON.stringify(functionCallsPackages)
+        JSON.stringify(functionCallsPackages),
       );
       console.log("functionCalls: ", JSON.stringify(functionCalls));
       messages.push({
@@ -215,7 +218,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               console.error(`Function ${name} not found`);
               return [name, `Function ${name} not found`];
             }
-          })
+          }),
         );
 
         const newMessages: OllamaMessage[] = results.map(
@@ -223,19 +226,19 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             role: "tool",
             content: result as string,
             tool_name: name as string,
-          })
+          }),
         );
 
         // Directly extract and return the tool result if available
         const describeMessage = newMessages.find((msg) =>
-          msg.content.startsWith(ToolReturnTag.Response)
+          msg.content.startsWith(ToolReturnTag.Response),
         );
         const responseContent = extractToolResponse(
-          describeMessage?.content || ""
+          describeMessage?.content || "",
         );
         if (responseContent) {
           console.log(
-            `[LLM] Tool response starts with "[response]", return it directly.`
+            `[LLM] Tool response starts with "[response]", return it directly.`,
           );
           newMessages.push({
             role: "assistant",
@@ -257,7 +260,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           () => {
             endResolve();
             endCallback();
-          }
+          },
         );
         return;
       } else {
@@ -274,4 +277,29 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   return promise;
 };
 
-export { chatWithLLMStream, resetChatHistory };
+const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
+  text: string, promptPrefix: string
+): Promise<string> => {
+  const prompt = `${promptPrefix}\n\n${text}\n\n`;
+
+  const response = await axios.post(
+    `${ollamaEndpoint}/api/generate`,
+    {
+      model: ollamaModel,
+      prompt: prompt,
+      stream: false,
+      think: false,
+    }
+  );
+
+  if (response.data && response.data.response) {
+    const summary = response.data.response;
+    console.log("Ollama summary:", summary);
+    return summary;
+  } else {
+    console.log("No summary returned from Ollama.");
+    return "";
+  }
+}
+
+export default { chatWithLLMStream, resetChatHistory, summaryTextWithLLM };
