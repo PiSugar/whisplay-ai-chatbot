@@ -250,4 +250,4 @@ const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
   }
 };
 
-export default { chatWithLLMStream, resetChatHistory };
+export default { chatWithLLMStream, resetChatHistory, summaryTextWithLLM };
