@@ -12,7 +12,10 @@ import { FunctionCall, Message, ToolReturnTag } from "../../type";
 import { combineFunction } from "../../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../../config/llm-tools";
-import { ChatWithLLMStreamFunction } from "../interface";
+import {
+  ChatWithLLMStreamFunction,
+  SummaryTextWithLLMFunction,
+} from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
 
 dotenv.config();
@@ -20,7 +23,7 @@ dotenv.config();
 const openaiLLMModel = process.env.OPENAI_LLM_MODEL || "gpt-4o"; // Default model
 
 const chatHistoryFileName = `openai_chat_history_${moment().format(
-  "YYYY-MM-DD_HH-mm-ss"
+  "YYYY-MM-DD_HH-mm-ss",
 )}.json`;
 
 const messages: Message[] = [
@@ -43,7 +46,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialCallback: (partial: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string, result?: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void,
 ): Promise<void> => {
   if (!openai) {
     console.error("OpenAI API key is not set.");
@@ -59,7 +62,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }).finally(() => {
     fs.writeFileSync(
       path.join(chatHistoryDir, chatHistoryFileName),
-      JSON.stringify(messages, null, 2)
+      JSON.stringify(messages, null, 2),
     );
   });
   messages.push(...inputMessages);
@@ -106,7 +109,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         } catch {
           console.error(
             `Error parsing arguments for function ${name}:`,
-            argString
+            argString,
           );
         }
         const func = llmFuncMap[name! as string];
@@ -128,7 +131,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           console.error(`Function ${name} not found`);
           return [id, `Function ${name} not found`];
         }
-      })
+      }),
     );
 
     console.log("call results: ", results);
@@ -150,4 +153,44 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   return promise;
 };
 
-export default { chatWithLLMStream, resetChatHistory };
+const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
+  text: string,
+  promptPrefix: string,
+): Promise<string> => {
+  if (!openai) {
+    console.error("OpenAI API key is not set. Using original text.");
+    return text;
+  }
+  const chatCompletion = await openai.chat.completions
+    .create({
+      model: openaiLLMModel,
+      messages: [
+        {
+          role: "system",
+          content: promptPrefix,
+        },
+        {
+          role: "user",
+          content: text,
+        },
+      ],
+      stream: false,
+    })
+    .catch((error) => {
+      console.log("Error during OpenAI summary request:", error.message);
+      return null;
+    });
+  if (!chatCompletion) {
+    return text;
+  }
+  if (chatCompletion.choices && chatCompletion.choices.length > 0) {
+    const summary = chatCompletion.choices[0].message?.content || "";
+    console.log("OpenAI summary:", summary);
+    return summary;
+  } else {
+    console.log("No summary returned from OpenAI. Using original text.");
+    return text;
+  }
+};
+
+export default { chatWithLLMStream, resetChatHistory, summaryTextWithLLM };

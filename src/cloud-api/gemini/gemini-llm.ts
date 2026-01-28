@@ -11,10 +11,14 @@ import { gemini, geminiModel } from "./gemini";
 import { llmFuncMap, llmToolsForGemini } from "../../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message } from "../../type";
-import { ChatWithLLMStreamFunction } from "../interface";
+import {
+  ChatWithLLMStreamFunction,
+  SummaryTextWithLLMFunction,
+} from "../interface";
 import { ToolListUnion, ToolUnion, Part, Content } from "@google/genai";
 import moment from "moment";
 import { chatHistoryDir } from "../../utils/dir";
+import { openai } from "../openai/openai";
 
 dotenv.config();
 
@@ -43,13 +47,16 @@ const convertToolsToGeminiFormat = (tools: LLMTool[]): ToolListUnion => {
   ];
 };
 
-function createGeminiChatInstance(history?: Content[]) {
+function createGeminiChatInstance(
+  history?: Content[],
+  customSystemPrompt?: string,
+) {
   return gemini?.chats.create({
     model: geminiModel,
     config: {
       tools: convertToolsToGeminiFormat(llmToolsForGemini),
       systemInstruction: {
-        parts: [{ text: systemPrompt }],
+        parts: [{ text: customSystemPrompt || systemPrompt }],
         role: "system",
       },
     },
@@ -213,4 +220,37 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   return promise;
 };
 
-export default { chatWithLLMStream, resetChatHistory };
+const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
+  text: string,
+  promptPrefix: string,
+): Promise<string> => {
+  if (!gemini) {
+    console.error("Gemini API key is not set. Using original text.");
+    return text;
+  }
+  const response = await gemini.models.generateContent({
+    model: geminiModel,
+    contents: [
+      {
+        parts: [{ text: `${promptPrefix}\n\n${text}\n\n` }],
+        role: "user",
+      },
+    ],
+  }).catch((error) => {
+    console.log("Error during Gemini summary request:", error.message);
+    return null;
+  });
+  if (!response) {
+    return text;
+  }
+  if (response && response.text) {
+    const summary = response.text;
+    console.log("Gemini summary:", summary);
+    return summary;
+  } else {
+    console.log("No summary returned from Gemini. Using original text.");
+    return text;
+  }
+};
+
+export default { chatWithLLMStream, resetChatHistory, summaryTextWithLLM };

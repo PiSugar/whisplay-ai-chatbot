@@ -12,9 +12,15 @@ import { combineFunction } from "../../utils";
 import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message, ToolReturnTag } from "../../type";
-import { ChatWithLLMStreamFunction } from "../interface";
+import {
+  ChatWithLLMStreamFunction,
+  SummaryTextWithLLMFunction,
+} from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
-import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
+import {
+  extractToolResponse,
+  stimulateStreamResponse,
+} from "../../config/common";
 
 dotenv.config();
 
@@ -23,7 +29,7 @@ const grokAccessToken = process.env.GROK_API_KEY || "";
 const grokLLMModel = process.env.GROK_LLM_MODEL || "grok-4-latest"; // Default model
 
 const chatHistoryFileName = `grok_chat_history_${moment().format(
-  "YYYY-MM-DD_HH-mm-ss"
+  "YYYY-MM-DD_HH-mm-ss",
 )}.json`;
 
 const messages: Message[] = [
@@ -46,7 +52,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
-  invokeFunctionCallback?: (functionName: string, result?: string) => void
+  invokeFunctionCallback?: (functionName: string, result?: string) => void,
 ): Promise<void> => {
   if (!grokAccessToken) {
     console.error("Grok access token is not set.");
@@ -63,7 +69,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }).finally(() => {
     fs.writeFileSync(
       path.join(chatHistoryDir, chatHistoryFileName),
-      JSON.stringify(messages, null, 2)
+      JSON.stringify(messages, null, 2),
     );
   });
   let partialAnswer = "";
@@ -85,7 +91,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           Authorization: `Bearer ${grokAccessToken}`,
         },
         responseType: "stream",
-      }
+      },
     );
 
     response.data.on("data", (chunk: Buffer) => {
@@ -93,7 +99,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       const dataLines = data.split("\n");
       const filteredLines = dataLines.filter((line) => line.trim() !== "");
       const filteredData = filteredLines.map((line) =>
-        line.replace(/^data:\s*/, "")
+        line.replace(/^data:\s*/, ""),
       );
 
       try {
@@ -146,7 +152,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             } catch {
               console.error(
                 `Error parsing arguments for function ${name}:`,
-                argString
+                argString,
               );
             }
             const func = llmFuncMap[name! as string];
@@ -168,7 +174,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               console.error(`Function ${name} not found`);
               return [id, `Function ${name} not found`];
             }
-          })
+          }),
         );
 
         console.log("call results: ", results);
@@ -180,14 +186,14 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
         // Directly extract and return the tool result if available
         const describeMessage = newMessages.find((msg) =>
-          msg.content.startsWith(ToolReturnTag.Response)
+          msg.content.startsWith(ToolReturnTag.Response),
         );
         const responseContent = extractToolResponse(
-          describeMessage?.content || ""
+          describeMessage?.content || "",
         );
         if (responseContent) {
           console.log(
-            `[LLM] Tool response starts with "[response]", return it directly.`
+            `[LLM] Tool response starts with "[response]", return it directly.`,
           );
           newMessages.push({
             role: "assistant",
@@ -220,4 +226,50 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   return promise;
 };
 
-export default { chatWithLLMStream, resetChatHistory };
+const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
+  text: string,
+  promptPrefix: string,
+): Promise<string> => {
+  if (!grokAccessToken) {
+    console.error("Grok access token is not set. Using original text.");
+    return text;
+  }
+  const response = await axios
+    .post(
+      "https://api.x.ai/v1/chat/completions",
+      {
+        model: grokLLMModel,
+        messages: [
+          {
+            role: "user",
+            content: `${promptPrefix}\n\n${text}\n\n`,
+          },
+        ],
+        stream: false,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${grokAccessToken}`,
+        },
+      },
+    )
+    .catch((error) => {
+      console.log("Error during Grok summary request:", error.message);
+      return null;
+    });
+  if (!response) {
+    return text;
+  }
+  const summary = get(response, "data.choices[0].message.content", "");
+
+  if (summary) {
+    console.log("Grok summary:", summary);
+    return summary;
+  } else {
+    console.log("No summary returned from Grok. Using original text.");
+    return text;
+  }
+};
+
+export default { chatWithLLMStream, resetChatHistory, summaryTextWithLLM };
