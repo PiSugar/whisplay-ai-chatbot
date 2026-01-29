@@ -137,6 +137,10 @@ Please refer to the [LLM8850 Integration Guide](https://github.com/PiSugar/whisp
 - Support LLM8850 image generation
 - Support speaker recognition
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=PiSugar/whisplay-ai-chatbot&type=date&legend=bottom-right)](https://www.star-history.com/#PiSugar/whisplay-ai-chatbot&type=date&legend=bottom-right)
+
 ## License
 
 [GPL-3.0](https://github.com/PiSugar/whisplay-ai-chatbot?tab=GPL-3.0-1-ov-file#readme)
