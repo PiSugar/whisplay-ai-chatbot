@@ -30,6 +30,7 @@ export class StreamResponser {
   private parsedSentences: string[] = [];
   private displaySentences: string[] = [];
   private isPlaying: boolean = false;
+  private ttsChain: Promise<void> = Promise.resolve();
 
   constructor(
     ttsFunc: TTSFunc,
@@ -102,6 +103,15 @@ export class StreamResponser {
     playNext();
   };
 
+  private enqueueTTS = (text: string): Promise<TTSResult> => {
+    const task = this.ttsChain.then(() => this.ttsFunc(text));
+    this.ttsChain = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    return task;
+  };
+
   partial = (text: string): void => {
     this.partialContent += text;
     // replace newlines with spaces
@@ -124,7 +134,7 @@ export class StreamResponser {
         if (!purified) {
           return;
         }
-        const ttsPromise = this.ttsFunc(purified);
+        const ttsPromise = this.enqueueTTS(purified);
         queueItems.push({
           sentenceIndex: startIndex + index,
           sentence,
@@ -157,7 +167,7 @@ export class StreamResponser {
         this.speakQueue.push({
           sentenceIndex: this.displaySentences.length - 1,
           sentence: this.displaySentences[this.displaySentences.length - 1],
-          ttsPromise: this.ttsFunc(text),
+          ttsPromise: this.enqueueTTS(text),
         });
         if (length === 0 && !this.isPlaying) {
           this.playAudioInOrder();
@@ -182,6 +192,7 @@ export class StreamResponser {
     this.parsedSentences.length = 0;
     this.displaySentences.length = 0;
     this.isPlaying = false;
+    this.ttsChain = Promise.resolve();
     this.playEndResolve();
     stopPlaying();
   };
