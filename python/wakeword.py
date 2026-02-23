@@ -23,7 +23,9 @@ def main():
     cooldown_sec = float(os.getenv("WAKE_WORD_COOLDOWN_SEC", "1.5"))
 
     if not wake_words and not model_paths:
-        wake_words = ["hey_amy"]
+        wake_words = ["hey_jarvis"]
+        
+    print(f"[WakeWord] Using wake words: {wake_words}")
 
     try:
         model = Model(wakeword_models=model_paths or wake_words)
