@@ -7,6 +7,7 @@ emoji_svg
 NotoSansSC-Bold.ttf
 cloud-api/speech.mp3
 python/emoji_svg.zip
+python/status-bar-icon/__pycache__
 dist
 python/__pycache__/
 chatbot.log
