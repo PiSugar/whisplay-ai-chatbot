@@ -2,8 +2,9 @@ import { exec } from "child_process";
 import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag } from "../utils";
+import { WebDisplayServer } from "./web-display";
 
-interface Status {
+export interface Status {
   status: string;
   emoji: string;
   text: string;
@@ -51,12 +52,32 @@ export class WhisplayDisplay {
   private buttonPressTimeArray: number[] = [];
   private buttonReleaseTimeArray: number[] = [];
   private buttonDetectInterval: NodeJS.Timeout | null = null;
+  private webDisplay: WebDisplayServer | null = null;
+  private deviceEnabled: boolean;
 
   constructor() {
-    this.startPythonProcess();
-    this.isReady = new Promise<void>((resolve) => {
-      this.connectWithRetry(15, resolve);
-    });
+    this.deviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
+    const webEnabled = parseBoolEnv("WHISPLAY_WEB_ENABLED", false);
+    if (webEnabled) {
+      const port = parseInt(process.env.WHISPLAY_WEB_PORT || "17880", 10);
+      const host = process.env.WHISPLAY_WEB_HOST || "0.0.0.0";
+      this.webDisplay = new WebDisplayServer({
+        host,
+        port,
+        onButtonPress: () => this.handleButtonPressedEvent(),
+        onButtonRelease: () => this.handleButtonReleasedEvent(),
+      });
+      this.webDisplay.updateStatus(this.currentStatus);
+    }
+
+    if (this.deviceEnabled) {
+      this.startPythonProcess();
+      this.isReady = new Promise<void>((resolve) => {
+        this.connectWithRetry(15, resolve);
+      });
+    } else {
+      this.isReady = Promise.resolve();
+    }
   }
 
   startMonitoringDoubleClick(): void {
@@ -93,6 +114,9 @@ export class WhisplayDisplay {
   }
 
   startPythonProcess(): void {
+    if (!this.deviceEnabled) {
+      return;
+    }
     const command = `cd ${resolve(
       __dirname,
       "../../python",
@@ -115,6 +139,9 @@ export class WhisplayDisplay {
   }
 
   killPythonProcess(): void {
+    if (!this.deviceEnabled) {
+      return;
+    }
     if (this.pythonProcess) {
       console.log("Killing Python process...", this.pythonProcess.pid);
       this.pythonProcess.kill();
@@ -127,6 +154,10 @@ export class WhisplayDisplay {
     retries: number = 10,
     outerResolve: () => void,
   ): Promise<void> {
+    if (!this.deviceEnabled) {
+      outerResolve();
+      return;
+    }
     await new Promise((resolve, reject) => {
       const attemptConnection = (attempt: number) => {
         this.connect()
@@ -173,22 +204,13 @@ export class WhisplayDisplay {
         try {
           const json = JSON.parse(dataString);
           if (json.event === "button_pressed") {
-            this.buttonPressTimeArray.push(Date.now());
-            this.startMonitoringDoubleClick();
-            if (!this.buttonDetectInterval) {
-              console.log("emit pressed");
-              this.buttonPressedCallback();
-            }
+            this.handleButtonPressedEvent();
           }
           if (json.event === "button_released") {
-            this.buttonReleaseTimeArray.push(Date.now());
-            if (!this.buttonDetectInterval) {
-              console.log("emit released");
-              this.buttonReleasedCallback();
-            }
+            this.handleButtonReleasedEvent();
           }
           if (json.event === "camera_capture") {
-            this.onCameraCaptureCallback();
+            this.handleCameraCaptureEvent();
           }
         } catch {
           // console.error("Failed to parse JSON from data");
@@ -221,6 +243,9 @@ export class WhisplayDisplay {
   }
 
   private async sendToDisplay(data: string): Promise<void> {
+    if (!this.deviceEnabled) {
+      return;
+    }
     await this.isReady;
     try {
       this.client?.write(`${data}\n`, "utf8", () => {
@@ -276,6 +301,33 @@ export class WhisplayDisplay {
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) console.log("send data:", data);
     this.sendToDisplay(data);
+    this.webDisplay?.updateStatus(this.currentStatus);
+  }
+
+  private handleButtonPressedEvent(): void {
+    this.buttonPressTimeArray.push(Date.now());
+    this.startMonitoringDoubleClick();
+    if (!this.buttonDetectInterval) {
+      console.log("emit pressed");
+      this.buttonPressedCallback();
+    }
+  }
+
+  private handleButtonReleasedEvent(): void {
+    this.buttonReleaseTimeArray.push(Date.now());
+    if (!this.buttonDetectInterval) {
+      console.log("emit released");
+      this.buttonReleasedCallback();
+    }
+  }
+
+  private handleCameraCaptureEvent(): void {
+    this.onCameraCaptureCallback();
+  }
+
+  stopWebDisplay(): void {
+    this.webDisplay?.close();
+    this.webDisplay = null;
   }
 }
 
@@ -297,6 +349,7 @@ export const onCameraCapture =
 function cleanup() {
   console.log("Cleaning up display process before exit...");
   displayInstance.killPythonProcess();
+  displayInstance.stopWebDisplay();
 }
 
 // kill the Python process on exit signals
@@ -323,3 +376,11 @@ process.on("keyboardInterrupt", () => {
   cleanup();
   process.exit(0);
 });
+
+function parseBoolEnv(key: string, defaultValue: boolean): boolean {
+  const raw = process.env[key];
+  if (!raw) {
+    return defaultValue;
+  }
+  return raw.toLowerCase() === "true" || raw === "1";
+}

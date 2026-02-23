@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Whisplay Web Display</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="screen">
+      <div class="screen-inner">
+        <div class="header">
+          <div class="status" id="statusText">starting</div>
+          <div class="emoji" id="emojiText">...</div>
+          <div class="icons">
+            <div class="battery">
+              <div class="battery-shell">
+                <div class="battery-fill" id="batteryFill"></div>
+              </div>
+              <span id="batteryText">--%</span>
+            </div>
+            <div class="icon" id="netIcon">NET</div>
+            <div class="icon" id="ragIcon">RAG</div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="image-layer" id="imageLayer">
+            <img id="imageDisplay" alt="display" />
+          </div>
+          <div class="text-viewport">
+            <div class="text-content" id="textContent"></div>
+          </div>
+        </div>
+        <div class="dim" id="dim"></div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="card">
+        <div class="title">RGB LED</div>
+        <div class="led" id="led"></div>
+        <div class="status-text" id="ledText">--</div>
+      </div>
+      <div class="card">
+        <div class="title">Button</div>
+        <button class="button" id="btn">PRESS</button>
+        <div class="status-text" id="btnText">released</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
