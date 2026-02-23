@@ -245,6 +245,10 @@ export default class VectorDB implements VectorDBClass {
     return response.collections.map((col) => col.name);
   };
 
+  public getCollection = async (collectionName: string): Promise<any> => {
+    return await this.client.getCollection(collectionName);
+  };
+
   public createCollection = async (
     collectionName: string,
     vectorSize: number,
@@ -304,6 +308,37 @@ export default class VectorDB implements VectorDBClass {
   ) => {
     return await this.client.retrieve(collectionName, {
       ids: ids,
+    });
+  };
+
+  public scroll = async (
+    collectionName: string,
+    limit: number,
+    filter?: any,
+    offset?: number | string | null,
+    withPayload: boolean = true
+  ) => {
+    const params: any = {
+      limit: limit,
+      with_payload: withPayload,
+      with_vector: false,
+    };
+    if (filter) {
+      params.filter = filter;
+    }
+    if (offset !== undefined && offset !== null) {
+      params.offset = offset;
+    }
+    return await this.client.scroll(collectionName, params);
+  };
+
+  public deletePointsByFilter = async (
+    collectionName: string,
+    filter: any
+  ): Promise<void> => {
+    await this.client.delete(collectionName, {
+      wait: true,
+      filter: filter,
     });
   };
 }
