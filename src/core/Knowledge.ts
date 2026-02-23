@@ -43,7 +43,7 @@ export async function indexKnowledgeCollection() {
       }
     } else {
       const choice = await promptChoice(
-        "Choose indexing mode: \n (i)ncremental \n(f)ull rebuild (WARNING: This operation will delete existing data). \n[i]: ",
+        "Choose indexing mode: \n\n(i)ncremental \n(f)ull rebuild (WARNING: This operation will delete existing data). \n\n[i]: ",
         "i"
       );
       shouldRecreate = choice === "f";
