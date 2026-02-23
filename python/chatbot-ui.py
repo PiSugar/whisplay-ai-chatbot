@@ -475,10 +475,10 @@ def handle_client(client_socket, addr, whisplay):
                                 camera_thread = None
                             camera_mode = False
 
-                          if (text is not None) or (status is not None) or (emoji is not None) or \
-                              (battery_level is not None) or (battery_color is not None) or \
-                                        (image_path is not None) or (network_connected is not None) or \
-                                        (rag_icon_visible is not None) or (scroll_sync is not None):
+                    if (text is not None) or (status is not None) or (emoji is not None) or \
+                       (battery_level is not None) or (battery_color is not None) or \
+                              (image_path is not None) or (network_connected is not None) or \
+                              (rag_icon_visible is not None) or (scroll_sync is not None):
                         update_display_data(status=status, emoji=emoji,
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
