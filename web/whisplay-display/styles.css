@@ -59,11 +59,17 @@ body {
   height: 98px;
   padding: 8px 10px;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 8px;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
   background: #000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .status {
@@ -78,28 +84,31 @@ body {
 .emoji {
   font-size: 40px;
   text-align: center;
+  line-height: 1;
 }
 
-.icons {
+.status-icons {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   align-items: center;
 }
 
-.icon {
-  font-size: 12px;
-  padding: 4px 6px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--muted);
+.status-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  filter: brightness(0.9);
+  opacity: 0.35;
 }
+
 
 .battery {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  color: var(--muted);
 }
 
 .battery-shell {

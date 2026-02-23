@@ -16,7 +16,11 @@ const imageDisplay = document.getElementById("imageDisplay");
 let scrollTop = 0;
 let scrollSpeed = 0;
 let scrollTarget = null;
-let scrollStep = 0;
+let scrollSyncStart = null;
+let scrollSyncDuration = 0;
+let scrollSyncFrom = 0;
+let lastFrameTime = 0;
+let maxScroll = 0;
 let lastText = "";
 let lastImageRevision = -1;
 let isPressed = false;
@@ -51,10 +55,11 @@ function applyScrollSync(text, sync, viewportHeight) {
   const duration = Math.max(1, parseInt(sync.duration_ms || 1, 10));
   const totalChars = text.length || 1;
   const ratio = Math.min(1, charEnd / totalChars);
-  const maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
+  maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
   scrollTarget = Math.round(maxScroll * ratio);
-  const frames = Math.max(1, Math.floor(duration / 200));
-  scrollStep = (scrollTarget - scrollTop) / frames;
+  scrollSyncFrom = scrollTop;
+  scrollSyncStart = performance.now();
+  scrollSyncDuration = duration;
 }
 
 function updateText(text, sync, speed) {
@@ -63,28 +68,39 @@ function updateText(text, sync, speed) {
     textContent.textContent = text || "";
     scrollTop = 0;
     scrollTarget = null;
-    scrollStep = 0;
+    scrollSyncStart = null;
+    scrollSyncDuration = 0;
+    scrollSyncFrom = 0;
     lastText = text;
   }
 
   scrollSpeed = Math.max(0, parseInt(speed || 0, 10));
   applyScrollSync(text, sync, viewportHeight);
+  maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
+}
 
-  const maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
-  if (scrollTarget !== null) {
-    const remaining = scrollTarget - scrollTop;
-    if (Math.abs(remaining) <= Math.abs(scrollStep)) {
-      scrollTop = scrollTarget;
+function animateScroll(timestamp) {
+  if (!lastFrameTime) {
+    lastFrameTime = timestamp;
+  }
+  const deltaMs = timestamp - lastFrameTime;
+  lastFrameTime = timestamp;
+
+  if (scrollTarget !== null && scrollSyncStart !== null) {
+    const elapsed = timestamp - scrollSyncStart;
+    const progress = Math.min(1, elapsed / scrollSyncDuration);
+    scrollTop = scrollSyncFrom + (scrollTarget - scrollSyncFrom) * progress;
+    if (progress >= 1) {
       scrollTarget = null;
-      scrollStep = 0;
-    } else {
-      scrollTop += scrollStep;
+      scrollSyncStart = null;
     }
   } else if (scrollSpeed > 0 && scrollTop < maxScroll) {
-    scrollTop = Math.min(maxScroll, scrollTop + scrollSpeed);
+    const speedPerSec = scrollSpeed * 5;
+    scrollTop = Math.min(maxScroll, scrollTop + (speedPerSec * deltaMs) / 1000);
   }
 
   textContent.style.transform = `translateY(${-scrollTop}px)`;
+  requestAnimationFrame(animateScroll);
 }
 
 let ws = null;
@@ -185,6 +201,7 @@ function sendButton(action) {
 }
 
 connectWebSocket();
+requestAnimationFrame(animateScroll);
 
 function setPressed(value) {
   isPressed = value;

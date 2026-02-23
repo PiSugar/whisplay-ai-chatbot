@@ -17,18 +17,20 @@
     <div class="screen">
       <div class="screen-inner">
         <div class="header">
-          <div class="status" id="statusText">starting</div>
-          <div class="emoji" id="emojiText">...</div>
-          <div class="icons">
-            <div class="battery">
-              <div class="battery-shell">
-                <div class="battery-fill" id="batteryFill"></div>
+          <div class="status-bar">
+            <div class="status" id="statusText">starting</div>
+            <div class="status-icons">
+              <img class="status-icon" id="netIcon" src="/img/wifi.png" alt="network" />
+              <img class="status-icon" id="ragIcon" src="/img/rag.png" alt="rag" />
+              <div class="battery">
+                <div class="battery-shell">
+                  <div class="battery-fill" id="batteryFill"></div>
+                </div>
+                <span id="batteryText">--%</span>
               </div>
-              <span id="batteryText">--%</span>
             </div>
-            <div class="icon" id="netIcon">NET</div>
-            <div class="icon" id="ragIcon">RAG</div>
           </div>
+          <div class="emoji" id="emojiText">...</div>
         </div>
         <div class="body">
           <div class="image-layer" id="imageLayer">
