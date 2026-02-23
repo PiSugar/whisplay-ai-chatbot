@@ -26,14 +26,14 @@ class CameraThread(threading.Thread):
         self.running = False
         self.capture_image = None
         self.image_path = image_path
-        self.web_frame_path = os.getenv("WHISPLAY_WEB_CAMERA_PATH", "")
+        self.web_frame_path = os.getenv(
+            "WHISPLAY_WEB_CAMERA_PATH",
+            os.path.join("data", "camera_feed", "web_live.jpg"),
+        )
         if self.web_frame_path:
             frame_dir = os.path.dirname(self.web_frame_path)
             if frame_dir:
                 os.makedirs(frame_dir, exist_ok=True)
-        # delete existing web frame files
-        if self.web_frame_path and os.path.exists(self.web_frame_path):
-            os.remove(self.web_frame_path)
         self.web_frame_interval = int(os.getenv("WHISPLAY_WEB_CAMERA_INTERVAL", "3"))
         
     def start(self):
@@ -42,6 +42,9 @@ class CameraThread(threading.Thread):
 
     def run(self):
         frame_index = 0
+         # delete existing web frame files
+        if self.web_frame_path and os.path.exists(self.web_frame_path):
+            os.remove(self.web_frame_path)
         while self.running and self.capture_image is None:
             start_time = time.time()
             frame = CameraThread.picam2.capture_array()

@@ -87,11 +87,12 @@ function updateText(text, sync, speed) {
   textContent.style.transform = `translateY(${-scrollTop}px)`;
 }
 
-async function fetchState() {
-  const res = await fetch("/state");
-  if (!res.ok) return;
-  const data = await res.json();
-  if (!data.ready) return;
+let ws = null;
+let reconnectTimer = null;
+let cameraTimer = null;
+
+function applyState(data) {
+  if (!data || !data.ready) return;
 
   statusText.textContent = data.status || "";
   emojiText.textContent = data.emoji || "";
@@ -120,10 +121,11 @@ async function fetchState() {
 
   if (data.camera_mode) {
     imageLayer.style.display = "flex";
-    imageDisplay.src = `/camera?ts=${Date.now()}`;
+    startCameraFeed();
     return;
   }
 
+  stopCameraFeed();
   if (data.image && data.image_revision !== lastImageRevision) {
     lastImageRevision = data.image_revision;
     imageDisplay.src = `/image?rev=${lastImageRevision}`;
@@ -133,20 +135,56 @@ async function fetchState() {
   }
 }
 
-async function tick() {
-  await fetchState();
+function startCameraFeed() {
+  if (cameraTimer) return;
+  cameraTimer = setInterval(() => {
+    imageDisplay.src = `/camera?ts=${Date.now()}`;
+  }, 200);
 }
 
-setInterval(tick, 200);
-tick();
+function stopCameraFeed() {
+  if (!cameraTimer) return;
+  clearInterval(cameraTimer);
+  cameraTimer = null;
+}
 
-async function sendButton(action) {
-  await fetch("/button", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action }),
+function connectWebSocket() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  const url = `${protocol}://${window.location.host}/ws`;
+  ws = new WebSocket(url);
+
+  ws.addEventListener("message", (event) => {
+    let message = null;
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (message.type === "state") {
+      applyState(message.payload);
+    }
+  });
+
+  ws.addEventListener("close", () => {
+    stopCameraFeed();
+    reconnectTimer = setTimeout(connectWebSocket, 1000);
+  });
+
+  ws.addEventListener("error", () => {
+    ws.close();
   });
 }
+
+function sendButton(action) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "button", action }));
+}
+
+connectWebSocket();
 
 function setPressed(value) {
   isPressed = value;

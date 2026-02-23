@@ -1,10 +1,11 @@
 import fs from "fs";
 import path from "path";
+import http from "http";
 import Koa from "koa";
 import Router from "@koa/router";
-import bodyParser from "koa-bodyparser";
 import serve from "koa-static";
-import { dataDir } from "../utils/dir";
+import { WebSocketServer, WebSocket, RawData } from "ws";
+import { dataDir, cameraFeedDir } from "../utils/dir";
 import { getImageMimeType } from "../utils/image";
 import type { Status } from "./display";
 
@@ -27,7 +28,9 @@ export class WebDisplayServer {
   private port: number;
   private onButtonPress: ButtonHandler;
   private onButtonRelease: ButtonHandler;
-  private server: ReturnType<Koa["listen"]> | null = null;
+  private server: http.Server | null = null;
+  private wsServer: WebSocketServer | null = null;
+  private wsClients = new Set<WebSocket>();
 
   constructor(options: WebDisplayOptions) {
     this.host = options.host;
@@ -39,13 +42,24 @@ export class WebDisplayServer {
     this.cameraFramePath = this.resolveCameraFramePath();
 
     const staticRoot = this.resolveWebRoot();
-    this.app.use(bodyParser({ enableTypes: ["json"] }));
     this.registerRoutes(staticRoot);
     this.app.use(this.router.routes());
     this.app.use(this.router.allowedMethods());
     this.app.use(serve(staticRoot));
 
-    this.server = this.app.listen(this.port, this.host, () => {
+    this.server = http.createServer(this.app.callback());
+    this.wsServer = new WebSocketServer({ server: this.server, path: "/ws" });
+    this.wsServer.on("connection", (socket) => {
+      this.wsClients.add(socket);
+      if (this.currentStatus) {
+        socket.send(JSON.stringify({ type: "state", payload: this.buildStatePayload() }));
+      }
+      socket.on("message", (message) => this.handleWsMessage(socket, message));
+      socket.on("close", () => this.wsClients.delete(socket));
+      socket.on("error", () => this.wsClients.delete(socket));
+    });
+
+    this.server.listen(this.port, this.host, () => {
       console.log(
         `[WebDisplay] Simulator running at http://${this.host}:${this.port}`,
       );
@@ -59,9 +73,13 @@ export class WebDisplayServer {
       this.imageRevision += 1;
     }
     this.currentStatus = { ...status };
+    this.broadcastState();
   }
 
   close(): void {
+    this.wsServer?.close();
+    this.wsServer = null;
+    this.wsClients.clear();
     this.server?.close();
     this.server = null;
   }
@@ -75,11 +93,6 @@ export class WebDisplayServer {
       ctx.set("Cache-Control", "no-store");
       ctx.type = "text/html";
       ctx.body = fs.createReadStream(path.join(staticRoot, "index.html"));
-    });
-
-    this.router.get("/state", (ctx) => {
-      ctx.set("Cache-Control", "no-store");
-      ctx.body = this.buildStatePayload();
     });
 
     this.router.get("/image", (ctx) => {
@@ -117,15 +130,6 @@ export class WebDisplayServer {
       ctx.body = fs.createReadStream(this.cameraFramePath);
     });
 
-    this.router.post("/button", (ctx) => {
-      const action = String((ctx.request.body as any)?.action || "");
-      if (action === "press") {
-        this.onButtonPress();
-      } else if (action === "release") {
-        this.onButtonRelease();
-      }
-      ctx.body = { ok: true };
-    });
   }
 
   private buildStatePayload(): any {
@@ -153,9 +157,42 @@ export class WebDisplayServer {
     };
   }
 
+  private broadcastState(): void {
+    if (!this.currentStatus || this.wsClients.size === 0) {
+      return;
+    }
+    const payload = JSON.stringify({ type: "state", payload: this.buildStatePayload() });
+    for (const client of this.wsClients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    }
+  }
+
+  private handleWsMessage(socket: WebSocket, message: RawData): void {
+    let data: any;
+    try {
+      data = JSON.parse(message.toString());
+    } catch {
+      return;
+    }
+    if (data?.type === "button") {
+      const action = String(data.action || "");
+      if (action === "press") {
+        this.onButtonPress();
+      } else if (action === "release") {
+        this.onButtonRelease();
+      }
+      return;
+    }
+    if (data?.type === "ping") {
+      socket.send(JSON.stringify({ type: "pong" }));
+    }
+  }
+
   private resolveCameraFramePath(): string | null {
     const configured = process.env.WHISPLAY_WEB_CAMERA_PATH;
-    const fallback = path.resolve(dataDir, "camera", "web_live.jpg");
+    const fallback = path.resolve(cameraFeedDir, "web_live.jpg");
     const candidate = configured
       ? path.resolve(configured)
       : fallback;
