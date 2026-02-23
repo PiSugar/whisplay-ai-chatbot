@@ -4,4 +4,3 @@ numpy<2
 spidev
 opencv-python-headless
 Flask
-openwakeword
