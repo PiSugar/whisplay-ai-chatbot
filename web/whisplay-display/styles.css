@@ -37,6 +37,7 @@ body {
 }
 
 .screen {
+  box-sizing: content-box;
   width: calc(var(--screen-w) * var(--scale));
   height: calc(var(--screen-h) * var(--scale));
   border-radius: 20px;
@@ -62,7 +63,7 @@ body {
   grid-template-rows: auto 1fr;
   gap: 6px;
   background: #000;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  /* border-bottom: 1px solid rgba(255, 255, 255, 0.06); */
 }
 
 .status-bar {
@@ -112,7 +113,7 @@ body {
 }
 
 .battery-shell {
-  width: 36px;
+  width: 26px;
   height: 14px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 4px;
