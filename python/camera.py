@@ -4,6 +4,7 @@ from whisplay import WhisplayBoard
 import sys
 import time
 import threading
+import os
 from utils import ImageUtils
 
 try:
@@ -25,17 +26,36 @@ class CameraThread(threading.Thread):
         self.running = False
         self.capture_image = None
         self.image_path = image_path
+        self.web_frame_path = os.getenv("WHISPLAY_WEB_CAMERA_PATH", "")
+        if self.web_frame_path:
+            frame_dir = os.path.dirname(self.web_frame_path)
+            if frame_dir:
+                os.makedirs(frame_dir, exist_ok=True)
+        # delete existing web frame files
+        if self.web_frame_path and os.path.exists(self.web_frame_path):
+            os.remove(self.web_frame_path)
+        self.web_frame_interval = int(os.getenv("WHISPLAY_WEB_CAMERA_INTERVAL", "3"))
         
     def start(self):
         self.running = True
         return super().start()
 
     def run(self):
+        frame_index = 0
         while self.running and self.capture_image is None:
             start_time = time.time()
             frame = CameraThread.picam2.capture_array()
             pixel_bytes = ImageUtils.convertCameraFrameToRGB565(frame, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT)
             self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, pixel_bytes)
+            if self.web_frame_path and frame_index % self.web_frame_interval == 0:
+                try:
+                    image = Image.fromarray(frame)
+                    if image.mode != "RGB":
+                        image = image.convert("RGB")
+                    image.save(self.web_frame_path, format="JPEG", quality=80)
+                except Exception:
+                    pass
+            frame_index += 1
             end_time = time.time()
             fps = 1 / (end_time - start_time)
         # Display the captured image

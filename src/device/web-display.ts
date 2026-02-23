@@ -22,6 +22,7 @@ export class WebDisplayServer {
   private router: Router;
   private currentStatus: Status | null = null;
   private imageRevision = 0;
+  private cameraFramePath: string | null = null;
   private host: string;
   private port: number;
   private onButtonPress: ButtonHandler;
@@ -35,6 +36,7 @@ export class WebDisplayServer {
     this.onButtonRelease = options.onButtonRelease;
     this.app = new Koa();
     this.router = new Router();
+    this.cameraFramePath = this.resolveCameraFramePath();
 
     const staticRoot = this.resolveWebRoot();
     this.app.use(bodyParser({ enableTypes: ["json"] }));
@@ -99,6 +101,22 @@ export class WebDisplayServer {
       ctx.body = fs.createReadStream(safePath);
     });
 
+    this.router.get("/camera", (ctx) => {
+      ctx.set("Cache-Control", "no-store");
+      if (!this.cameraFramePath) {
+        ctx.status = 404;
+        ctx.body = "Camera frame not configured";
+        return;
+      }
+      if (!fs.existsSync(this.cameraFramePath)) {
+        ctx.status = 404;
+        ctx.body = "Camera frame not found";
+        return;
+      }
+      ctx.type = getImageMimeType(this.cameraFramePath);
+      ctx.body = fs.createReadStream(this.cameraFramePath);
+    });
+
     this.router.post("/button", (ctx) => {
       const action = String((ctx.request.body as any)?.action || "");
       if (action === "press") {
@@ -133,6 +151,16 @@ export class WebDisplayServer {
       rag_icon_visible: this.currentStatus.rag_icon_visible,
       image_revision: this.imageRevision,
     };
+  }
+
+  private resolveCameraFramePath(): string | null {
+    const configured = process.env.WHISPLAY_WEB_CAMERA_PATH;
+    const fallback = path.resolve(dataDir, "camera", "web_live.jpg");
+    const candidate = configured
+      ? path.resolve(configured)
+      : fallback;
+    const safe = this.resolveSafeImagePath(candidate);
+    return safe || null;
   }
 
   private resolveSafeImagePath(imagePath: string): string | null {

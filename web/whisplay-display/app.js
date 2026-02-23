@@ -118,6 +118,12 @@ async function fetchState() {
   const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));
   dim.style.opacity = dimOpacity.toFixed(2);
 
+  if (data.camera_mode) {
+    imageLayer.style.display = "flex";
+    imageDisplay.src = `/camera?ts=${Date.now()}`;
+    return;
+  }
+
   if (data.image && data.image_revision !== lastImageRevision) {
     lastImageRevision = data.image_revision;
     imageDisplay.src = `/image?rev=${lastImageRevision}`;
