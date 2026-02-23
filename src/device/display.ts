@@ -3,6 +3,9 @@ import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag } from "../utils";
 import { WebDisplayServer } from "./web-display";
+import dotEnv from "dotenv";
+
+dotEnv.config();
 
 export interface Status {
   status: string;
