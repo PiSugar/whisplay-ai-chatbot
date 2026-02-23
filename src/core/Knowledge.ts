@@ -35,7 +35,7 @@ export async function indexKnowledgeCollection() {
     const existingDimension = getCollectionVectorSize(collectionInfo);
     if (existingDimension && existingDimension !== dimension) {
       shouldRecreate = await promptYesNo(
-        `Embedding dimension mismatch (existing: ${existingDimension}, current: ${dimension}). Full reindex required. Continue? (y/N): `
+        `\nEmbedding dimension mismatch (existing: ${existingDimension}, current: ${dimension}). Full reindex required. Continue? (y/N): `
       );
       if (!shouldRecreate) {
         console.log("Aborted indexing due to dimension mismatch.");
@@ -43,7 +43,7 @@ export async function indexKnowledgeCollection() {
       }
     } else {
       const choice = await promptChoice(
-        "Choose indexing mode: \n\n(i)ncremental \n(f)ull rebuild (WARNING: This operation will delete existing data). \n\n[i]: ",
+        "\nChoose indexing mode: \n\n(i)ncremental \n(f)ull rebuild (WARNING: This operation will delete existing data). \n\n[i]: ",
         "i"
       );
       shouldRecreate = choice === "f";
