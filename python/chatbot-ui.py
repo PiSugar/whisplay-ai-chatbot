@@ -35,6 +35,10 @@ current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
 current_scroll_speed = 6
+current_scroll_sync_char_end = None
+current_scroll_sync_duration_ms = None
+current_scroll_sync_target_top = None
+current_scroll_sync_speed = None
 current_image_path = ""
 current_image = None
 current_network_connected = None
@@ -134,8 +138,25 @@ class RenderThread(threading.Thread):
 
         
 
+    def compute_scroll_target_from_char_end(self, lines, line_height, area_height, char_end):
+        if char_end is None or char_end <= 0:
+            return 0
+        total_chars = 0
+        target_line = 0
+        for i, line in enumerate(lines):
+            total_chars += len(line)
+            if total_chars >= char_end:
+                target_line = i
+                break
+            if i < len(lines) - 1:
+                total_chars += 1
+        target_top = target_line * line_height - (area_height // 2)
+        return max(0, target_top)
+
     def render_main_text(self, main_text_image, area_height, draw, text, scroll_speed=2):
-        global current_scroll_top
+        global current_scroll_top, current_scroll_sync_char_end
+        global current_scroll_sync_duration_ms, current_scroll_sync_target_top
+        global current_scroll_sync_speed
         """Render main text content, wrap lines according to screen width, only display currently visible part"""
         if not text:
             return
@@ -145,6 +166,20 @@ class RenderThread(threading.Thread):
 
         # Line height
         line_height = self.main_text_line_height
+
+        max_scroll_top = max(0, (len(lines) + 1) * line_height - area_height)
+
+        if current_scroll_sync_char_end is not None and current_scroll_sync_duration_ms is not None:
+            target_top = self.compute_scroll_target_from_char_end(
+                lines, line_height, area_height, current_scroll_sync_char_end
+            )
+            target_top = min(max_scroll_top, target_top)
+            duration_ms = max(1, current_scroll_sync_duration_ms)
+            frames = max(1, int(duration_ms * self.fps / 1000))
+            current_scroll_sync_target_top = target_top
+            current_scroll_sync_speed = (target_top - current_scroll_top) / frames
+            current_scroll_sync_char_end = None
+            current_scroll_sync_duration_ms = None
 
         # Calculate currently visible lines
         display_lines = []
@@ -171,11 +206,21 @@ class RenderThread(threading.Thread):
             # Update cache image
             self.text_cache_image = show_text_image
         # Draw text_cache_image to main_text_image
-        main_text_image.paste(self.text_cache_image, (0, -current_scroll_top), self.text_cache_image)
+        main_text_image.paste(self.text_cache_image, (0, -int(current_scroll_top)), self.text_cache_image)
 
         # Update scroll position
-        if scroll_speed > 0 and current_scroll_top < (len(lines) + 1) * line_height - area_height:
+        if current_scroll_sync_speed is not None and current_scroll_sync_target_top is not None:
+            remaining = current_scroll_sync_target_top - current_scroll_top
+            if abs(remaining) <= abs(current_scroll_sync_speed):
+                current_scroll_top = current_scroll_sync_target_top
+                current_scroll_sync_speed = None
+                current_scroll_sync_target_top = None
+            else:
+                current_scroll_top += current_scroll_sync_speed
+        elif scroll_speed > 0 and current_scroll_top < max_scroll_top:
             current_scroll_top += scroll_speed
+        if current_scroll_top > max_scroll_top:
+            current_scroll_top = max_scroll_top
                 
 
     def render_header(self, image, draw, status, emoji, battery_level, battery_color):
@@ -260,16 +305,31 @@ class RenderThread(threading.Thread):
         self.running = False
 
 def update_display_data(status=None, emoji=None, text=None,
-                  scroll_speed=None, battery_level=None, battery_color=None, image_path=None,
+                  scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
                   network_connected=None, rag_icon_visible=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
+    global current_scroll_sync_char_end, current_scroll_sync_duration_ms
+    global current_scroll_sync_target_top, current_scroll_sync_speed
     global current_network_connected, current_rag_icon_visible
 
     # If text is not continuation of previous, reset scroll position
     if text is not None and not text.startswith(current_text):
         current_scroll_top = 0
+        current_scroll_sync_char_end = None
+        current_scroll_sync_duration_ms = None
+        current_scroll_sync_target_top = None
+        current_scroll_sync_speed = None
         TextUtils.clean_line_image_cache()
+    if scroll_sync is not None:
+        try:
+            char_end = scroll_sync.get("char_end", None)
+            duration_ms = scroll_sync.get("duration_ms", None)
+            if char_end is not None and duration_ms is not None:
+                current_scroll_sync_char_end = int(char_end)
+                current_scroll_sync_duration_ms = int(duration_ms)
+        except Exception as e:
+            print(f"[Display] Invalid scroll_sync payload: {e}")
     if scroll_speed is not None:
         current_scroll_speed = scroll_speed
     if network_connected is not None:
@@ -376,6 +436,7 @@ def handle_client(client_socket, addr, whisplay):
                     rgbled = content.get("RGB", None)
                     brightness = content.get("brightness", None)
                     scroll_speed = content.get("scroll_speed", 2)
+                    scroll_sync = content.get("scroll_sync", None)
                     response_to_client = content.get("response", None)
                     battery_level = content.get("battery_level", None)
                     battery_color = content.get("battery_color", None)
@@ -414,12 +475,12 @@ def handle_client(client_socket, addr, whisplay):
                                 camera_thread = None
                             camera_mode = False
 
-                    if (text is not None) or (status is not None) or (emoji is not None) or \
-                       (battery_level is not None) or (battery_color is not None) or \
-                              (image_path is not None) or (network_connected is not None) or \
-                              (rag_icon_visible is not None):
+                          if (text is not None) or (status is not None) or (emoji is not None) or \
+                              (battery_level is not None) or (battery_color is not None) or \
+                                        (image_path is not None) or (network_connected is not None) or \
+                                        (rag_icon_visible is not None) or (scroll_sync is not None):
                         update_display_data(status=status, emoji=emoji,
-                                     text=text, scroll_speed=scroll_speed,
+                                     text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
                                                  rag_icon_visible=rag_icon_visible)

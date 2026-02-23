@@ -8,21 +8,34 @@ dotenv.config();
 type TTSFunc = (text: string) => Promise<TTSResult>;
 type SentencesCallback = (sentences: string[]) => void;
 type TextCallback = (text: string) => void;
+type SentencePlayCallback = (payload: {
+  charEnd: number;
+  durationMs: number;
+  sentenceIndex: number;
+  sentence: string;
+}) => void;
 
 export class StreamResponser {
   private ttsFunc: TTSFunc;
   private sentencesCallback?: SentencesCallback;
   private textCallback?: TextCallback;
+  private sentencePlayCallback?: SentencePlayCallback;
   private partialContent: string = "";
   private playEndResolve: () => void = () => {};
-  private speakArray: Promise<TTSResult>[] = [];
+  private speakQueue: {
+    sentenceIndex: number;
+    sentence: string;
+    ttsPromise: Promise<TTSResult>;
+  }[] = [];
   private parsedSentences: string[] = [];
+  private displaySentences: string[] = [];
   private isPlaying: boolean = false;
 
   constructor(
     ttsFunc: TTSFunc,
     sentencesCallback?: SentencesCallback,
-    textCallback?: TextCallback
+    textCallback?: TextCallback,
+    sentencePlayCallback?: SentencePlayCallback
   ) {
     this.ttsFunc = async (text) => {
       console.time("[TTS time]");
@@ -32,6 +45,14 @@ export class StreamResponser {
     };
     this.sentencesCallback = sentencesCallback;
     this.textCallback = textCallback;
+    this.sentencePlayCallback = sentencePlayCallback;
+  }
+
+  private getCharEndForSentence(sentenceIndex: number): number {
+    if (sentenceIndex < 0 || sentenceIndex >= this.displaySentences.length) {
+      return 0;
+    }
+    return this.displaySentences.slice(0, sentenceIndex + 1).join(" ").length;
   }
 
   private playAudioInOrder = async (): Promise<void> => {
@@ -44,13 +65,20 @@ export class StreamResponser {
     }
     let currentIndex = 0;
     const playNext = async () => {
-      if (currentIndex < this.speakArray.length) {
+      if (currentIndex < this.speakQueue.length) {
         this.isPlaying = true;
         try {
-          const playParams = await this.speakArray[currentIndex];
+          const item = this.speakQueue[currentIndex];
+          const playParams = await item.ttsPromise;
           console.log(
-            `Playing audio ${currentIndex + 1}/${this.speakArray.length}`
+            `Playing audio ${currentIndex + 1}/${this.speakQueue.length}`
           );
+          this.sentencePlayCallback?.({
+            charEnd: this.getCharEndForSentence(item.sentenceIndex),
+            durationMs: playParams.duration,
+            sentenceIndex: item.sentenceIndex,
+            sentence: item.sentence,
+          });
           await playAudioData(playParams);
         } catch (error) {
           console.error("Audio playback error:", error);
@@ -62,12 +90,13 @@ export class StreamResponser {
         playNext();
       } else {
         console.log(
-          `Play all audio completed. Total: ${this.speakArray.length}`
+          `Play all audio completed. Total: ${this.speakQueue.length}`
         );
         this.isPlaying = false;
         this.playEndResolve();
-        this.speakArray.length = 0;
-        this.speakArray = [];
+        this.speakQueue.length = 0;
+        this.speakQueue = [];
+        this.displaySentences.length = 0;
       }
     };
     playNext();
@@ -80,21 +109,34 @@ export class StreamResponser {
     const { sentences, remaining } = splitSentences(this.partialContent);
     if (sentences.length > 0) {
       this.parsedSentences.push(...sentences);
-      this.sentencesCallback?.(this.parsedSentences);
+      const startIndex = this.displaySentences.length;
+      this.displaySentences.push(...sentences);
+      this.sentencesCallback?.(this.displaySentences);
       // remove emoji
-      const filteredSentences = sentences
-        .map(purifyTextForTTS)
-        .filter((item) => item !== "");
-      const length = this.speakArray.length;
-      this.speakArray.push(
-        ...filteredSentences.map((item, index) =>
-          this.ttsFunc(item).finally(() => {
-            if (length === 0 && index === 0) {
-              this.playAudioInOrder();
-            }
-          })
-        )
-      );
+      const length = this.speakQueue.length;
+      const queueItems: {
+        sentenceIndex: number;
+        sentence: string;
+        ttsPromise: Promise<TTSResult>;
+      }[] = [];
+      sentences.forEach((sentence, index) => {
+        const purified = purifyTextForTTS(sentence);
+        if (!purified) {
+          return;
+        }
+        const ttsPromise = this.ttsFunc(purified);
+        queueItems.push({
+          sentenceIndex: startIndex + index,
+          sentence,
+          ttsPromise,
+        });
+      });
+      if (queueItems.length > 0) {
+        this.speakQueue.push(...queueItems);
+        if (length === 0 && !this.isPlaying) {
+          this.playAudioInOrder();
+        }
+      }
     }
     this.partialContent = remaining;
   };
@@ -102,7 +144,8 @@ export class StreamResponser {
   endPartial = (): void => {
     if (this.partialContent) {
       this.parsedSentences.push(this.partialContent);
-      this.sentencesCallback?.(this.parsedSentences);
+      this.displaySentences.push(this.partialContent);
+      this.sentencesCallback?.(this.displaySentences);
       // remove emoji
       this.partialContent = this.partialContent.replace(
         /[\u{1F600}-\u{1F64F}]/gu,
@@ -110,17 +153,19 @@ export class StreamResponser {
       );
       if (this.partialContent.trim() !== "") {
         const text = purifyTextForTTS(this.partialContent);
-        this.speakArray.push(
-          this.ttsFunc(text).finally(() => {
-            if (!this.isPlaying) {
-              this.playAudioInOrder();
-            }
-          })
-        );
+        const length = this.speakQueue.length;
+        this.speakQueue.push({
+          sentenceIndex: this.displaySentences.length - 1,
+          sentence: this.displaySentences[this.displaySentences.length - 1],
+          ttsPromise: this.ttsFunc(text),
+        });
+        if (length === 0 && !this.isPlaying) {
+          this.playAudioInOrder();
+        }
       }
       this.partialContent = "";
     }
-    this.textCallback?.(this.parsedSentences.join(" "));
+    this.textCallback?.(this.displaySentences.join(" "));
     this.parsedSentences.length = 0;
   };
 
@@ -131,10 +176,11 @@ export class StreamResponser {
   };
 
   stop = (): void => {
-    this.speakArray = [];
-    this.speakArray.length = 0;
+    this.speakQueue = [];
+    this.speakQueue.length = 0;
     this.partialContent = "";
     this.parsedSentences.length = 0;
+    this.displaySentences.length = 0;
     this.isPlaying = false;
     this.playEndResolve();
     stopPlaying();

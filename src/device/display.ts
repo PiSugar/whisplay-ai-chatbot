@@ -8,6 +8,10 @@ interface Status {
   emoji: string;
   text: string;
   scroll_speed: number;
+  scroll_sync?: {
+    char_end: number;
+    duration_ms: number;
+  };
   brightness: number;
   RGB: string;
   battery_color: string;
@@ -25,6 +29,7 @@ export class WhisplayDisplay {
     emoji: "😊",
     text: "",
     scroll_speed: 3,
+    scroll_sync: undefined,
     brightness: 100,
     RGB: "#00FF30",
     battery_color: "#000000",
@@ -237,6 +242,7 @@ export class WhisplayDisplay {
       text,
       RGB,
       brightness,
+      scroll_sync,
       battery_level,
       battery_color,
       image,
@@ -258,6 +264,7 @@ export class WhisplayDisplay {
     this.currentStatus.text = text;
     this.currentStatus.RGB = RGB;
     this.currentStatus.brightness = brightness;
+    this.currentStatus.scroll_sync = scroll_sync;
     this.currentStatus.battery_level = battery_level;
     this.currentStatus.battery_color = battery_color;
     this.currentStatus.image = image;

@@ -83,6 +83,16 @@ class ChatFlow implements ChatFlowContext {
           scroll_speed: 3,
         });
       },
+      ({ charEnd, durationMs }) => {
+        if (!this.isAnswerFlow()) return;
+        if (!durationMs || durationMs <= 0) return;
+        display({
+          scroll_sync: {
+            char_end: charEnd,
+            duration_ms: durationMs,
+          },
+        });
+      }
     );
     if (options?.enableCamera) {
       this.enableCamera = true;
