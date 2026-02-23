@@ -4,6 +4,8 @@ import { resolve } from "path";
 import dotenv from "dotenv";
 dotenv.config();
 
+const pythonBinary = process.env.WAKE_WORD_PYTHON_PATH || "python3";
+
 export class WakeWordListener extends EventEmitter {
   private process: ChildProcess | null = null;
   private buffer: string = "";
@@ -14,7 +16,7 @@ export class WakeWordListener extends EventEmitter {
     if (enabled !== "true") return;
 
     const scriptPath = resolve(__dirname, "../../python/wakeword.py");
-    this.process = spawn("python3", [scriptPath], {
+    this.process = spawn(pythonBinary, [scriptPath], {
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
