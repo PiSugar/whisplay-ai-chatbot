@@ -31,6 +31,7 @@ export class StreamResponser {
   private displaySentences: string[] = [];
   private isPlaying: boolean = false;
   private ttsChain: Promise<void> = Promise.resolve();
+  private hasStartedTTS: boolean = false;
 
   constructor(
     ttsFunc: TTSFunc,
@@ -98,18 +99,23 @@ export class StreamResponser {
         this.speakQueue.length = 0;
         this.speakQueue = [];
         this.displaySentences.length = 0;
+        this.hasStartedTTS = false;
       }
     };
     playNext();
   };
 
   private enqueueTTS = (text: string): Promise<TTSResult> => {
-    const task = this.ttsChain.then(() => this.ttsFunc(text));
-    this.ttsChain = task.then(
-      () => undefined,
-      () => undefined,
-    );
-    return task;
+    if (!this.hasStartedTTS) {
+      this.hasStartedTTS = true;
+      const task = this.ttsChain.then(() => this.ttsFunc(text));
+      this.ttsChain = task.then(
+        () => undefined,
+        () => undefined,
+      );
+      return task;
+    }
+    return this.ttsFunc(text);
   };
 
   partial = (text: string): void => {
@@ -193,6 +199,7 @@ export class StreamResponser {
     this.displaySentences.length = 0;
     this.isPlaying = false;
     this.ttsChain = Promise.resolve();
+    this.hasStartedTTS = false;
     this.playEndResolve();
     stopPlaying();
   };
