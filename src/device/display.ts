@@ -220,7 +220,6 @@ export class WhisplayDisplay {
         }
       });
       this.client.on("error", (err: any) => {
-        console.error("Display Socket error:", err);
         // 如果是ECONNREFUSED
         if (err.code === "ECONNREFUSED") {
           reject(err);

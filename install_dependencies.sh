@@ -18,7 +18,7 @@ command_exists() {
 
 # apt install sox libsox-fmt-mp3 mpg123
 sudo apt-get update
-sudo apt-get install -y sox mpg123 libsox-fmt-mp3 python3-dev libcairo2 libcairo2-dev
+sudo apt-get install -y sox mpg123 libsox-fmt-mp3 python3-dev libcairo2 libcairo2-dev unzip
 
 # enable spi
 sudo raspi-config nonint do_spi 0
