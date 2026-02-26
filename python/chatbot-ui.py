@@ -39,6 +39,7 @@ current_scroll_sync_char_end = None
 current_scroll_sync_duration_ms = None
 current_scroll_sync_target_top = None
 current_scroll_sync_speed = None
+current_transaction_id = None
 current_image_path = ""
 current_image = None
 current_network_connected = None
@@ -174,6 +175,7 @@ class RenderThread(threading.Thread):
                 lines, line_height, area_height, current_scroll_sync_char_end
             )
             target_top = min(max_scroll_top, target_top)
+            target_top = max(current_scroll_top, target_top)
             duration_ms = max(1, current_scroll_sync_duration_ms)
             frames = max(1, int(duration_ms * self.fps / 1000))
             current_scroll_sync_target_top = target_top
@@ -306,21 +308,48 @@ class RenderThread(threading.Thread):
 
 def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
-                  network_connected=None, rag_icon_visible=None):
+                  network_connected=None, rag_icon_visible=None, transaction_id=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
     global current_scroll_sync_target_top, current_scroll_sync_speed
-    global current_network_connected, current_rag_icon_visible
+    global current_network_connected, current_rag_icon_visible, current_transaction_id
 
-    # If text is not continuation of previous, reset scroll position
-    if text is not None and not text.startswith(current_text):
-        current_scroll_top = 0
-        current_scroll_sync_char_end = None
-        current_scroll_sync_duration_ms = None
-        current_scroll_sync_target_top = None
-        current_scroll_sync_speed = None
-        TextUtils.clean_line_image_cache()
+    next_text = text
+    if text is not None:
+        previous_text = current_text or ""
+        incoming_text = text or ""
+        same_transaction = (
+            transaction_id is not None
+            and current_transaction_id is not None
+            and transaction_id == current_transaction_id
+        )
+        regressive_update = (
+            len(incoming_text) > 0
+            and len(incoming_text) < len(previous_text)
+            and previous_text.startswith(incoming_text)
+        )
+        if same_transaction and regressive_update:
+            next_text = previous_text
+        elif (
+            transaction_id is not None
+            and current_transaction_id is not None
+            and transaction_id != current_transaction_id
+        ):
+            current_scroll_top = 0
+            current_scroll_sync_char_end = None
+            current_scroll_sync_duration_ms = None
+            current_scroll_sync_target_top = None
+            current_scroll_sync_speed = None
+            TextUtils.clean_line_image_cache()
+        elif not incoming_text.startswith(previous_text):
+            if not previous_text.startswith(incoming_text):
+                current_scroll_top = 0
+                current_scroll_sync_char_end = None
+                current_scroll_sync_duration_ms = None
+                current_scroll_sync_target_top = None
+                current_scroll_sync_speed = None
+                TextUtils.clean_line_image_cache()
     if scroll_sync is not None:
         try:
             char_end = scroll_sync.get("char_end", None)
@@ -336,9 +365,11 @@ def update_display_data(status=None, emoji=None, text=None,
         current_network_connected = network_connected
     if rag_icon_visible is not None:
         current_rag_icon_visible = rag_icon_visible
+    if transaction_id is not None:
+        current_transaction_id = transaction_id
     current_status = status if status is not None else current_status
     current_emoji = emoji if emoji is not None else current_emoji
-    current_text = text if text is not None else current_text
+    current_text = next_text if text is not None else current_text
     current_battery_level = battery_level if battery_level is not None else current_battery_level
     current_battery_color = battery_color if battery_color is not None else current_battery_color
     current_image_path = image_path if image_path is not None else current_image_path
@@ -483,7 +514,8 @@ def handle_client(client_socket, addr, whisplay):
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
-                                                 rag_icon_visible=rag_icon_visible)
+                                                 rag_icon_visible=rag_icon_visible,
+                                                 transaction_id=transaction_id)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:

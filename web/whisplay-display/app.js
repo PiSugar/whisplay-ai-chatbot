@@ -56,7 +56,7 @@ function applyScrollSync(text, sync, viewportHeight) {
   const totalChars = text.length || 1;
   const ratio = Math.min(1, charEnd / totalChars);
   maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
-  scrollTarget = Math.round(maxScroll * ratio);
+  scrollTarget = Math.max(scrollTop, Math.round(maxScroll * ratio));
   scrollSyncFrom = scrollTop;
   scrollSyncStart = performance.now();
   scrollSyncDuration = duration;
@@ -64,18 +64,32 @@ function applyScrollSync(text, sync, viewportHeight) {
 
 function updateText(text, sync, speed) {
   const viewportHeight = document.querySelector(".text-viewport").offsetHeight;
-  if (text !== lastText) {
-    textContent.textContent = text || "";
-    scrollTop = 0;
-    scrollTarget = null;
-    scrollSyncStart = null;
-    scrollSyncDuration = 0;
-    scrollSyncFrom = 0;
-    lastText = text;
+  const nextText = text || "";
+  const isRegressive =
+    nextText.length > 0 && nextText.length < lastText.length && lastText.startsWith(nextText);
+
+  if (isRegressive) {
+    scrollSpeed = Math.max(0, parseInt(speed || 0, 10));
+    applyScrollSync(lastText, sync, viewportHeight);
+    maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
+    return;
+  }
+
+  if (nextText !== lastText) {
+    const isContinuation = nextText.startsWith(lastText);
+    textContent.textContent = nextText;
+    if (!isContinuation) {
+      scrollTop = 0;
+      scrollTarget = null;
+      scrollSyncStart = null;
+      scrollSyncDuration = 0;
+      scrollSyncFrom = 0;
+    }
+    lastText = nextText;
   }
 
   scrollSpeed = Math.max(0, parseInt(speed || 0, 10));
-  applyScrollSync(text, sync, viewportHeight);
+  applyScrollSync(lastText, sync, viewportHeight);
   maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
 }
 
