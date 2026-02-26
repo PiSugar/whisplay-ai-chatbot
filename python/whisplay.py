@@ -1,5 +1,6 @@
 import spidev
 import time
+import os
 import threading
 
 
@@ -12,6 +13,17 @@ def _detect_platform():
             if "Raspberry" in model:
                 return "rpi", model
             elif "Radxa" in model:
+                return "radxa", model
+    except Exception:
+        pass
+    # Also check compatible string (some SoCs use non-descriptive model names)
+    try:
+        with open("/proc/device-tree/compatible", "r") as f:
+            compat = f.read()
+            if "radxa" in compat.lower():
+                # Extract first compatible string as readable model name
+                parts = compat.split('\0')
+                model = parts[0] if parts else "Unknown Radxa"
                 return "radxa", model
     except Exception:
         pass
@@ -44,8 +56,9 @@ else:
             )
 
 
-# ==================== Radxa Zero 3W Pin Mapping ====================
+# ==================== Radxa Pin Mappings ====================
 # Physical 40-pin header pin number -> (gpiochip number, line offset)
+
 # Based on RK3566 Radxa ZERO 3W
 RADXA_ZERO3_PIN_MAP = {
     3: (1, 0),    5: (1, 1),    7: (3, 20),   8: (0, 25),
@@ -56,6 +69,36 @@ RADXA_ZERO3_PIN_MAP = {
     31: (3, 12),  32: (3, 18),  33: (3, 19),  35: (3, 4),
     36: (3, 7),   37: (1, 4),   38: (3, 6),   40: (3, 5),
 }
+
+# Based on Allwinner A733 Radxa Cubie A7Z
+# gpiochip0 (2000000.pinctrl, 352 lines): PA=0-31, PB=32-63, ..., PJ=288-319, PK=320-351
+# gpiochip1 (7025000.pinctrl, 64 lines): PL=0-31, PM=32-63
+RADXA_CUBIE_A7Z_PIN_MAP = {
+    3: (0, 311),   5: (0, 310),   7: (0, 32),    8: (0, 41),
+    10: (0, 42),   11: (0, 33),   12: (0, 37),   13: (1, 6),
+    15: (1, 7),    16: (0, 312),  18: (0, 313),  19: (0, 108),
+    21: (0, 109),  22: (1, 5),    23: (0, 107),  24: (0, 106),
+    26: (0, 110),  27: (0, 113),  28: (0, 112),  29: (0, 34),
+    31: (0, 35),   32: (1, 37),   33: (1, 35),   35: (0, 38),
+    36: (0, 36),   37: (1, 36),   38: (0, 40),   40: (0, 39),
+}
+
+
+def _detect_radxa_board():
+    """Detect specific Radxa board variant from device tree compatible string"""
+    try:
+        with open("/proc/device-tree/compatible", "r") as f:
+            compat = f.read().lower()
+            if "cubie-a7z" in compat:
+                return "cubie-a7z"
+            elif "cubie-a7a" in compat:
+                return "cubie-a7a"
+            elif "cubie-a7s" in compat:
+                return "cubie-a7s"
+    except Exception:
+        pass
+    # Default to zero3w for backward compatibility
+    return "zero3w"
 
 
 # ==================== Software PWM ====================
@@ -180,9 +223,14 @@ class WhisplayBoard:
         self.spi.max_speed_hz = 100_000_000
         self.spi.mode = 0b00
 
-    # ==================== Radxa Zero 3W Initialization ====================
+    # ==================== Radxa Initialization ====================
     def _init_radxa(self):
-        pin_map = RADXA_ZERO3_PIN_MAP
+        self._radxa_board = _detect_radxa_board()
+
+        if self._radxa_board == "cubie-a7z":
+            pin_map = RADXA_CUBIE_A7Z_PIN_MAP
+        else:
+            pin_map = RADXA_ZERO3_PIN_MAP
 
         # Open required GPIO chips
         self._gpio_chips = {}
@@ -246,10 +294,14 @@ class WhisplayBoard:
         self._btn_thread = threading.Thread(target=self._button_monitor_radxa, daemon=True)
         self._btn_thread.start()
 
-        # Initialize SPI (40-pin header on Radxa Zero 3W uses SPI3)
+        # Initialize SPI (board-specific SPI bus)
         self.spi = spidev.SpiDev()
-        self.spi.open(3, 0)  # SPI3, CS0
-        self.spi.max_speed_hz = 48_000_000  # RK3566 SPI max 50MHz
+        if self._radxa_board == "cubie-a7z":
+            self.spi.open(1, 0)  # SPI1, CS0 (Allwinner A733)
+            self.spi.max_speed_hz = 48_000_000
+        else:
+            self.spi.open(3, 0)  # SPI3, CS0 (RK3566 Radxa Zero 3W)
+            self.spi.max_speed_hz = 48_000_000  # RK3566 SPI max 50MHz
         self.spi.mode = 0b00
 
     def _button_monitor_radxa(self):
