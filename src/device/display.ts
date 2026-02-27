@@ -281,6 +281,9 @@ export class WhisplayDisplay {
       battery_level,
       battery_color,
       image,
+      camera_mode,
+      camera_capture,
+      capture_image_path,
       network_connected,
       rag_icon_visible,
       image_icon_visible,
@@ -304,6 +307,9 @@ export class WhisplayDisplay {
     this.currentStatus.battery_level = battery_level;
     this.currentStatus.battery_color = battery_color;
     this.currentStatus.image = image;
+    this.currentStatus.camera_mode = camera_mode;
+    this.currentStatus.camera_capture = camera_capture;
+    this.currentStatus.capture_image_path = capture_image_path;
     this.currentStatus.network_connected = network_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
     this.currentStatus.image_icon_visible = image_icon_visible;
