@@ -29,10 +29,11 @@ const openaiLLMModel = process.env.OPENAI_LLM_MODEL || "gpt-4o"; // Default mode
 const openaiEnableTools =
   (process.env.OPENAI_ENABLE_TOOLS || "true").toLowerCase() === "true";
 const shouldIncludeTools = openaiEnableTools;
-const useSingleMessagePayload = (process.env.OPENAI_USE_SINGLE_MESSAGE_PAYLOAD || "true").toLowerCase() === "true";
-const useCapturedImageInChat =
-  (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() ===
+const useSingleMessagePayload =
+  (process.env.OPENAI_USE_SINGLE_MESSAGE_PAYLOAD || "true").toLowerCase() ===
   "true";
+const useCapturedImageInChat =
+  (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() === "true";
 
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
@@ -88,9 +89,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     .reverse()
     .find((msg) => msg.role === "user");
   const capturedImagePath =
-    useCapturedImageInChat &&
-    lastUserMessage &&
-    hasPendingCapturedImgForChat()
+    useCapturedImageInChat && lastUserMessage && hasPendingCapturedImgForChat()
       ? consumePendingCapturedImgForChat()
       : "";
   const multimodalLastUserContent = capturedImagePath
@@ -119,13 +118,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     .map(({ index }) => index)
     .pop();
 
-  const requestMessages: any[] = useSingleMessagePayload
-    ? [
-        {
-          role: "user",
-          content: multimodalLastUserContent,
-        },
-      ]
+  const requestMessages = useSingleMessagePayload
+    ? {
+        role: "user",
+        content: multimodalLastUserContent,
+      } as any
     : messages.map((msg, index) => {
         if (
           capturedImagePath &&
