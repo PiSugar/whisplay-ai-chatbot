@@ -100,9 +100,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         },
         {
           type: "image_url",
-          image_url: {
-            url: buildImageDataUrl(capturedImagePath),
-          },
+          image_url: useSingleMessagePayload
+            ? buildImageDataUrl(capturedImagePath)
+            : {
+                url: buildImageDataUrl(capturedImagePath),
+              },
         },
       ]
     : [
@@ -119,10 +121,10 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     .pop();
 
   const requestMessages = useSingleMessagePayload
-    ? {
+    ? ({
         role: "user",
         content: multimodalLastUserContent,
-      } as any
+      } as any)
     : messages.map((msg, index) => {
         if (
           capturedImagePath &&
