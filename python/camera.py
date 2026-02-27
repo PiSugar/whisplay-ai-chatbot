@@ -18,10 +18,8 @@ except ImportError:
 
 
 def _default_web_frame_path() -> str:
-    configured = os.getenv("WHISPLAY_WEB_CAMERA_PATH")
-    if configured:
-        return os.path.abspath(configured)
-    return os.path.abspath(os.path.join("data", "camera_feed", "web_live.jpg"))
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    return os.path.join(project_root, "data", "camera_feed", "web_live.jpg")
 
 
 DAEMON_HOST = os.getenv("WHISPLAY_CAMERA_DAEMON_HOST", "127.0.0.1")

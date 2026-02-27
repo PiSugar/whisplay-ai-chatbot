@@ -200,11 +200,7 @@ export class WebDisplayServer {
   }
 
   private resolveCameraFramePath(): string | null {
-    const configured = process.env.WHISPLAY_WEB_CAMERA_PATH;
-    const fallback = path.resolve(cameraFeedDir, "web_live.jpg");
-    const candidate = configured
-      ? path.resolve(configured)
-      : fallback;
+    const candidate = path.resolve(cameraFeedDir, "web_live.jpg");
     // Camera frames are produced by the Python camera module (camera.py/CameraThread)
     // and consumed here by web-display. This avoids direct camera device ownership in web-display.
     const safe = this.resolveSafeImagePath(candidate);

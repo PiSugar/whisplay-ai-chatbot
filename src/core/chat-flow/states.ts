@@ -90,7 +90,6 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     display({
       status: "camera",
       emoji: "📷",
-      text: "Tap to capture, long press to exit",
       RGB: "#00ff88",
     });
   },
