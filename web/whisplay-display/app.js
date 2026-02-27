@@ -4,6 +4,7 @@ const textContent = document.getElementById("textContent");
 const batteryFill = document.getElementById("batteryFill");
 const batteryText = document.getElementById("batteryText");
 const netIcon = document.getElementById("netIcon");
+const imageIcon = document.getElementById("imageIcon");
 const ragIcon = document.getElementById("ragIcon");
 const led = document.getElementById("led");
 const ledText = document.getElementById("ledText");
@@ -144,6 +145,7 @@ function applyState(data) {
   batteryFill.style.background = normalizeColor(data.battery_color);
 
   netIcon.style.opacity = data.network_connected ? "1" : "0.3";
+  imageIcon.style.opacity = data.image_icon_visible ? "1" : "0.3";
   ragIcon.style.opacity = data.rag_icon_visible ? "1" : "0.3";
 
   const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));
