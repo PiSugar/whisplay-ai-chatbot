@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import http from "http";
+import { Socket } from "net";
 import Koa from "koa";
 import Router from "@koa/router";
 import serve from "koa-static";
@@ -67,12 +68,19 @@ export class WebDisplayServer {
   }
 
   updateStatus(status: Status): void {
+    const prevCameraMode = this.currentStatus?.camera_mode || false;
     const nextImage = status.image || "";
     const prevImage = this.currentStatus?.image || "";
     if (nextImage !== prevImage) {
       this.imageRevision += 1;
     }
     this.currentStatus = { ...status };
+    const nextCameraMode = this.currentStatus.camera_mode;
+    if (!prevCameraMode && nextCameraMode) {
+      this.sendCameraDaemonCommand("start_stream");
+    } else if (prevCameraMode && !nextCameraMode) {
+      this.sendCameraDaemonCommand("stop_stream");
+    }
     this.broadcastState();
   }
 
@@ -196,8 +204,26 @@ export class WebDisplayServer {
     const candidate = configured
       ? path.resolve(configured)
       : fallback;
+    // Camera frames are produced by the Python camera module (camera.py/CameraThread)
+    // and consumed here by web-display. This avoids direct camera device ownership in web-display.
     const safe = this.resolveSafeImagePath(candidate);
     return safe || null;
+  }
+
+  private sendCameraDaemonCommand(cmd: string): void {
+    const port = parseInt(process.env.WHISPLAY_CAMERA_DAEMON_PORT || "18765", 10);
+    const socket = new Socket();
+    socket.setTimeout(600);
+    socket.connect(port, "127.0.0.1", () => {
+      socket.write(`${JSON.stringify({ cmd })}\n`);
+      socket.end();
+    });
+    socket.on("error", () => {
+      socket.destroy();
+    });
+    socket.on("timeout", () => {
+      socket.destroy();
+    });
   }
 
   private resolveSafeImagePath(imagePath: string): string | null {

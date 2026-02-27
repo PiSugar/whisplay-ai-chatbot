@@ -58,9 +58,14 @@ export class WhisplayDisplay {
   private buttonDetectInterval: NodeJS.Timeout | null = null;
   private webDisplay: WebDisplayServer | null = null;
   private deviceEnabled: boolean;
+  private cameraEnabled: boolean;
 
   constructor() {
     this.deviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
+    this.cameraEnabled = parseBoolEnv("ENABLE_CAMERA", false);
+    if (this.cameraEnabled) {
+      this.ensureCameraDaemon();
+    }
     const webEnabled = parseBoolEnv("WHISPLAY_WEB_ENABLED", false);
     if (webEnabled) {
       const port = parseInt(process.env.WHISPLAY_WEB_PORT || "17880", 10);
@@ -303,6 +308,15 @@ export class WhisplayDisplay {
     changedValuesObj.brightness = 100;
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) console.log("send data:", data);
+
+    if (!this.deviceEnabled && newStatus.camera_capture) {
+      const capturePath = newStatus.capture_image_path || this.currentStatus.capture_image_path;
+      if (capturePath) {
+        this.sendCameraDaemonCommand("capture", { path: capturePath });
+        this.handleCameraCaptureEvent();
+      }
+    }
+
     this.sendToDisplay(data);
     this.webDisplay?.updateStatus(this.currentStatus);
   }
@@ -331,6 +345,44 @@ export class WhisplayDisplay {
   stopWebDisplay(): void {
     this.webDisplay?.close();
     this.webDisplay = null;
+  }
+
+  private ensureCameraDaemon(): void {
+    const command = `cd ${resolve(
+      __dirname,
+      "../../python",
+    )} && python3 camera.py --ensure-daemon`;
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.warn("[CameraDaemon] ensure failed:", error.message);
+        return;
+      }
+      if (stdout?.trim()) {
+        console.log(stdout.trim());
+      }
+      if (stderr?.trim()) {
+        console.warn(stderr.trim());
+      }
+    });
+  }
+
+  private sendCameraDaemonCommand(
+    cmd: string,
+    payload: Record<string, unknown> = {},
+  ): void {
+    const port = parseInt(process.env.WHISPLAY_CAMERA_DAEMON_PORT || "18765", 10);
+    const socket = new Socket();
+    socket.setTimeout(1000);
+    socket.connect(port, "127.0.0.1", () => {
+      socket.write(`${JSON.stringify({ cmd, ...payload })}\n`);
+      socket.end();
+    });
+    socket.on("error", () => {
+      socket.destroy();
+    });
+    socket.on("timeout", () => {
+      socket.destroy();
+    });
   }
 }
 
