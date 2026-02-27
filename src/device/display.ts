@@ -61,6 +61,7 @@ export class WhisplayDisplay {
   private webDisplay: WebDisplayServer | null = null;
   private deviceEnabled: boolean;
   private cameraEnabled: boolean;
+  private receiveBuffer = "";
 
   constructor() {
     this.deviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
@@ -200,31 +201,40 @@ export class WhisplayDisplay {
       this.client = new Socket();
       this.client.connect(12345, "0.0.0.0", () => {
         console.log("Connected to local display socket");
+        this.receiveBuffer = "";
         this.sendToDisplay(JSON.stringify(this.currentStatus));
         resolve();
       });
       this.client.on("data", (data: Buffer) => {
-        const dataString = data.toString();
-        if (dataString.trim() === "OK") {
-          return;
-        }
-        console.log(
-          `[${getCurrentTimeTag()}] Received data from Whisplay hat:`,
-          dataString,
-        );
-        try {
-          const json = JSON.parse(dataString);
-          if (json.event === "button_pressed") {
-            this.handleButtonPressedEvent();
+        this.receiveBuffer += data.toString();
+        while (this.receiveBuffer.includes("\n")) {
+          const newlineIndex = this.receiveBuffer.indexOf("\n");
+          const line = this.receiveBuffer.slice(0, newlineIndex).trim();
+          this.receiveBuffer = this.receiveBuffer.slice(newlineIndex + 1);
+          if (!line || line === "OK") {
+            continue;
           }
-          if (json.event === "button_released") {
-            this.handleButtonReleasedEvent();
+          console.log(
+            `[${getCurrentTimeTag()}] Received data from Whisplay hat:`,
+            line,
+          );
+          try {
+            const json = JSON.parse(line);
+            if (json.event === "button_pressed") {
+              this.handleButtonPressedEvent();
+            }
+            if (json.event === "button_released") {
+              this.handleButtonReleasedEvent();
+            }
+            if (json.event === "camera_capture") {
+              this.handleCameraCaptureEvent();
+            }
+            if (json.event === "exit_camera_mode") {
+              this.display({ camera_mode: false });
+            }
+          } catch {
+            // ignore invalid non-json lines
           }
-          if (json.event === "camera_capture") {
-            this.handleCameraCaptureEvent();
-          }
-        } catch {
-          // console.error("Failed to parse JSON from data");
         }
       });
       this.client.on("error", (err: any) => {
