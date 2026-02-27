@@ -22,22 +22,34 @@ import { cameraDir } from "../../utils/dir";
 import { getLatestDisplayImg, setLatestCapturedImg } from "../../utils/image";
 import { sendWhisplayIMMessage } from "../../cloud-api/whisplay-im/whisplay-im";
 import { ChatFlowContext, FlowName, FlowStateHandler } from "./types";
+import {
+  enterCameraMode,
+  handleCameraModePress,
+  handleCameraModeRelease,
+  resetCameraModeControl,
+} from "./camera-mode";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
     onButtonPressed(() => {
+      if (getCurrentStatus().camera_mode) {
+        handleCameraModePress();
+        return;
+      }
+      resetCameraModeControl();
       ctx.transitionTo("listening");
     });
-    onButtonReleased(noop);
+    onButtonReleased(() => {
+      if (getCurrentStatus().camera_mode) {
+        handleCameraModeRelease();
+      }
+    });
     if (ctx.enableCamera) {
       const captureImgPath = `${cameraDir}/capture-${moment().format(
         "YYYYMMDD-HHmmss",
       )}.jpg`;
       onButtonDoubleClick(() => {
-        display({
-          camera_mode: true,
-          capture_image_path: captureImgPath,
-        });
+        enterCameraMode(captureImgPath);
       });
       onCameraCapture(() => {
         setLatestCapturedImg(captureImgPath);

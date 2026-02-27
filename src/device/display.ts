@@ -22,6 +22,7 @@ export interface Status {
   battery_level: number | undefined;
   image: string;
   camera_mode: boolean;
+  camera_capture?: boolean;
   capture_image_path: string;
   network_connected: boolean;
   rag_icon_visible: boolean;
