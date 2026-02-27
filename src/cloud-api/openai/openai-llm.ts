@@ -17,10 +17,15 @@ import {
   SummaryTextWithLLMFunction,
 } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
+import { LLMServer } from "../../type";
 
 dotenv.config();
 // OpenAI LLM
 const openaiLLMModel = process.env.OPENAI_LLM_MODEL || "gpt-4o"; // Default model
+const openaiEnableTools =
+  (process.env.OPENAI_ENABLE_TOOLS || "true").toLowerCase() === "true";
+const shouldIncludeTools = openaiEnableTools;
+const useSingleMessagePayload = (process.env.OPENAI_USE_SINGLE_MESSAGE_PAYLOAD || "true").toLowerCase() === "true";
 
 const chatHistoryFileName = `openai_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss",
@@ -66,11 +71,25 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     );
   });
   messages.push(...inputMessages);
+  const lastUserMessage = [...inputMessages]
+    .reverse()
+    .find((msg) => msg.role === "user");
+  const requestMessages = useSingleMessagePayload
+    ? {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: lastUserMessage?.content || "",
+          },
+        ],
+      } as unknown as any[]
+    : messages;
   const chatCompletion = await openai.chat.completions.create({
     model: openaiLLMModel,
-    messages: messages as any,
+    messages: requestMessages,
     stream: true,
-    tools: llmTools,
+    tools: shouldIncludeTools ? llmTools : undefined,
   });
   let partialAnswer = "";
   let partialThinking = "";

@@ -58,6 +58,7 @@ export const visionServer: VisionServer = (
 console.log(`Current ASR Server: ${asrServer}`);
 console.log(`Current LLM Server: ${llmServer}`);
 console.log(`Current TTS Server: ${ttsServer}`);
+
 if (imageGenerationServer)
   console.log(`Current Image Generation Server: ${imageGenerationServer}`);
 if (visionServer) console.log(`Current Vision Server: ${visionServer}`);
