@@ -19,6 +19,7 @@ if STATUS_ICON_DIR not in sys.path:
 from battery_icon import BatteryStatusIcon
 from network_icon import NetworkStatusIcon
 from rag_icon import RagStatusIcon
+from image_icon import ImageStatusIcon
 
 scroll_thread = None
 scroll_stop_event = threading.Event()
@@ -44,6 +45,7 @@ current_image_path = ""
 current_image = None
 current_network_connected = None
 current_rag_icon_visible = False
+current_image_icon_visible = False
 camera_mode = False
 camera_capture_image_path = ""
 camera_thread = None
@@ -256,6 +258,7 @@ class RenderThread(threading.Thread):
             "status_font_size": status_font_size,
             "network_connected": current_network_connected,
             "rag_icon_visible": current_rag_icon_visible,
+            "image_icon_visible": current_image_icon_visible,
         }
         status_icons = self.build_status_icons(status_icon_context)
         self.render_status_icons(draw, status_icons, image_width)
@@ -273,6 +276,8 @@ class RenderThread(threading.Thread):
             icons.append(BatteryStatusIcon(battery_level, battery_color, battery_font, status_font_size))
         if context.get("network_connected"):
             icons.append(NetworkStatusIcon(status_font_size))
+        if context.get("image_icon_visible"):
+            icons.append(ImageStatusIcon(status_font_size))
         if context.get("rag_icon_visible"):
             icons.append(RagStatusIcon(status_font_size))
 
@@ -306,12 +311,12 @@ class RenderThread(threading.Thread):
 
 def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
-                  network_connected=None, rag_icon_visible=None, transaction_id=None):
+                  network_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
     global current_scroll_sync_target_top, current_scroll_sync_speed
-    global current_network_connected, current_rag_icon_visible, current_transaction_id
+    global current_network_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
 
     next_text = text
     if text is not None:
@@ -363,6 +368,8 @@ def update_display_data(status=None, emoji=None, text=None,
         current_network_connected = network_connected
     if rag_icon_visible is not None:
         current_rag_icon_visible = rag_icon_visible
+    if image_icon_visible is not None:
+        current_image_icon_visible = image_icon_visible
     if transaction_id is not None:
         current_transaction_id = transaction_id
     current_status = status if status is not None else current_status
@@ -444,6 +451,7 @@ def handle_client(client_socket, addr, whisplay):
                     image_path = content.get("image", None)
                     network_connected = content.get("network_connected", None)
                     rag_icon_visible = content.get("rag_icon_visible", None)
+                    image_icon_visible = content.get("image_icon_visible", None)
                     capture_image_path = content.get("capture_image_path", None)
                     trigger_camera_capture = content.get("camera_capture", None)
                     # boolean to enable camera mode
@@ -487,12 +495,13 @@ def handle_client(client_socket, addr, whisplay):
                     if (text is not None) or (status is not None) or (emoji is not None) or \
                        (battery_level is not None) or (battery_color is not None) or \
                               (image_path is not None) or (network_connected is not None) or \
-                              (rag_icon_visible is not None) or (scroll_sync is not None):
+                            (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None):
                         update_display_data(status=status, emoji=emoji,
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
                                                  rag_icon_visible=rag_icon_visible,
+                                         image_icon_visible=image_icon_visible,
                                                  transaction_id=transaction_id)
 
                     client_socket.send(b"OK\n")

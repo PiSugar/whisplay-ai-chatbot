@@ -19,7 +19,12 @@ import { isImMode } from "../../cloud-api/llm";
 import { getSystemPromptWithKnowledge } from "../Knowledge";
 import { enableRAG } from "../../cloud-api/knowledge";
 import { cameraDir } from "../../utils/dir";
-import { getLatestDisplayImg, setLatestCapturedImg } from "../../utils/image";
+import {
+  clearPendingCapturedImgForChat,
+  getLatestDisplayImg,
+  setLatestCapturedImg,
+  setPendingCapturedImgForChat,
+} from "../../utils/image";
 import { sendWhisplayIMMessage } from "../../cloud-api/whisplay-im/whisplay-im";
 import { ChatFlowContext, FlowName, FlowStateHandler } from "./types";
 import {
@@ -53,6 +58,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       });
       onCameraCapture(() => {
         setLatestCapturedImg(captureImgPath);
+        setPendingCapturedImgForChat(captureImgPath);
+        display({ image_icon_visible: true });
       });
     }
     display({
@@ -281,6 +288,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       });
     getPlayEndPromise().then(() => {
       if (ctx.currentFlowName === "answer") {
+        clearPendingCapturedImgForChat();
+        display({ image_icon_visible: false });
         if (ctx.wakeSessionActive || ctx.endAfterAnswer) {
           if (ctx.endAfterAnswer) {
             ctx.endWakeSession();
@@ -303,6 +312,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonPressed(() => {
       stopPlaying();
+      clearPendingCapturedImgForChat();
+      display({ image_icon_visible: false });
       ctx.transitionTo("listening");
     });
     onButtonReleased(noop);

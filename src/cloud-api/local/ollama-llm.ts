@@ -23,6 +23,10 @@ import {
   stimulateStreamResponse,
 } from "../../config/common";
 import { defaultPortMap } from "./common";
+import {
+  consumePendingCapturedImgForChat,
+  hasPendingCapturedImgForChat,
+} from "../../utils/image";
 
 dotenv.config();
 
@@ -35,6 +39,9 @@ const ollamaPredictNum = process.env.OLLAMA_PREDICT_NUM
   ? parseInt(process.env.OLLAMA_PREDICT_NUM)
   : undefined;
 const enableThinking = process.env.ENABLE_THINKING === "true";
+const useCapturedImageInChat =
+  (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() ===
+  "true";
 
 const llmServer = process.env.LLM_SERVER || "";
 
@@ -116,13 +123,34 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   const functionCallsPackages: OllamaFunctionCall[][] = [];
 
   try {
+    const lastUserMessageIndex = messages
+      .map((msg, index) => ({ msg, index }))
+      .filter(({ msg }) => msg.role === "user")
+      .map(({ index }) => index)
+      .pop();
+    const capturedImagePath =
+      useCapturedImageInChat &&
+      lastUserMessageIndex !== undefined &&
+      hasPendingCapturedImgForChat()
+        ? consumePendingCapturedImgForChat()
+        : "";
+    const capturedImageBase64 = capturedImagePath
+      ? fs.readFileSync(capturedImagePath).toString("base64")
+      : "";
+
     const response = await axios.post(
       `${ollamaEndpoint}/api/chat`,
       {
         model: ollamaModel,
-        messages: messages.map((msg) => ({
+        messages: messages.map((msg, index) => ({
           role: msg.role,
           content: msg.content,
+          ...(capturedImageBase64 &&
+          msg.role === "user" &&
+          lastUserMessageIndex !== undefined &&
+          index === lastUserMessageIndex
+            ? { images: [capturedImageBase64] }
+            : {}),
         })),
         think: enableThinking,
         stream: true,

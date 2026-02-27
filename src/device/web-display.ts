@@ -161,6 +161,7 @@ export class WebDisplayServer {
       capture_image_path: this.currentStatus.capture_image_path,
       network_connected: this.currentStatus.network_connected,
       rag_icon_visible: this.currentStatus.rag_icon_visible,
+      image_icon_visible: this.currentStatus.image_icon_visible,
       image_revision: this.imageRevision,
     };
   }

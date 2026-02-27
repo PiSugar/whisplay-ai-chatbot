@@ -18,9 +18,17 @@ import {
 import { ToolListUnion, ToolUnion, Part, Content } from "@google/genai";
 import moment from "moment";
 import { chatHistoryDir } from "../../utils/dir";
-import { openai } from "../openai/openai";
+import {
+  consumePendingCapturedImgForChat,
+  hasPendingCapturedImgForChat,
+  getImageMimeType,
+} from "../../utils/image";
 
 dotenv.config();
+
+const useCapturedImageInChat =
+  (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() ===
+  "true";
 
 const chatHistoryFileName = `gemini_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss",
@@ -109,10 +117,38 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   const functionCallsPackages: any[] = [];
 
   try {
+    const lastUserMessageIndex = inputMessages
+      .map((msg, index) => ({ msg, index }))
+      .filter(({ msg }) => msg.role === "user")
+      .map(({ index }) => index)
+      .pop();
+    const capturedImagePath =
+      useCapturedImageInChat &&
+      lastUserMessageIndex !== undefined &&
+      hasPendingCapturedImgForChat()
+        ? consumePendingCapturedImgForChat()
+        : "";
+    const imagePart = capturedImagePath
+      ? {
+          inlineData: {
+            mimeType: getImageMimeType(capturedImagePath),
+            data: fs.readFileSync(capturedImagePath).toString("base64"),
+          },
+        }
+      : null;
+
     const geminiPart: Part[] = inputMessages
-      .map((msg) => {
+      .map((msg, index) => {
         if (msg.role === "user") {
-          return { text: msg.content };
+          const parts: any[] = [{ text: msg.content }];
+          if (
+            imagePart &&
+            lastUserMessageIndex !== undefined &&
+            index === lastUserMessageIndex
+          ) {
+            parts.push(imagePart);
+          }
+          return parts;
         } else if (msg.role === "assistant") {
           return { text: msg.content };
         } else if (msg.role === "tool") {
@@ -125,6 +161,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         }
         return null;
       })
+      .flat()
       .filter((item) => item !== null) as Part[];
 
     const response = await chat.sendMessageStream({

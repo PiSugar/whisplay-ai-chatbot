@@ -7,6 +7,8 @@ export const capturedImgList: string[] = [];
 
 let latestDisplayImg = "";
 let latestShowedImg = "";
+let pendingCapturedImgForChat = "";
+let pendingCapturedImgConsumed = false;
 
 const setLatestShowedImage = (imagePath: string) => {
   latestShowedImg = imagePath;
@@ -74,6 +76,32 @@ export const getLatestGenImg = () => {
 export const setLatestCapturedImg = (imgPath: string) => {
   capturedImgList.push(imgPath);
   setLatestShowedImage(imgPath);
+};
+
+export const setPendingCapturedImgForChat = (imgPath: string) => {
+  pendingCapturedImgForChat = imgPath || "";
+  pendingCapturedImgConsumed = false;
+};
+
+export const hasPendingCapturedImgForChat = (): boolean => {
+  return Boolean(
+    pendingCapturedImgForChat &&
+      !pendingCapturedImgConsumed &&
+      fs.existsSync(pendingCapturedImgForChat),
+  );
+};
+
+export const consumePendingCapturedImgForChat = (): string => {
+  if (!hasPendingCapturedImgForChat()) {
+    return "";
+  }
+  pendingCapturedImgConsumed = true;
+  return pendingCapturedImgForChat;
+};
+
+export const clearPendingCapturedImgForChat = () => {
+  pendingCapturedImgForChat = "";
+  pendingCapturedImgConsumed = false;
 };
 
 export const getLatestCapturedImg = () => {
