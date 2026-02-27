@@ -149,7 +149,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     messages: requestMessages as any,
     stream: true,
     tools: shouldIncludeTools ? llmTools : undefined,
-  });
+  }).catch((error) => {
+    console.log("Error during OpenAI chat completion request:", error.message);
+    endResolve();
+    endCallback();
+    return [];
+  }) ;
   let partialAnswer = "";
   let partialThinking = "";
   const functionCallsPackages: any[] = [];
