@@ -31,35 +31,25 @@ import {
   enterCameraMode,
   handleCameraModePress,
   handleCameraModeRelease,
+  onCameraModeExit,
   resetCameraModeControl,
 } from "./camera-mode";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
     onButtonPressed(() => {
-      if (getCurrentStatus().camera_mode) {
-        handleCameraModePress();
-        return;
-      }
       resetCameraModeControl();
       ctx.transitionTo("listening");
     });
-    onButtonReleased(() => {
-      if (getCurrentStatus().camera_mode) {
-        handleCameraModeRelease();
-      }
-    });
+    onButtonReleased(noop);
+    onCameraModeExit(null);
     if (ctx.enableCamera) {
       const captureImgPath = `${cameraDir}/capture-${moment().format(
         "YYYYMMDD-HHmmss",
       )}.jpg`;
       onButtonDoubleClick(() => {
         enterCameraMode(captureImgPath);
-      });
-      onCameraCapture(() => {
-        setLatestCapturedImg(captureImgPath);
-        setPendingCapturedImgForChat(captureImgPath);
-        display({ image_icon_visible: true });
+        ctx.transitionTo("camera");
       });
     }
     display({
@@ -73,6 +63,35 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
             }.`,
         }
         : {}),
+    });
+  },
+  camera: (ctx: ChatFlowContext) => {
+    onButtonDoubleClick(null);
+    onButtonPressed(() => {
+      handleCameraModePress();
+    });
+    onButtonReleased(() => {
+      handleCameraModeRelease();
+    });
+    onCameraCapture(() => {
+      const captureImagePath = getCurrentStatus().capture_image_path;
+      if (!captureImagePath) {
+        return;
+      }
+      setLatestCapturedImg(captureImagePath);
+      setPendingCapturedImgForChat(captureImagePath);
+      display({ image_icon_visible: true });
+    });
+    onCameraModeExit(() => {
+      if (ctx.currentFlowName === "camera") {
+        ctx.transitionTo("sleep");
+      }
+    });
+    display({
+      status: "camera",
+      emoji: "📷",
+      text: "Tap to capture, long press to exit",
+      RGB: "#00ff88",
     });
   },
   listening: (ctx: ChatFlowContext) => {

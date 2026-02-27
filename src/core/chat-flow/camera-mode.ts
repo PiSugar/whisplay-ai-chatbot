@@ -6,6 +6,16 @@ const CAMERA_EXIT_AFTER_CAPTURE_MS = 2000;
 let cameraModePressAt = 0;
 let cameraModeLongPressTimer: NodeJS.Timeout | null = null;
 let cameraModeExitAfterCaptureTimer: NodeJS.Timeout | null = null;
+let onCameraModeExitCallback: () => void = () => {};
+
+function exitCameraMode(): void {
+  if (!getCurrentStatus().camera_mode) {
+    return;
+  }
+  resetCameraModeControl();
+  display({ camera_mode: false });
+  onCameraModeExitCallback();
+}
 
 function clearCameraModeTimers(): void {
   if (cameraModeLongPressTimer) {
@@ -23,6 +33,10 @@ export function resetCameraModeControl(): void {
   cameraModePressAt = 0;
 }
 
+export function onCameraModeExit(callback: (() => void) | null): void {
+  onCameraModeExitCallback = callback || (() => {});
+}
+
 export function enterCameraMode(captureImgPath: string): void {
   resetCameraModeControl();
   display({
@@ -37,11 +51,7 @@ export function handleCameraModePress(): void {
     clearTimeout(cameraModeLongPressTimer);
   }
   cameraModeLongPressTimer = setTimeout(() => {
-    if (!getCurrentStatus().camera_mode) {
-      return;
-    }
-    resetCameraModeControl();
-    display({ camera_mode: false });
+    exitCameraMode();
   }, CAMERA_LONG_PRESS_MS);
 }
 
@@ -64,9 +74,7 @@ export function handleCameraModeRelease(): void {
       clearTimeout(cameraModeExitAfterCaptureTimer);
     }
     cameraModeExitAfterCaptureTimer = setTimeout(() => {
-      if (getCurrentStatus().camera_mode) {
-        display({ camera_mode: false });
-      }
+      exitCameraMode();
       cameraModeExitAfterCaptureTimer = null;
     }, CAMERA_EXIT_AFTER_CAPTURE_MS);
   }
