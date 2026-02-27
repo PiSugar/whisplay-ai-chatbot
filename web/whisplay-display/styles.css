@@ -63,6 +63,8 @@ body {
   grid-template-rows: auto 1fr;
   gap: 6px;
   background: #000;
+  position: relative;
+  z-index: 1;
   /* border-bottom: 1px solid rgba(255, 255, 255, 0.06); */
 }
 
@@ -144,6 +146,7 @@ body {
   padding: 10px 10px 12px;
   background: #000;
   position: relative;
+  z-index: 1;
 }
 
 .text-viewport {
@@ -170,6 +173,7 @@ body {
   align-items: center;
   justify-content: center;
   background: #000;
+  z-index: 5;
 }
 
 .image-layer img {
@@ -184,6 +188,7 @@ body {
   background: #000;
   pointer-events: none;
   opacity: 0;
+  z-index: 10;
 }
 
 .side {
