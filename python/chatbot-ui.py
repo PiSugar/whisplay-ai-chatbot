@@ -35,13 +35,14 @@ current_text = "Waiting for message..."
 current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
-DEFAULT_SCROLL_SPEED = 0.8
-MAX_SCROLL_SPEED = 1.2
+DEFAULT_SCROLL_SPEED = 0.25
+MAX_SCROLL_SPEED = 0.5
 current_scroll_speed = DEFAULT_SCROLL_SPEED
 current_scroll_sync_char_end = None
 current_scroll_sync_duration_ms = None
 current_scroll_sync_target_top = None
 current_scroll_sync_speed = None
+current_scroll_sync_hold_until = 0.0
 current_transaction_id = None
 current_image_path = ""
 current_image = None
@@ -159,7 +160,7 @@ class RenderThread(threading.Thread):
     def render_main_text(self, main_text_image, area_height, draw, text, scroll_speed=2):
         global current_scroll_top, current_scroll_sync_char_end
         global current_scroll_sync_duration_ms, current_scroll_sync_target_top
-        global current_scroll_sync_speed
+        global current_scroll_sync_speed, current_scroll_sync_hold_until
         """Render main text content, wrap lines according to screen width, only display currently visible part"""
         if not text:
             return
@@ -221,7 +222,11 @@ class RenderThread(threading.Thread):
                 current_scroll_sync_target_top = None
             else:
                 current_scroll_top += current_scroll_sync_speed
-        elif scroll_speed > 0 and current_scroll_top < max_scroll_top:
+        elif (
+            scroll_speed > 0
+            and current_scroll_top < max_scroll_top
+            and time.time() >= current_scroll_sync_hold_until
+        ):
             current_scroll_top += scroll_speed
         if current_scroll_top > max_scroll_top:
             current_scroll_top = max_scroll_top
@@ -318,6 +323,7 @@ def update_display_data(status=None, emoji=None, text=None,
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
     global current_scroll_sync_target_top, current_scroll_sync_speed
+    global current_scroll_sync_hold_until
     global current_network_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
 
     next_text = text
@@ -362,6 +368,11 @@ def update_display_data(status=None, emoji=None, text=None,
             if char_end is not None and duration_ms is not None:
                 current_scroll_sync_char_end = int(char_end)
                 current_scroll_sync_duration_ms = int(duration_ms)
+                hold_seconds = max(0.3, (current_scroll_sync_duration_ms / 1000.0) + 0.2)
+                current_scroll_sync_hold_until = max(
+                    current_scroll_sync_hold_until,
+                    time.time() + hold_seconds,
+                )
         except Exception as e:
             print(f"[Display] Invalid scroll_sync payload: {e}")
     if scroll_speed is not None:
