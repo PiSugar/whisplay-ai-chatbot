@@ -255,6 +255,12 @@ export class WhisplayDisplay {
   }
 
   onButtonDoubleClick(callback: (() => void) | null): void {
+    if (this.buttonDetectInterval) {
+      clearTimeout(this.buttonDetectInterval);
+      this.buttonDetectInterval = null;
+    }
+    this.buttonPressTimeArray = [];
+    this.buttonReleaseTimeArray = [];
     this.buttonDoubleClickCallback = callback || null;
   }
 
