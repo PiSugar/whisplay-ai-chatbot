@@ -35,7 +35,9 @@ current_text = "Waiting for message..."
 current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
-current_scroll_speed = 6
+DEFAULT_SCROLL_SPEED = 0.8
+MAX_SCROLL_SPEED = 1.2
+current_scroll_speed = DEFAULT_SCROLL_SPEED
 current_scroll_sync_char_end = None
 current_scroll_sync_duration_ms = None
 current_scroll_sync_target_top = None
@@ -363,7 +365,11 @@ def update_display_data(status=None, emoji=None, text=None,
         except Exception as e:
             print(f"[Display] Invalid scroll_sync payload: {e}")
     if scroll_speed is not None:
-        current_scroll_speed = scroll_speed
+        try:
+            requested_speed = float(scroll_speed)
+            current_scroll_speed = min(MAX_SCROLL_SPEED, max(0.0, requested_speed))
+        except (TypeError, ValueError):
+            print(f"[Display] Invalid scroll_speed payload: {scroll_speed}")
     if network_connected is not None:
         current_network_connected = network_connected
     if rag_icon_visible is not None:
@@ -443,7 +449,7 @@ def handle_client(client_socket, addr, whisplay):
                     text = content.get("text", None)
                     rgbled = content.get("RGB", None)
                     brightness = content.get("brightness", None)
-                    scroll_speed = content.get("scroll_speed", 2)
+                    scroll_speed = content.get("scroll_speed", None)
                     scroll_sync = content.get("scroll_sync", None)
                     response_to_client = content.get("response", None)
                     battery_level = content.get("battery_level", None)
