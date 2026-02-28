@@ -32,7 +32,7 @@ class SharedCameraService:
         self.web_frame_path = _default_web_frame_path()
         os.makedirs(os.path.dirname(self.web_frame_path), exist_ok=True)
 
-        self.capture_width = max(64, int(os.getenv("WHISPLAY_CAMERA_WIDTH", "640")))
+        self.capture_width = max(64, int(os.getenv("WHISPLAY_CAMERA_WIDTH", "560")))
         self.capture_height = max(64, int(os.getenv("WHISPLAY_CAMERA_HEIGHT", "480")))
         interval_ms = int(os.getenv("WHISPLAY_CAMERA_DAEMON_INTERVAL_MS", "200"))
         self.stream_interval_sec = max(0.05, interval_ms / 1000)
