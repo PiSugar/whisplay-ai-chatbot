@@ -100,9 +100,9 @@ body {
 .status-icon {
   width: 16px;
   height: 16px;
+  display: none;
   object-fit: contain;
   filter: brightness(0.9);
-  opacity: 0.35;
 }
 
 

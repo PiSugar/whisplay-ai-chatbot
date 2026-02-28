@@ -26,6 +26,10 @@ let lastText = "";
 let lastImageRevision = -1;
 let isPressed = false;
 
+function setIconVisible(iconEl, visible) {
+  iconEl.style.display = visible ? "block" : "none";
+}
+
 function rgb565ToRgb(color) {
   const r = (color >> 11) & 0x1f;
   const g = (color >> 5) & 0x3f;
@@ -144,9 +148,9 @@ function applyState(data) {
   }
   batteryFill.style.background = normalizeColor(data.battery_color);
 
-  netIcon.style.opacity = data.network_connected ? "1" : "0.3";
-  imageIcon.style.opacity = data.image_icon_visible ? "1" : "0.3";
-  ragIcon.style.opacity = data.rag_icon_visible ? "1" : "0.3";
+  setIconVisible(netIcon, Boolean(data.network_connected));
+  setIconVisible(imageIcon, Boolean(data.image_icon_visible));
+  setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
 
   const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));
   dim.style.opacity = dimOpacity.toFixed(2);
