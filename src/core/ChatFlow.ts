@@ -55,7 +55,6 @@ class ChatFlow implements ChatFlowContext {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
     this.recordingsDir = recordingsDir;
     this.stateMachine = new FlowStateMachine(this, flowStates);
-    this.transitionTo("sleep");
     this.streamResponser = new StreamResponser(
       ttsProcessor,
       (sentences: string[]) => {
@@ -97,6 +96,8 @@ class ChatFlow implements ChatFlowContext {
     if (options?.enableCamera) {
       this.enableCamera = true;
     }
+
+    this.transitionTo("sleep");
 
     const wakeEnabled = (process.env.WAKE_WORD_ENABLED || "").toLowerCase();
     if (wakeEnabled === "true") {
