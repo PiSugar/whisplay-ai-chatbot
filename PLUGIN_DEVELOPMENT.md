@@ -46,7 +46,7 @@ The plugin system is automatically initialized at application startup:
 2. Scans the `plugins/` directory for local third-party plugins
 3. Scans `node_modules` for npm packages with the `whisplay-plugin-*` prefix
 4. Activates the corresponding plugin based on environment variables (e.g., `ASR_SERVER=openai`)
-5. Injects a `PluginContext` (including a snapshot of `process.env`) into each plugin's `activate(ctx)` call
+5. Injects a `PluginContext` (including a snapshot of `process.env` and host-managed directories like `imageDir` and `ttsDir`) into each plugin's `activate(ctx)` call
 
 > **Important:** Plugins should read configuration from the injected `ctx.env` rather than accessing `process.env` directly. This ensures proper isolation and testability.
 
@@ -130,17 +130,21 @@ interface PluginBase {
 /** Context injected by the host process */
 interface PluginContext {
   env: Record<string, string | undefined>;  // Snapshot of environment variables
+  imageDir: string;                          // Host-managed directory for generated images
+  ttsDir: string;                            // Host-managed directory for TTS temp/output files
 }
 ```
 
 The `ctx.env` object is a snapshot of `process.env` at activation time. Plugins should always read configuration from `ctx.env` for proper isolation.
+For image-related plugins, use `ctx.imageDir` as the output directory instead of hard-coding paths.
+For TTS plugins that need temp/output files, use `ctx.ttsDir` instead of hard-coding paths.
 
 ### Audio Format Requirements (ASR/TTS)
 
 Formats are defined by plugin metadata (not environment variables):
 
 - ASR plugins should set `audioFormat` to declare expected recording input (`"wav"` or `"mp3"`).
-- TTS plugins should set `audioFormat` to declare playback decoding format for `base64`/`buffer` output (`"wav"` or `"mp3"`).
+- TTS plugins should set `audioFormat` to declare playback decoding format for `base64`/`buffer` output (`"wav"` or `"mp3"`). If you return a `filePath`, it only supports "wav".
 - If metadata is omitted, the system falls back to built-in compatibility defaults.
 
 ### ASR Plugin
@@ -353,6 +357,8 @@ interface TTSResult {
 
 ```javascript
 // plugins/my-tts/index.js
+const fs = require("fs");
+const path = require("path");
 const axios = require("axios");
 const mp3Duration = require("mp3-duration");
 
@@ -365,9 +371,11 @@ module.exports = {
 
   activate(ctx) {
     const apiKey = ctx.env.MY_TTS_API_KEY;
+    fs.mkdirSync(ctx.ttsDir, { recursive: true });
 
     return {
       async ttsProcessor(text) {
+        const tempFilePath = path.join(ctx.ttsDir, `my-tts-${Date.now()}.mp3`);
         try {
           const response = await axios.post(
             "https://api.example.com/tts",
@@ -378,7 +386,8 @@ module.exports = {
             }
           );
 
-          const buffer = Buffer.from(response.data);
+          fs.writeFileSync(tempFilePath, Buffer.from(response.data));
+          const buffer = fs.readFileSync(tempFilePath);
           const duration = await mp3Duration(buffer);
 
           return {
@@ -388,6 +397,10 @@ module.exports = {
         } catch (error) {
           console.error("TTS synthesis failed:", error.message);
           return { duration: 0 };
+        } finally {
+          if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+          }
         }
       }
     };
@@ -470,7 +483,7 @@ module.exports = {
             try {
               const imageBuffer = await myImageApi.generate(params.prompt);
               const fileName = `generated-${Date.now()}.png`;
-              const imagePath = path.join(process.cwd(), "img", fileName);
+              const imagePath = path.join(ctx.imageDir, fileName);
               fs.writeFileSync(imagePath, imageBuffer);
               return "[success]Image generated successfully.";
             } catch (error) {
@@ -723,7 +736,7 @@ All plugin-related TypeScript type definitions are located in `src/plugin/types.
 |------|-------------|
 | `PluginType` | `"asr" \| "llm" \| "tts" \| "image-generation" \| "vision"` |
 | `AudioFormat` | `"wav" \| "mp3"` |
-| `PluginContext` | Context object injected into `activate(ctx)` containing `env` |
+| `PluginContext` | Context object injected into `activate(ctx)` containing `env`, `imageDir`, and `ttsDir` |
 | `PluginBase` | Base plugin interface (name, displayName, version, type) |
 | `ASRPlugin` / `ASRProvider` | ASR plugin and provider interfaces (`audioFormat` metadata) |
 | `LLMPlugin` / `LLMProvider` | LLM plugin and provider interfaces |

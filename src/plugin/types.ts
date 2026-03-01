@@ -67,6 +67,10 @@ export interface ProviderTypeMap {
 export interface PluginContext {
   /** Environment variables snapshot injected by the host */
   env: Record<string, string | undefined>;
+  /** Host-managed image output directory for image generation plugins */
+  imageDir: string;
+  /** Host-managed TTS working/output directory for TTS plugins */
+  ttsDir: string;
 }
 
 // ========== Plugin Base ==========

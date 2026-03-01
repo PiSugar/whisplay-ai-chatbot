@@ -6,6 +6,7 @@
  */
 
 import { Plugin, PluginContext, PluginType, ProviderTypeMap } from "./types";
+import { imageDir, ttsDir } from "../utils/dir";
 
 class PluginRegistry {
   private plugins = new Map<string, Plugin>();
@@ -30,6 +31,8 @@ class PluginRegistry {
   private buildContext(): PluginContext {
     return {
       env: { ...process.env } as Record<string, string | undefined>,
+      imageDir,
+      ttsDir,
     };
   }
 
