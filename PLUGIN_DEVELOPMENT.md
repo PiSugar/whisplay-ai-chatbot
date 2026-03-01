@@ -135,6 +135,14 @@ interface PluginContext {
 
 The `ctx.env` object is a snapshot of `process.env` at activation time. Plugins should always read configuration from `ctx.env` for proper isolation.
 
+### Audio Format Requirements (ASR/TTS)
+
+Formats are defined by plugin metadata (not environment variables):
+
+- ASR plugins should set `audioFormat` to declare expected recording input (`"wav"` or `"mp3"`).
+- TTS plugins should set `audioFormat` to declare playback decoding format for `base64`/`buffer` output (`"wav"` or `"mp3"`).
+- If metadata is omitted, the system falls back to built-in compatibility defaults.
+
 ### ASR Plugin
 
 **Purpose:** Convert audio files to text.
@@ -145,6 +153,7 @@ interface ASRPlugin {
   displayName: string;
   version: string;
   type: "asr";
+  audioFormat?: "wav" | "mp3";
   activate(ctx: PluginContext): ASRProvider | Promise<ASRProvider>;
 }
 
@@ -170,6 +179,7 @@ module.exports = {
   displayName: "My ASR Service",
   version: "1.0.0",
   type: "asr",
+  audioFormat: "wav",
   description: "Custom ASR using my API",
 
   activate(ctx) {
@@ -317,6 +327,7 @@ interface TTSPlugin {
   displayName: string;
   version: string;
   type: "tts";
+  audioFormat?: "wav" | "mp3";
   activate(ctx: PluginContext): TTSProvider | Promise<TTSProvider>;
 }
 
@@ -350,6 +361,7 @@ module.exports = {
   displayName: "My TTS Service",
   version: "1.0.0",
   type: "tts",
+  audioFormat: "mp3",
 
   activate(ctx) {
     const apiKey = ctx.env.MY_TTS_API_KEY;
@@ -710,11 +722,12 @@ All plugin-related TypeScript type definitions are located in `src/plugin/types.
 | Type | Description |
 |------|-------------|
 | `PluginType` | `"asr" \| "llm" \| "tts" \| "image-generation" \| "vision"` |
+| `AudioFormat` | `"wav" \| "mp3"` |
 | `PluginContext` | Context object injected into `activate(ctx)` containing `env` |
 | `PluginBase` | Base plugin interface (name, displayName, version, type) |
-| `ASRPlugin` / `ASRProvider` | ASR plugin and provider interfaces |
+| `ASRPlugin` / `ASRProvider` | ASR plugin and provider interfaces (`audioFormat` metadata) |
 | `LLMPlugin` / `LLMProvider` | LLM plugin and provider interfaces |
-| `TTSPlugin` / `TTSProvider` | TTS plugin and provider interfaces |
+| `TTSPlugin` / `TTSProvider` | TTS plugin and provider interfaces (`audioFormat` metadata) |
 | `ImageGenerationPlugin` / `ImageGenerationProvider` | Image generation plugin and provider interfaces |
 | `VisionPlugin` / `VisionProvider` | Vision plugin and provider interfaces |
 | `Message` | LLM conversation message type |

@@ -10,6 +10,7 @@ import { Message, LLMTool, TTSResult } from "../type";
 // ========== Plugin Categories ==========
 
 export type PluginType = "asr" | "llm" | "tts" | "image-generation" | "vision";
+export type AudioFormat = "wav" | "mp3";
 
 // ========== Provider Interfaces ==========
 
@@ -87,6 +88,8 @@ export interface PluginBase {
 
 export interface ASRPlugin extends PluginBase {
   type: "asr";
+  /** Audio format used by this plugin (ASR: input recording format) */
+  audioFormat?: AudioFormat;
   activate(ctx: PluginContext): ASRProvider | Promise<ASRProvider>;
 }
 
@@ -97,6 +100,8 @@ export interface LLMPlugin extends PluginBase {
 
 export interface TTSPlugin extends PluginBase {
   type: "tts";
+  /** Audio format used by this plugin (TTS: playback decoding format for base64/buffer) */
+  audioFormat?: AudioFormat;
   activate(ctx: PluginContext): TTSProvider | Promise<TTSProvider>;
 }
 

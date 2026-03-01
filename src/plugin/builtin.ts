@@ -34,6 +34,7 @@ function registerASRPlugins(): void {
     displayName: "Volcengine ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "mp3",
     description: "Volcengine (ByteDance) speech recognition service",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/volcengine/volcengine-asr");
@@ -46,6 +47,7 @@ function registerASRPlugins(): void {
     displayName: "Tencent ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "mp3",
     description: "Tencent Cloud speech recognition service",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/tencent/tencent-cloud");
@@ -58,6 +60,7 @@ function registerASRPlugins(): void {
     displayName: "OpenAI ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "mp3",
     description: "OpenAI Whisper API speech recognition",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/openai/openai-asr");
@@ -70,6 +73,7 @@ function registerASRPlugins(): void {
     displayName: "Gemini ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "mp3",
     description: "Google Gemini speech recognition",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/gemini/gemini-asr");
@@ -82,6 +86,7 @@ function registerASRPlugins(): void {
     displayName: "Vosk ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "wav",
     description: "Vosk offline speech recognition",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/local/vosk-asr");
@@ -94,6 +99,7 @@ function registerASRPlugins(): void {
     displayName: "Whisper ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "wav",
     description: "Local Whisper speech recognition",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/local/whisper-asr");
@@ -106,6 +112,7 @@ function registerASRPlugins(): void {
     displayName: "Whisper HTTP ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "wav",
     description: "Whisper HTTP API speech recognition",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/local/whisper-http-asr");
@@ -118,6 +125,7 @@ function registerASRPlugins(): void {
     displayName: "LLM8850 Whisper ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "wav",
     description: "LLM8850 Whisper speech recognition",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/local/llm8850-whisper");
@@ -130,6 +138,7 @@ function registerASRPlugins(): void {
     displayName: "Faster Whisper ASR",
     version: "1.0.0",
     type: "asr",
+    audioFormat: "wav",
     description: "Faster Whisper optimized speech recognition",
     activate: () => {
       const { recognizeAudio } = require("../cloud-api/local/faster-whisper-asr");
@@ -265,6 +274,7 @@ function registerTTSPlugins(): void {
     displayName: "Volcengine TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "mp3",
     description: "Volcengine (ByteDance) text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/volcengine/volcengine-tts").default;
@@ -277,6 +287,7 @@ function registerTTSPlugins(): void {
     displayName: "OpenAI TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "mp3",
     description: "OpenAI text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/openai/openai-tts").default;
@@ -289,6 +300,7 @@ function registerTTSPlugins(): void {
     displayName: "Tencent TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "mp3",
     description: "Tencent Cloud text-to-speech",
     activate: () => {
       const { synthesizeSpeech } = require("../cloud-api/tencent/tencent-cloud");
@@ -301,6 +313,7 @@ function registerTTSPlugins(): void {
     displayName: "Gemini TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "wav",
     description: "Google Gemini text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/gemini/gemini-tts").default;
@@ -313,6 +326,7 @@ function registerTTSPlugins(): void {
     displayName: "Piper TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "wav",
     description: "Piper local text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/local/piper-tts").default;
@@ -325,6 +339,7 @@ function registerTTSPlugins(): void {
     displayName: "Piper HTTP TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "mp3",
     description: "Piper HTTP API text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/local/piper-http-tts").default;
@@ -337,6 +352,7 @@ function registerTTSPlugins(): void {
     displayName: "eSpeak NG TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "mp3",
     description: "eSpeak NG offline text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/local/espeak-ng-tts").default;
@@ -349,6 +365,7 @@ function registerTTSPlugins(): void {
     displayName: "LLM8850 MeloTTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "mp3",
     description: "LLM8850 MeloTTS text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/local/llm8850-melotts").default;
@@ -361,6 +378,7 @@ function registerTTSPlugins(): void {
     displayName: "Supertonic TTS",
     version: "1.0.0",
     type: "tts",
+    audioFormat: "mp3",
     description: "Supertonic text-to-speech",
     activate: () => {
       const ttsProcessor = require("../cloud-api/local/supertonic-tts").default;
