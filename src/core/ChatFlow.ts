@@ -55,7 +55,6 @@ class ChatFlow implements ChatFlowContext {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
     this.recordingsDir = recordingsDir;
     this.stateMachine = new FlowStateMachine(this, flowStates);
-    this.transitionTo("sleep");
     this.streamResponser = new StreamResponser(
       ttsProcessor,
       (sentences: string[]) => {
@@ -83,10 +82,22 @@ class ChatFlow implements ChatFlowContext {
           scroll_speed: 3,
         });
       },
+      ({ charEnd, durationMs }) => {
+        if (!this.isAnswerFlow()) return;
+        if (!durationMs || durationMs <= 0) return;
+        display({
+          scroll_sync: {
+            char_end: charEnd,
+            duration_ms: durationMs,
+          },
+        });
+      }
     );
     if (options?.enableCamera) {
       this.enableCamera = true;
     }
+
+    this.transitionTo("sleep");
 
     const wakeEnabled = (process.env.WAKE_WORD_ENABLED || "").toLowerCase();
     if (wakeEnabled === "true") {

@@ -1,6 +1,6 @@
-import { createKnowledgeCollection } from "./core/Knowledge";
+import { indexKnowledgeCollection } from "./core/Knowledge";
 
-createKnowledgeCollection()
+indexKnowledgeCollection()
   .catch((e) => {
     console.error("Failed to create knowledge collection:", e);
   })

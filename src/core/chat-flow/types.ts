@@ -2,6 +2,7 @@ import { StreamResponser } from "../StreamResponsor";
 
 export type FlowName =
   | "sleep"
+  | "camera"
   | "listening"
   | "wake_listening"
   | "asr"

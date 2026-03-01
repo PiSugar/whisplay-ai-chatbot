@@ -17,10 +17,29 @@ import {
   SummaryTextWithLLMFunction,
 } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
+import {
+  consumePendingCapturedImgForChat,
+  hasPendingCapturedImgForChat,
+  getImageMimeType,
+} from "../../utils/image";
 
 dotenv.config();
 // OpenAI LLM
 const openaiLLMModel = process.env.OPENAI_LLM_MODEL || "gpt-4o"; // Default model
+const openaiEnableTools =
+  (process.env.OPENAI_ENABLE_TOOLS || "true").toLowerCase() === "true";
+const shouldIncludeTools = openaiEnableTools;
+const useSingleMessagePayload =
+  (process.env.OPENAI_USE_SINGLE_MESSAGE_PAYLOAD || "true").toLowerCase() ===
+  "true";
+const useCapturedImageInChat =
+  (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() === "true";
+
+const buildImageDataUrl = (imagePath: string): string => {
+  const mimeType = getImageMimeType(imagePath) || "image/jpeg";
+  const base64 = fs.readFileSync(imagePath).toString("base64");
+  return `data:${mimeType};base64,${base64}`;
+};
 
 const chatHistoryFileName = `openai_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss",
@@ -66,12 +85,76 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     );
   });
   messages.push(...inputMessages);
+  const lastUserMessage = [...inputMessages]
+    .reverse()
+    .find((msg) => msg.role === "user");
+  const capturedImagePath =
+    useCapturedImageInChat && lastUserMessage && hasPendingCapturedImgForChat()
+      ? consumePendingCapturedImgForChat()
+      : "";
+  const multimodalLastUserContent = capturedImagePath
+    ? [
+        {
+          type: "text",
+          text: lastUserMessage?.content || "",
+        },
+        {
+          type: "image_url",
+          image_url: useSingleMessagePayload
+            ? buildImageDataUrl(capturedImagePath)
+            : {
+                url: buildImageDataUrl(capturedImagePath),
+              },
+        },
+      ]
+    : [
+        {
+          type: "text",
+          text: lastUserMessage?.content || "",
+        },
+      ];
+
+  const lastUserMessageIndex = messages
+    .map((msg, index) => ({ msg, index }))
+    .filter(({ msg }) => msg.role === "user")
+    .map(({ index }) => index)
+    .pop();
+
+  const requestMessages = useSingleMessagePayload
+    ? ({
+        role: "user",
+        content: multimodalLastUserContent,
+      } as any)
+    : messages.map((msg, index) => {
+        if (
+          capturedImagePath &&
+          msg.role === "user" &&
+          lastUserMessageIndex !== undefined &&
+          index === lastUserMessageIndex
+        ) {
+          return {
+            role: "user",
+            content: multimodalLastUserContent,
+          };
+        }
+        return {
+          role: msg.role,
+          content: msg.content,
+          ...(msg.tool_call_id ? { tool_call_id: msg.tool_call_id } : {}),
+          ...(msg.tool_calls ? { tool_calls: msg.tool_calls } : {}),
+        };
+      });
   const chatCompletion = await openai.chat.completions.create({
     model: openaiLLMModel,
-    messages: messages as any,
+    messages: requestMessages as any,
     stream: true,
-    tools: llmTools,
-  });
+    tools: shouldIncludeTools ? llmTools : undefined,
+  }).catch((error) => {
+    console.log("Error during OpenAI chat completion request:", error.message);
+    endResolve();
+    endCallback();
+    return [];
+  }) ;
   let partialAnswer = "";
   let partialThinking = "";
   const functionCallsPackages: any[] = [];

@@ -15,6 +15,7 @@ export type TTSProcessorFunction = (text: string) => Promise<any>;
 
 export interface VectorDBClass {
   getCollections(): Promise<string[]>;
+  getCollection(collectionName: string): Promise<any>;
   deleteCollection(collectionName: string): Promise<void>;
   createCollection(
     collectionName: string,
@@ -36,4 +37,12 @@ export interface VectorDBClass {
     filter?: any
   ): Promise<any>;
   retrieve(collectionName: string, ids: Array<number | string>): Promise<any>;
+  scroll(
+    collectionName: string,
+    limit: number,
+    filter?: any,
+    offset?: number | string | null,
+    withPayload?: boolean
+  ): Promise<any>;
+  deletePointsByFilter(collectionName: string, filter: any): Promise<void>;
 }

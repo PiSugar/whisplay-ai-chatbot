@@ -19,6 +19,7 @@ if STATUS_ICON_DIR not in sys.path:
 from battery_icon import BatteryStatusIcon
 from network_icon import NetworkStatusIcon
 from rag_icon import RagStatusIcon
+from image_icon import ImageStatusIcon
 
 scroll_thread = None
 scroll_stop_event = threading.Event()
@@ -34,14 +35,21 @@ current_text = "Waiting for message..."
 current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
-current_scroll_speed = 6
+DEFAULT_SCROLL_SPEED = 0.25
+MAX_SCROLL_SPEED = 0.5
+current_scroll_speed = DEFAULT_SCROLL_SPEED
+current_scroll_sync_char_end = None
+current_scroll_sync_duration_ms = None
+current_scroll_sync_target_top = None
+current_scroll_sync_speed = None
+current_scroll_sync_hold_until = 0.0
+current_transaction_id = None
 current_image_path = ""
 current_image = None
 current_network_connected = None
 current_rag_icon_visible = False
+current_image_icon_visible = False
 camera_mode = False
-camera_mode_button_press_time = 0
-camera_mode_button_release_time = 0
 camera_capture_image_path = ""
 camera_thread = None
 clients = {}
@@ -134,8 +142,25 @@ class RenderThread(threading.Thread):
 
         
 
+    def compute_scroll_target_from_char_end(self, lines, line_height, area_height, char_end):
+        if char_end is None or char_end <= 0:
+            return 0
+        total_chars = 0
+        target_line = 0
+        for i, line in enumerate(lines):
+            total_chars += len(line)
+            if total_chars >= char_end:
+                target_line = i
+                break
+            if i < len(lines) - 1:
+                total_chars += 1
+        target_top = target_line * line_height - (area_height // 2)
+        return max(0, target_top)
+
     def render_main_text(self, main_text_image, area_height, draw, text, scroll_speed=2):
-        global current_scroll_top
+        global current_scroll_top, current_scroll_sync_char_end
+        global current_scroll_sync_duration_ms, current_scroll_sync_target_top
+        global current_scroll_sync_speed, current_scroll_sync_hold_until
         """Render main text content, wrap lines according to screen width, only display currently visible part"""
         if not text:
             return
@@ -145,6 +170,21 @@ class RenderThread(threading.Thread):
 
         # Line height
         line_height = self.main_text_line_height
+
+        max_scroll_top = max(0, (len(lines) + 1) * line_height - area_height)
+
+        if current_scroll_sync_char_end is not None and current_scroll_sync_duration_ms is not None:
+            target_top = self.compute_scroll_target_from_char_end(
+                lines, line_height, area_height, current_scroll_sync_char_end
+            )
+            target_top = min(max_scroll_top, target_top)
+            target_top = max(current_scroll_top, target_top)
+            duration_ms = max(1, current_scroll_sync_duration_ms)
+            frames = max(1, int(duration_ms * self.fps / 1000))
+            current_scroll_sync_target_top = target_top
+            current_scroll_sync_speed = (target_top - current_scroll_top) / frames
+            current_scroll_sync_char_end = None
+            current_scroll_sync_duration_ms = None
 
         # Calculate currently visible lines
         display_lines = []
@@ -171,11 +211,25 @@ class RenderThread(threading.Thread):
             # Update cache image
             self.text_cache_image = show_text_image
         # Draw text_cache_image to main_text_image
-        main_text_image.paste(self.text_cache_image, (0, -current_scroll_top), self.text_cache_image)
+        main_text_image.paste(self.text_cache_image, (0, -int(current_scroll_top)), self.text_cache_image)
 
         # Update scroll position
-        if scroll_speed > 0 and current_scroll_top < (len(lines) + 1) * line_height - area_height:
+        if current_scroll_sync_speed is not None and current_scroll_sync_target_top is not None:
+            remaining = current_scroll_sync_target_top - current_scroll_top
+            if abs(remaining) <= abs(current_scroll_sync_speed):
+                current_scroll_top = current_scroll_sync_target_top
+                current_scroll_sync_speed = None
+                current_scroll_sync_target_top = None
+            else:
+                current_scroll_top += current_scroll_sync_speed
+        elif (
+            scroll_speed > 0
+            and current_scroll_top < max_scroll_top
+            and time.time() >= current_scroll_sync_hold_until
+        ):
             current_scroll_top += scroll_speed
+        if current_scroll_top > max_scroll_top:
+            current_scroll_top = max_scroll_top
                 
 
     def render_header(self, image, draw, status, emoji, battery_level, battery_color):
@@ -211,6 +265,7 @@ class RenderThread(threading.Thread):
             "status_font_size": status_font_size,
             "network_connected": current_network_connected,
             "rag_icon_visible": current_rag_icon_visible,
+            "image_icon_visible": current_image_icon_visible,
         }
         status_icons = self.build_status_icons(status_icon_context)
         self.render_status_icons(draw, status_icons, image_width)
@@ -228,6 +283,8 @@ class RenderThread(threading.Thread):
             icons.append(BatteryStatusIcon(battery_level, battery_color, battery_font, status_font_size))
         if context.get("network_connected"):
             icons.append(NetworkStatusIcon(status_font_size))
+        if context.get("image_icon_visible"):
+            icons.append(ImageStatusIcon(status_font_size))
         if context.get("rag_icon_visible"):
             icons.append(RagStatusIcon(status_font_size))
 
@@ -260,25 +317,81 @@ class RenderThread(threading.Thread):
         self.running = False
 
 def update_display_data(status=None, emoji=None, text=None,
-                  scroll_speed=None, battery_level=None, battery_color=None, image_path=None,
-                  network_connected=None, rag_icon_visible=None):
+                  scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
+                  network_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
-    global current_network_connected, current_rag_icon_visible
+    global current_scroll_sync_char_end, current_scroll_sync_duration_ms
+    global current_scroll_sync_target_top, current_scroll_sync_speed
+    global current_scroll_sync_hold_until
+    global current_network_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
 
-    # If text is not continuation of previous, reset scroll position
-    if text is not None and not text.startswith(current_text):
-        current_scroll_top = 0
-        TextUtils.clean_line_image_cache()
+    next_text = text
+    if text is not None:
+        previous_text = current_text or ""
+        incoming_text = text or ""
+        same_transaction = (
+            transaction_id is not None
+            and current_transaction_id is not None
+            and transaction_id == current_transaction_id
+        )
+        regressive_update = (
+            len(incoming_text) > 0
+            and len(incoming_text) < len(previous_text)
+            and previous_text.startswith(incoming_text)
+        )
+        if same_transaction and regressive_update:
+            next_text = previous_text
+        elif (
+            transaction_id is not None
+            and current_transaction_id is not None
+            and transaction_id != current_transaction_id
+        ):
+            current_scroll_top = 0
+            current_scroll_sync_char_end = None
+            current_scroll_sync_duration_ms = None
+            current_scroll_sync_target_top = None
+            current_scroll_sync_speed = None
+            TextUtils.clean_line_image_cache()
+        elif not incoming_text.startswith(previous_text):
+            if not previous_text.startswith(incoming_text):
+                current_scroll_top = 0
+                current_scroll_sync_char_end = None
+                current_scroll_sync_duration_ms = None
+                current_scroll_sync_target_top = None
+                current_scroll_sync_speed = None
+                TextUtils.clean_line_image_cache()
+    if scroll_sync is not None:
+        try:
+            char_end = scroll_sync.get("char_end", None)
+            duration_ms = scroll_sync.get("duration_ms", None)
+            if char_end is not None and duration_ms is not None:
+                current_scroll_sync_char_end = int(char_end)
+                current_scroll_sync_duration_ms = int(duration_ms)
+                hold_seconds = max(0.3, (current_scroll_sync_duration_ms / 1000.0) + 0.2)
+                current_scroll_sync_hold_until = max(
+                    current_scroll_sync_hold_until,
+                    time.time() + hold_seconds,
+                )
+        except Exception as e:
+            print(f"[Display] Invalid scroll_sync payload: {e}")
     if scroll_speed is not None:
-        current_scroll_speed = scroll_speed
+        try:
+            requested_speed = float(scroll_speed)
+            current_scroll_speed = min(MAX_SCROLL_SPEED, max(0.0, requested_speed))
+        except (TypeError, ValueError):
+            print(f"[Display] Invalid scroll_speed payload: {scroll_speed}")
     if network_connected is not None:
         current_network_connected = network_connected
     if rag_icon_visible is not None:
         current_rag_icon_visible = rag_icon_visible
+    if image_icon_visible is not None:
+        current_image_icon_visible = image_icon_visible
+    if transaction_id is not None:
+        current_transaction_id = transaction_id
     current_status = status if status is not None else current_status
     current_emoji = emoji if emoji is not None else current_emoji
-    current_text = text if text is not None else current_text
+    current_text = next_text if text is not None else current_text
     current_battery_level = battery_level if battery_level is not None else current_battery_level
     current_battery_color = battery_color if battery_color is not None else current_battery_color
     current_image_path = image_path if image_path is not None else current_image_path
@@ -309,41 +422,13 @@ def exit_camera_mode():
     send_to_all_clients(notification)
     camera_mode = False
 
-def check_is_released():
-    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time, camera_thread
-    if camera_mode and camera_mode_button_release_time < camera_mode_button_press_time:
-        # long press detected, exit camera mode
-        print("[Camera] Exiting camera mode due to long press...")
-        exit_camera_mode()
-
 def on_button_pressed():
-    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
-    if camera_mode:
-        camera_mode_button_press_time = time.time()
-        # check after 2 seconds, exit camera mode if not released
-        threading.Timer(2.0, check_is_released).start()
-        return
     """Function executed when button is pressed"""
     print("[Server] Button pressed")
     notification = {"event": "button_pressed"}
     send_to_all_clients(notification)
 
 def on_button_release():
-    global camera_mode, camera_mode_button_press_time, camera_mode_button_release_time
-    if camera_mode:
-        camera_mode_button_release_time = time.time()
-        # if single press and release within 2 seconds
-        if camera_mode_button_release_time - camera_mode_button_press_time <= 2:
-            # capture image
-            print("[Camera] Capturing image...")
-            if camera_thread is not None:
-                camera_thread.capture()
-                notification = {"event": "camera_capture"}
-                send_to_all_clients(notification)
-                # exit camera mode in 2 seconds after capture
-                threading.Timer(2.0, exit_camera_mode).start()
-                
-        return  # Ignore button presses in camera mode
     """Function executed when button is released"""
     print("[Server] Button released")
     notification = {"event": "button_released"}
@@ -375,14 +460,17 @@ def handle_client(client_socket, addr, whisplay):
                     text = content.get("text", None)
                     rgbled = content.get("RGB", None)
                     brightness = content.get("brightness", None)
-                    scroll_speed = content.get("scroll_speed", 2)
+                    scroll_speed = content.get("scroll_speed", None)
+                    scroll_sync = content.get("scroll_sync", None)
                     response_to_client = content.get("response", None)
                     battery_level = content.get("battery_level", None)
                     battery_color = content.get("battery_color", None)
                     image_path = content.get("image", None)
                     network_connected = content.get("network_connected", None)
                     rag_icon_visible = content.get("rag_icon_visible", None)
+                    image_icon_visible = content.get("image_icon_visible", None)
                     capture_image_path = content.get("capture_image_path", None)
+                    trigger_camera_capture = content.get("camera_capture", None)
                     # boolean to enable camera mode
                     set_camera_mode = content.get("camera_mode", None)
 
@@ -414,15 +502,24 @@ def handle_client(client_socket, addr, whisplay):
                                 camera_thread = None
                             camera_mode = False
 
+                    if trigger_camera_capture:
+                        print("[Camera] Capturing image by command...")
+                        if camera_thread is not None:
+                            camera_thread.capture()
+                            notification = {"event": "camera_capture"}
+                            send_to_all_clients(notification)
+
                     if (text is not None) or (status is not None) or (emoji is not None) or \
                        (battery_level is not None) or (battery_color is not None) or \
                               (image_path is not None) or (network_connected is not None) or \
-                              (rag_icon_visible is not None):
+                            (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None):
                         update_display_data(status=status, emoji=emoji,
-                                     text=text, scroll_speed=scroll_speed,
+                                     text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
-                                                 rag_icon_visible=rag_icon_visible)
+                                                 rag_icon_visible=rag_icon_visible,
+                                         image_icon_visible=image_icon_visible,
+                                                 transaction_id=transaction_id)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:

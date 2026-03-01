@@ -2,21 +2,31 @@ import { exec } from "child_process";
 import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag } from "../utils";
+import { WebDisplayServer } from "./web-display";
+import dotEnv from "dotenv";
 
-interface Status {
+dotEnv.config();
+
+export interface Status {
   status: string;
   emoji: string;
   text: string;
   scroll_speed: number;
+  scroll_sync?: {
+    char_end: number;
+    duration_ms: number;
+  };
   brightness: number;
   RGB: string;
   battery_color: string;
   battery_level: number | undefined;
   image: string;
   camera_mode: boolean;
+  camera_capture?: boolean;
   capture_image_path: string;
   network_connected: boolean;
   rag_icon_visible: boolean;
+  image_icon_visible: boolean;
 }
 
 export class WhisplayDisplay {
@@ -25,6 +35,7 @@ export class WhisplayDisplay {
     emoji: "😊",
     text: "",
     scroll_speed: 3,
+    scroll_sync: undefined,
     brightness: 100,
     RGB: "#00FF30",
     battery_color: "#000000",
@@ -34,6 +45,7 @@ export class WhisplayDisplay {
     capture_image_path: "",
     network_connected: false,
     rag_icon_visible: false,
+    image_icon_visible: false,
   };
 
   private client = null as Socket | null;
@@ -46,12 +58,38 @@ export class WhisplayDisplay {
   private buttonPressTimeArray: number[] = [];
   private buttonReleaseTimeArray: number[] = [];
   private buttonDetectInterval: NodeJS.Timeout | null = null;
+  private webDisplay: WebDisplayServer | null = null;
+  private deviceEnabled: boolean;
+  private cameraEnabled: boolean;
+  private receiveBuffer = "";
 
   constructor() {
-    this.startPythonProcess();
-    this.isReady = new Promise<void>((resolve) => {
-      this.connectWithRetry(15, resolve);
-    });
+    this.deviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
+    this.cameraEnabled = parseBoolEnv("ENABLE_CAMERA", false);
+    if (this.cameraEnabled) {
+      this.ensureCameraDaemon();
+    }
+    const webEnabled = parseBoolEnv("WHISPLAY_WEB_ENABLED", false);
+    if (webEnabled) {
+      const port = parseInt(process.env.WHISPLAY_WEB_PORT || "17880", 10);
+      const host = process.env.WHISPLAY_WEB_HOST || "0.0.0.0";
+      this.webDisplay = new WebDisplayServer({
+        host,
+        port,
+        onButtonPress: () => this.handleButtonPressedEvent(),
+        onButtonRelease: () => this.handleButtonReleasedEvent(),
+      });
+      this.webDisplay.updateStatus(this.currentStatus);
+    }
+
+    if (this.deviceEnabled) {
+      this.startPythonProcess();
+      this.isReady = new Promise<void>((resolve) => {
+        this.connectWithRetry(15, resolve);
+      });
+    } else {
+      this.isReady = Promise.resolve();
+    }
   }
 
   startMonitoringDoubleClick(): void {
@@ -88,6 +126,9 @@ export class WhisplayDisplay {
   }
 
   startPythonProcess(): void {
+    if (!this.deviceEnabled) {
+      return;
+    }
     const command = `cd ${resolve(
       __dirname,
       "../../python",
@@ -110,6 +151,9 @@ export class WhisplayDisplay {
   }
 
   killPythonProcess(): void {
+    if (!this.deviceEnabled) {
+      return;
+    }
     if (this.pythonProcess) {
       console.log("Killing Python process...", this.pythonProcess.pid);
       this.pythonProcess.kill();
@@ -122,6 +166,10 @@ export class WhisplayDisplay {
     retries: number = 10,
     outerResolve: () => void,
   ): Promise<void> {
+    if (!this.deviceEnabled) {
+      outerResolve();
+      return;
+    }
     await new Promise((resolve, reject) => {
       const attemptConnection = (attempt: number) => {
         this.connect()
@@ -153,44 +201,43 @@ export class WhisplayDisplay {
       this.client = new Socket();
       this.client.connect(12345, "0.0.0.0", () => {
         console.log("Connected to local display socket");
+        this.receiveBuffer = "";
         this.sendToDisplay(JSON.stringify(this.currentStatus));
         resolve();
       });
       this.client.on("data", (data: Buffer) => {
-        const dataString = data.toString();
-        if (dataString.trim() === "OK") {
-          return;
-        }
-        console.log(
-          `[${getCurrentTimeTag()}] Received data from Whisplay hat:`,
-          dataString,
-        );
-        try {
-          const json = JSON.parse(dataString);
-          if (json.event === "button_pressed") {
-            this.buttonPressTimeArray.push(Date.now());
-            this.startMonitoringDoubleClick();
-            if (!this.buttonDetectInterval) {
-              console.log("emit pressed");
-              this.buttonPressedCallback();
+        this.receiveBuffer += data.toString();
+        while (this.receiveBuffer.includes("\n")) {
+          const newlineIndex = this.receiveBuffer.indexOf("\n");
+          const line = this.receiveBuffer.slice(0, newlineIndex).trim();
+          this.receiveBuffer = this.receiveBuffer.slice(newlineIndex + 1);
+          if (!line || line === "OK") {
+            continue;
+          }
+          console.log(
+            `[${getCurrentTimeTag()}] Received data from Whisplay hat:`,
+            line,
+          );
+          try {
+            const json = JSON.parse(line);
+            if (json.event === "button_pressed") {
+              this.handleButtonPressedEvent();
             }
-          }
-          if (json.event === "button_released") {
-            this.buttonReleaseTimeArray.push(Date.now());
-            if (!this.buttonDetectInterval) {
-              console.log("emit released");
-              this.buttonReleasedCallback();
+            if (json.event === "button_released") {
+              this.handleButtonReleasedEvent();
             }
+            if (json.event === "camera_capture") {
+              this.handleCameraCaptureEvent();
+            }
+            if (json.event === "exit_camera_mode") {
+              this.display({ camera_mode: false });
+            }
+          } catch {
+            // ignore invalid non-json lines
           }
-          if (json.event === "camera_capture") {
-            this.onCameraCaptureCallback();
-          }
-        } catch {
-          // console.error("Failed to parse JSON from data");
         }
       });
       this.client.on("error", (err: any) => {
-        console.error("Display Socket error:", err);
         // 如果是ECONNREFUSED
         if (err.code === "ECONNREFUSED") {
           reject(err);
@@ -208,6 +255,12 @@ export class WhisplayDisplay {
   }
 
   onButtonDoubleClick(callback: (() => void) | null): void {
+    if (this.buttonDetectInterval) {
+      clearTimeout(this.buttonDetectInterval);
+      this.buttonDetectInterval = null;
+    }
+    this.buttonPressTimeArray = [];
+    this.buttonReleaseTimeArray = [];
     this.buttonDoubleClickCallback = callback || null;
   }
 
@@ -216,6 +269,9 @@ export class WhisplayDisplay {
   }
 
   private async sendToDisplay(data: string): Promise<void> {
+    if (!this.deviceEnabled) {
+      return;
+    }
     await this.isReady;
     try {
       this.client?.write(`${data}\n`, "utf8", () => {
@@ -237,11 +293,16 @@ export class WhisplayDisplay {
       text,
       RGB,
       brightness,
+      scroll_sync,
       battery_level,
       battery_color,
       image,
+      camera_mode,
+      camera_capture,
+      capture_image_path,
       network_connected,
       rag_icon_visible,
+      image_icon_visible,
     } = {
       ...this.currentStatus,
       ...newStatus,
@@ -258,17 +319,95 @@ export class WhisplayDisplay {
     this.currentStatus.text = text;
     this.currentStatus.RGB = RGB;
     this.currentStatus.brightness = brightness;
+    this.currentStatus.scroll_sync = scroll_sync;
     this.currentStatus.battery_level = battery_level;
     this.currentStatus.battery_color = battery_color;
     this.currentStatus.image = image;
+    this.currentStatus.camera_mode = camera_mode;
+    this.currentStatus.capture_image_path = capture_image_path;
     this.currentStatus.network_connected = network_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
+    this.currentStatus.image_icon_visible = image_icon_visible;
     
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) console.log("send data:", data);
+
+    if (!this.deviceEnabled && newStatus.camera_capture) {
+      const capturePath = newStatus.capture_image_path || this.currentStatus.capture_image_path;
+      if (capturePath) {
+        this.sendCameraDaemonCommand("capture", { path: capturePath });
+        this.handleCameraCaptureEvent();
+      }
+    }
+
     this.sendToDisplay(data);
+    this.webDisplay?.updateStatus(this.currentStatus);
+  }
+
+  private handleButtonPressedEvent(): void {
+    this.buttonPressTimeArray.push(Date.now());
+    this.startMonitoringDoubleClick();
+    if (!this.buttonDetectInterval) {
+      console.log("emit pressed");
+      this.buttonPressedCallback();
+    }
+  }
+
+  private handleButtonReleasedEvent(): void {
+    this.buttonReleaseTimeArray.push(Date.now());
+    if (!this.buttonDetectInterval) {
+      console.log("emit released");
+      this.buttonReleasedCallback();
+    }
+  }
+
+  private handleCameraCaptureEvent(): void {
+    this.onCameraCaptureCallback();
+  }
+
+  stopWebDisplay(): void {
+    this.webDisplay?.close();
+    this.webDisplay = null;
+  }
+
+  private ensureCameraDaemon(): void {
+    const command = `cd ${resolve(
+      __dirname,
+      "../../python",
+    )} && python3 camera.py --ensure-daemon`;
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.warn("[CameraDaemon] ensure failed:", error.message);
+        return;
+      }
+      if (stdout?.trim()) {
+        console.log(stdout.trim());
+      }
+      if (stderr?.trim()) {
+        console.warn(stderr.trim());
+      }
+    });
+  }
+
+  private sendCameraDaemonCommand(
+    cmd: string,
+    payload: Record<string, unknown> = {},
+  ): void {
+    const port = parseInt(process.env.WHISPLAY_CAMERA_DAEMON_PORT || "18765", 10);
+    const socket = new Socket();
+    socket.setTimeout(1000);
+    socket.connect(port, "127.0.0.1", () => {
+      socket.write(`${JSON.stringify({ cmd, ...payload })}\n`);
+      socket.end();
+    });
+    socket.on("error", () => {
+      socket.destroy();
+    });
+    socket.on("timeout", () => {
+      socket.destroy();
+    });
   }
 }
 
@@ -290,6 +429,7 @@ export const onCameraCapture =
 function cleanup() {
   console.log("Cleaning up display process before exit...");
   displayInstance.killPythonProcess();
+  displayInstance.stopWebDisplay();
 }
 
 // kill the Python process on exit signals
@@ -316,3 +456,11 @@ process.on("keyboardInterrupt", () => {
   cleanup();
   process.exit(0);
 });
+
+function parseBoolEnv(key: string, defaultValue: boolean): boolean {
+  const raw = process.env[key];
+  if (!raw) {
+    return defaultValue;
+  }
+  return raw.toLowerCase() === "true" || raw === "1";
+}

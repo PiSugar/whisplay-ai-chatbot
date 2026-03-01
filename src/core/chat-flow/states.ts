@@ -19,28 +19,37 @@ import { isImMode } from "../../cloud-api/llm";
 import { getSystemPromptWithKnowledge } from "../Knowledge";
 import { enableRAG } from "../../cloud-api/knowledge";
 import { cameraDir } from "../../utils/dir";
-import { getLatestDisplayImg, setLatestCapturedImg } from "../../utils/image";
+import {
+  clearPendingCapturedImgForChat,
+  getLatestDisplayImg,
+  setLatestCapturedImg,
+  setPendingCapturedImgForChat,
+} from "../../utils/image";
 import { sendWhisplayIMMessage } from "../../cloud-api/whisplay-im/whisplay-im";
 import { ChatFlowContext, FlowName, FlowStateHandler } from "./types";
+import {
+  enterCameraMode,
+  handleCameraModePress,
+  handleCameraModeRelease,
+  onCameraModeExit,
+  resetCameraModeControl,
+} from "./camera-mode";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
     onButtonPressed(() => {
+      resetCameraModeControl();
       ctx.transitionTo("listening");
     });
     onButtonReleased(noop);
+    onCameraModeExit(null);
     if (ctx.enableCamera) {
       const captureImgPath = `${cameraDir}/capture-${moment().format(
         "YYYYMMDD-HHmmss",
       )}.jpg`;
       onButtonDoubleClick(() => {
-        display({
-          camera_mode: true,
-          capture_image_path: captureImgPath,
-        });
-      });
-      onCameraCapture(() => {
-        setLatestCapturedImg(captureImgPath);
+        enterCameraMode(captureImgPath);
+        ctx.transitionTo("camera");
       });
     }
     display({
@@ -54,6 +63,34 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
             }.`,
         }
         : {}),
+    });
+  },
+  camera: (ctx: ChatFlowContext) => {
+    onButtonDoubleClick(null);
+    onButtonPressed(() => {
+      handleCameraModePress();
+    });
+    onButtonReleased(() => {
+      handleCameraModeRelease();
+    });
+    onCameraCapture(() => {
+      const captureImagePath = getCurrentStatus().capture_image_path;
+      if (!captureImagePath) {
+        return;
+      }
+      setLatestCapturedImg(captureImagePath);
+      setPendingCapturedImgForChat(captureImagePath);
+      display({ image_icon_visible: true });
+    });
+    onCameraModeExit(() => {
+      if (ctx.currentFlowName === "camera") {
+        ctx.transitionTo("sleep");
+      }
+    });
+    display({
+      status: "camera",
+      emoji: "📷",
+      RGB: "#00ff88",
     });
   },
   listening: (ctx: ChatFlowContext) => {
@@ -269,6 +306,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       });
     getPlayEndPromise().then(() => {
       if (ctx.currentFlowName === "answer") {
+        clearPendingCapturedImgForChat();
+        display({ image_icon_visible: false });
         if (ctx.wakeSessionActive || ctx.endAfterAnswer) {
           if (ctx.endAfterAnswer) {
             ctx.endWakeSession();
@@ -291,6 +330,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonPressed(() => {
       stopPlaying();
+      clearPendingCapturedImgForChat();
+      display({ image_icon_visible: false });
       ctx.transitionTo("listening");
     });
     onButtonReleased(noop);
