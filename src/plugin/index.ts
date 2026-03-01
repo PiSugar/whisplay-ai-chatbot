@@ -33,4 +33,4 @@ export * from "./types";
 
 // Re-export commonly needed types for third-party plugin developers
 export { Message, LLMTool, TTSResult, ToolReturnTag, FunctionCall } from "../type";
-export type { PluginContext } from "./types";
+export type { PluginContext, LLMToolsProvider } from "./types";

@@ -118,6 +118,39 @@ class PluginRegistry {
   listPlugins(): Plugin[] {
     return Array.from(this.plugins.values());
   }
+
+  /**
+   * Activate ALL plugins of a given type synchronously and return their providers.
+   * Useful for additive plugin types like "llm-tools" where every registered
+   * plugin should contribute.
+   */
+  activateAllPluginsSync<T extends PluginType>(
+    type: T,
+  ): { name: string; provider: ProviderTypeMap[T] }[] {
+    const plugins = this.getPluginsOfType(type);
+    const results: { name: string; provider: ProviderTypeMap[T] }[] = [];
+    const ctx = this.buildContext();
+
+    for (const plugin of plugins) {
+      try {
+        const provider = (plugin as any).activate(ctx);
+        if (provider && typeof provider.then === "function") {
+          console.warn(
+            `[Plugin] Skipping async plugin ${plugin.type}:${plugin.name} in sync activation`,
+          );
+          continue;
+        }
+        results.push({ name: plugin.name, provider: provider as ProviderTypeMap[T] });
+        console.log(`[Plugin] Activated: ${plugin.displayName} (${plugin.type}:${plugin.name})`);
+      } catch (e: any) {
+        console.error(
+          `[Plugin] Failed to activate ${plugin.type}:${plugin.name}:`,
+          e.message,
+        );
+      }
+    }
+    return results;
+  }
 }
 
 export const pluginRegistry = new PluginRegistry();

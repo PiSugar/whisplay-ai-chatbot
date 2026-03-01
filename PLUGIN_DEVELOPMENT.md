@@ -1,6 +1,6 @@
 # Whisplay Plugin Development Guide
 
-This guide explains how to develop and install third-party plugins for the Whisplay AI Chatbot. The plugin system supports five types: **ASR (Speech Recognition)**, **LLM (Large Language Model)**, **TTS (Text-to-Speech)**, **IMAGE_GENERATION (Image Generation)**, and **VISION (Image Understanding)**.
+This guide explains how to develop and install third-party plugins for the Whisplay AI Chatbot. The plugin system supports six types: **ASR (Speech Recognition)**, **LLM (Large Language Model)**, **TTS (Text-to-Speech)**, **IMAGE_GENERATION (Image Generation)**, **VISION (Image Understanding)**, and **LLM_TOOLS (Function-Calling Tools)**.
 
 ---
 
@@ -15,6 +15,7 @@ This guide explains how to develop and install third-party plugins for the Whisp
   - [TTS Plugin](#tts-plugin)
   - [IMAGE_GENERATION Plugin](#image_generation-plugin)
   - [VISION Plugin](#vision-plugin)
+  - [LLM_TOOLS Plugin](#llm_tools-plugin)
 - [Installing Third-Party Plugins](#installing-third-party-plugins)
 - [Plugin Development Templates](#plugin-development-templates)
 - [Type Reference](#type-reference)
@@ -28,9 +29,9 @@ This guide explains how to develop and install third-party plugins for the Whisp
 ┌─────────────────────────────────────────────────┐
 │                 Plugin Registry                  │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐        │
-│  │ ASR      │ │ LLM      │ │ TTS      │  ...   │
-│  │ Plugins  │ │ Plugins  │ │ Plugins  │        │
-│  └──────────┘ └──────────┘ └──────────┘        │
+│  │ ASR      │ │ LLM      │ │ TTS      │ │LLM-Tools │
+│  │ Plugins  │ │ Plugins  │ │ Plugins  │ │ Plugins  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘
 ├─────────────────────────────────────────────────┤
 │              Plugin Loader                       │
 │  ┌──────────────┐  ┌────────────────────────┐   │
@@ -61,6 +62,7 @@ The plugin system is automatically initialized at application startup:
 | `tts` | `TTS_SERVER` | Text-to-Speech: text → audio |
 | `image-generation` | `IMAGE_GENERATION_SERVER` | Image Generation: text prompt → image |
 | `vision` | `VISION_SERVER` | Image Understanding: image → text description |
+| `llm-tools` | *(all activated)* | Function-Calling Tools: contribute tools to LLM |
 
 ---
 
@@ -570,6 +572,119 @@ module.exports = {
 
 ---
 
+### LLM_TOOLS Plugin
+
+**Purpose:** Contribute custom function-calling tools to the LLM. Unlike other plugin types where only one plugin is active at a time, **all registered `llm-tools` plugins are activated simultaneously**, and their tools are merged into the LLM tool list.
+
+> **No environment variable required.** All `llm-tools` plugins are activated automatically on startup.
+
+```typescript
+interface LLMToolsPlugin {
+  name: string;
+  displayName: string;
+  version: string;
+  type: "llm-tools";
+  activate(ctx: PluginContext): LLMToolsProvider | Promise<LLMToolsProvider>;
+}
+
+interface LLMToolsProvider {
+  /** Return the tool definitions this plugin contributes */
+  getTools(): LLMTool[];
+}
+
+/** LLM tool definition */
+interface LLMTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type?: string;
+      properties?: Record<string, any>;
+      required?: string[];
+    };
+  };
+  func: (params: any) => Promise<string>;
+}
+```
+
+**Full Example:**
+
+```javascript
+// plugins/smart-home/index.js
+const net = require("net");
+
+module.exports = {
+  name: "smart-home",
+  displayName: "Smart Home Tools",
+  version: "1.0.0",
+  type: "llm-tools",
+  description: "Smart home control tools for lights and switches",
+
+  activate(ctx) {
+    const host = ctx.env.SMART_HOME_HOST || "192.168.1.100";
+    const port = parseInt(ctx.env.SMART_HOME_PORT || "8888");
+
+    return {
+      getTools() {
+        return [
+          {
+            type: "function",
+            function: {
+              name: "switchLight",
+              description: "Switch the light on or off",
+              parameters: {
+                type: "object",
+                properties: {
+                  action: {
+                    type: "string",
+                    description: "Action to perform on the light",
+                    enum: ["start", "stop"],
+                  },
+                },
+                required: ["action"],
+              },
+            },
+            func: async (params) => {
+              if (params.action !== "start" && params.action !== "stop") {
+                return "[error]Invalid action. Please specify 'start' or 'stop'.";
+              }
+              return new Promise((resolve) => {
+                const client = new net.Socket();
+                client.connect(port, host, () => {
+                  client.write(
+                    JSON.stringify({ action: params.action, effect: "rainbow" })
+                  );
+                  client.end();
+                  resolve(`[success]Light switched ${params.action}`);
+                });
+                client.on("error", (err) => {
+                  resolve(`[error]Failed to switch light: ${err.message}`);
+                });
+              });
+            },
+          },
+          {
+            type: "function",
+            function: {
+              name: "getTemperature",
+              description: "Get the current room temperature",
+              parameters: {},
+            },
+            func: async () => {
+              // ...your implementation
+              return "[response]The current room temperature is 23°C.";
+            },
+          },
+        ];
+      }
+    };
+  }
+};
+```
+
+---
+
 ## Installing Third-Party Plugins
 
 ### Option 1: Local Plugin Directory
@@ -734,7 +849,7 @@ All plugin-related TypeScript type definitions are located in `src/plugin/types.
 
 | Type | Description |
 |------|-------------|
-| `PluginType` | `"asr" \| "llm" \| "tts" \| "image-generation" \| "vision"` |
+| `PluginType` | `"asr" \| "llm" \| "tts" \| "image-generation" \| "vision" \| "llm-tools"` |
 | `AudioFormat` | `"wav" \| "mp3"` |
 | `PluginContext` | Context object injected into `activate(ctx)` containing `env`, `imageDir`, and `ttsDir` |
 | `PluginBase` | Base plugin interface (name, displayName, version, type) |
@@ -743,6 +858,7 @@ All plugin-related TypeScript type definitions are located in `src/plugin/types.
 | `TTSPlugin` / `TTSProvider` | TTS plugin and provider interfaces (`audioFormat` metadata) |
 | `ImageGenerationPlugin` / `ImageGenerationProvider` | Image generation plugin and provider interfaces |
 | `VisionPlugin` / `VisionProvider` | Vision plugin and provider interfaces |
+| `LLMToolsPlugin` / `LLMToolsProvider` | LLM tools plugin and provider interfaces |
 | `Message` | LLM conversation message type |
 | `LLMTool` | LLM tool definition type |
 | `TTSResult` | TTS return result type |
@@ -750,7 +866,7 @@ All plugin-related TypeScript type definitions are located in `src/plugin/types.
 
 ### Tool Return Tags
 
-In IMAGE_GENERATION and VISION plugins, tool function return values use special prefix tags:
+In IMAGE_GENERATION, VISION, and LLM_TOOLS plugins, tool function return values use special prefix tags:
 
 - `[success]` — Operation succeeded
 - `[error]` — Operation failed

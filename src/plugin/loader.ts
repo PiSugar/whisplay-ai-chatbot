@@ -152,6 +152,6 @@ function isValidPlugin(plugin: any): plugin is Plugin {
     typeof plugin.version === "string" &&
     typeof plugin.displayName === "string" &&
     typeof plugin.activate === "function" &&
-    ["asr", "llm", "tts", "image-generation", "vision"].includes(plugin.type)
+    ["asr", "llm", "tts", "image-generation", "vision", "llm-tools"].includes(plugin.type)
   );
 }

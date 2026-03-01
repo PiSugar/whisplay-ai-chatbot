@@ -9,7 +9,7 @@ import { Message, LLMTool, TTSResult } from "../type";
 
 // ========== Plugin Categories ==========
 
-export type PluginType = "asr" | "llm" | "tts" | "image-generation" | "vision";
+export type PluginType = "asr" | "llm" | "tts" | "image-generation" | "vision" | "llm-tools";
 export type AudioFormat = "wav" | "mp3";
 
 // ========== Provider Interfaces ==========
@@ -47,6 +47,12 @@ export interface VisionProvider {
   addVisionTools(tools: LLMTool[]): void;
 }
 
+/** LLM Tools provider – contributes function-calling tools to the LLM */
+export interface LLMToolsProvider {
+  /** Return the tool definitions this plugin contributes */
+  getTools(): LLMTool[];
+}
+
 // ========== Provider Type Map ==========
 
 export interface ProviderTypeMap {
@@ -55,6 +61,7 @@ export interface ProviderTypeMap {
   tts: TTSProvider;
   "image-generation": ImageGenerationProvider;
   vision: VisionProvider;
+  "llm-tools": LLMToolsProvider;
 }
 
 // ========== Plugin Context ==========
@@ -119,9 +126,15 @@ export interface VisionPlugin extends PluginBase {
   activate(ctx: PluginContext): VisionProvider | Promise<VisionProvider>;
 }
 
+export interface LLMToolsPlugin extends PluginBase {
+  type: "llm-tools";
+  activate(ctx: PluginContext): LLMToolsProvider | Promise<LLMToolsProvider>;
+}
+
 export type Plugin =
   | ASRPlugin
   | LLMPlugin
   | TTSPlugin
   | ImageGenerationPlugin
-  | VisionPlugin;
+  | VisionPlugin
+  | LLMToolsPlugin;
