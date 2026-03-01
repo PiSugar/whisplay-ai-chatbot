@@ -4,9 +4,7 @@ import {
   showLatestGenImg,
 } from "../utils/image";
 import { isEmpty } from "lodash";
-import { addGeminiGenerationTool } from "../cloud-api/gemini/gemini-image-generation";
-import { addOpenaiGenerationTool } from "../cloud-api/openai/openai-image-generation";
-import { addVolcengineGenerationTool } from "../cloud-api/volcengine/volcengine-image-generation";
+import { pluginRegistry } from "../plugin";
 
 dotenv.config();
 
@@ -16,18 +14,17 @@ export const imageGenerationServer: ImageGenerationServer = (
 
 const imageGenerationTools: LLMTool[] = [];
 
-switch (imageGenerationServer) {
-  case ImageGenerationServer.gemini:
-    addGeminiGenerationTool(imageGenerationTools);
-    break;
-  case ImageGenerationServer.openai:
-    addOpenaiGenerationTool(imageGenerationTools);
-    break;
-  case ImageGenerationServer.volcengine:
-    addVolcengineGenerationTool(imageGenerationTools);
-    break;
-  default:
-    break;
+// Activate image generation plugin
+if (imageGenerationServer) {
+  try {
+    const provider = pluginRegistry.activatePluginSync<"image-generation">(
+      "image-generation",
+      imageGenerationServer,
+    );
+    provider.addImageGenerationTools(imageGenerationTools);
+  } catch (e: any) {
+    console.warn(e.message);
+  }
 }
 
 if (!isEmpty(imageGenerationTools)) {

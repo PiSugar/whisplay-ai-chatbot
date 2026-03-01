@@ -1,10 +1,7 @@
 import { VisionServer, LLMTool } from "../type";
 import dotenv from "dotenv";
 import { showLatestCapturedImg } from "../utils/image";
-import { addOllamaVisionTool } from "../cloud-api/local/ollama-vision";
-import { addOpenaiVisionTool } from "../cloud-api/openai/openai-vision";
-import { addGeminiVisionTool } from "../cloud-api/gemini/gemini-vision";
-import { addVolcengineVisionTool } from "../cloud-api/volcengine/volcengine-vision";
+import { pluginRegistry } from "../plugin";
 
 dotenv.config();
 
@@ -32,21 +29,17 @@ if (enableCamera) {
   });
 }
 
-switch (visionServer) {
-  case VisionServer.ollama:
-    addOllamaVisionTool(visionTools);
-    break;
-  case VisionServer.openai:
-    addOpenaiVisionTool(visionTools);
-    break;
-  case VisionServer.gemini:
-    addGeminiVisionTool(visionTools);
-    break;
-  case VisionServer.volcengine:
-    addVolcengineVisionTool(visionTools);
-    break;
-  default:
-    break;
+// Activate vision plugin
+if (visionServer) {
+  try {
+    const provider = pluginRegistry.activatePluginSync<"vision">(
+      "vision",
+      visionServer,
+    );
+    provider.addVisionTools(visionTools);
+  } catch (e: any) {
+    console.warn(e.message);
+  }
 }
 
 export const addVisionTools = (tools: LLMTool[]) => {
