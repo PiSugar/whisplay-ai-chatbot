@@ -32,6 +32,7 @@ export enum LLMServer {
   grok = "grok",
   llm8850 = "llm8850",
   whisplayim = "whisplay-im",
+  imagetooldirect = "image-tool-direct",
 }
 
 export enum TTSServer {
