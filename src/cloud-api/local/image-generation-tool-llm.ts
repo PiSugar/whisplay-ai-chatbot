@@ -19,7 +19,7 @@ const fixedReplies: string[] = [
     "Check out your newly generated image on screen.",
 ];
 
-const fixedReply: string = fixedReplies[Math.floor(Math.random() * fixedReplies.length)] || "The image has been generated, please check on the screen.";
+
 
 const imageContextRegex =
   /(this image|this picture|this photo|基于这张|这张图|这张图片|这张照片)/i;
@@ -31,6 +31,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   _partialThinkingCallback?: (partialThinking: string) => void,
   invokeFunctionCallback?: (functionName: string, result?: string) => void,
 ): Promise<void> => {
+  const fixedReply: string = fixedReplies[Math.floor(Math.random() * fixedReplies.length)] || "The image has been generated, please check on the screen.";
   try {
     const lastUserMessage = [...inputMessages]
       .reverse()
