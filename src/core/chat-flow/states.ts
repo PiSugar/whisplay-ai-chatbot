@@ -107,6 +107,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       stop();
       display({
         RGB: "#ff6800",
+        image: "",
       });
     });
     result
