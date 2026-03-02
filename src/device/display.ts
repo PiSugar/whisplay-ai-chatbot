@@ -62,6 +62,9 @@ export class WhisplayDisplay {
   private deviceEnabled: boolean;
   private cameraEnabled: boolean;
   private receiveBuffer = "";
+  private textCounterTimer: NodeJS.Timeout | null = null;
+  private textCounterTemplate: string | null = null;
+  private textCounterStartAt = 0;
 
   constructor() {
     this.deviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
@@ -286,7 +289,56 @@ export class WhisplayDisplay {
     return this.currentStatus;
   }
 
+  private stopTextCounter(): void {
+    if (this.textCounterTimer) {
+      clearInterval(this.textCounterTimer);
+      this.textCounterTimer = null;
+    }
+    this.textCounterTemplate = null;
+    this.textCounterStartAt = 0;
+  }
+
+  private startTextCounter(template: string): void {
+    this.stopTextCounter();
+    this.textCounterTemplate = template;
+    this.textCounterStartAt = Date.now();
+    this.textCounterTimer = setInterval(() => {
+      if (!this.textCounterTemplate) {
+        this.stopTextCounter();
+        return;
+      }
+      const elapsedSec = Math.floor((Date.now() - this.textCounterStartAt) / 1000);
+      const renderedText = this.textCounterTemplate.replace(
+        /\{count\}/g,
+        `${elapsedSec}`,
+      );
+      if (this.currentStatus.text === renderedText) {
+        return;
+      }
+      this.currentStatus.text = renderedText;
+      const data = JSON.stringify({ text: renderedText, brightness: 100 });
+      this.sendToDisplay(data);
+      this.webDisplay?.updateStatus(this.currentStatus);
+    }, 1000);
+  }
+
   async display(newStatus: Partial<Status> = {}): Promise<void> {
+    const hasTextOverride = Object.prototype.hasOwnProperty.call(
+      newStatus,
+      "text",
+    );
+    const normalizedStatus: Partial<Status> = { ...newStatus };
+    if (hasTextOverride) {
+      const incomingText = `${newStatus.text ?? ""}`;
+      if (incomingText.includes("{count}")) {
+        this.startTextCounter(incomingText);
+        const initialText = incomingText.replace(/\{count\}/g, "0");
+        normalizedStatus.text = initialText;
+      } else {
+        this.stopTextCounter();
+      }
+    }
+
     const {
       status,
       emoji,
@@ -305,10 +357,10 @@ export class WhisplayDisplay {
       image_icon_visible,
     } = {
       ...this.currentStatus,
-      ...newStatus,
+      ...normalizedStatus,
     };
 
-    const changedValues = Object.entries(newStatus).filter(
+    const changedValues = Object.entries(normalizedStatus).filter(
       ([key, value]) => (this.currentStatus as any)[key] !== value,
     );
 
@@ -334,8 +386,8 @@ export class WhisplayDisplay {
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) console.log("send data:", data);
 
-    if (!this.deviceEnabled && newStatus.camera_capture) {
-      const capturePath = newStatus.capture_image_path || this.currentStatus.capture_image_path;
+    if (!this.deviceEnabled && normalizedStatus.camera_capture) {
+      const capturePath = normalizedStatus.capture_image_path || this.currentStatus.capture_image_path;
       if (capturePath) {
         this.sendCameraDaemonCommand("capture", { path: capturePath });
         this.handleCameraCaptureEvent();

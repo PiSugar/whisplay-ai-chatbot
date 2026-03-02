@@ -298,7 +298,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
               });
             } else {
               display({
-                text: `Invoking [${functionName}]...`,
+                text: `Invoking [${functionName}]... {count}s`,
               });
             }
           },
