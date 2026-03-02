@@ -22,6 +22,7 @@ export enum ASRServer {
   whisperhttp = "whisper-http",
   llm8850whisper = "llm8850whisper",
   fasterwhisper = "faster-whisper",
+  picovoice = "picovoice",
 }
 
 export enum LLMServer {
@@ -33,6 +34,7 @@ export enum LLMServer {
   llm8850 = "llm8850",
   whisplayim = "whisplay-im",
   imagetooldirect = "image-tool-direct",
+  perplexity = "perplexity",
 }
 
 export enum TTSServer {
@@ -45,6 +47,7 @@ export enum TTSServer {
   espeakng = "espeak-ng",
   llm8850melotts = "llm8850melotts",
   supertonic = "supertonic",
+  picovoice = "picovoice",
 }
 
 export enum VectorDBServer {

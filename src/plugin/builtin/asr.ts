@@ -118,4 +118,17 @@ export function registerASRPlugins(): void {
       return { recognizeAudio };
     },
   } as ASRPlugin);
+
+  pluginRegistry.register({
+    name: "picovoice",
+    displayName: "Picovoice Leopard ASR",
+    version: "1.0.0",
+    type: "asr",
+    audioFormat: "wav",
+    description: "Picovoice Leopard on-device speech recognition",
+    activate: () => {
+      const { recognizeAudio } = require("../../cloud-api/picovoice/picovoice-asr");
+      return { recognizeAudio };
+    },
+  } as ASRPlugin);
 }

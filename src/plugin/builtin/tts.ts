@@ -118,4 +118,17 @@ export function registerTTSPlugins(): void {
       return { ttsProcessor };
     },
   } as TTSPlugin);
+
+  pluginRegistry.register({
+    name: "picovoice",
+    displayName: "Picovoice Orca TTS",
+    version: "1.0.0",
+    type: "tts",
+    audioFormat: "wav",
+    description: "Picovoice Orca on-device text-to-speech",
+    activate: () => {
+      const ttsProcessor = require("../../cloud-api/picovoice/picovoice-tts").default;
+      return { ttsProcessor };
+    },
+  } as TTSPlugin);
 }
