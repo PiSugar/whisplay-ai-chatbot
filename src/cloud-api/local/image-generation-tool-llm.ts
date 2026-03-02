@@ -6,9 +6,20 @@ import {
 } from "../interface";
 import { llmFuncMap } from "../../config/llm-tools";
 
-const fixedReply: string =
-    process.env.IMAGE_TOOL_LLM_FIXED_REPLY ||
-    "The image has been generated, please check on the screen.";
+const fixedReplies: string[] = [
+    "The image has been generated, please check on the screen.",
+    "Image generation complete! Take a look at the result.",
+    "Your image is ready. Check it out on the display.",
+    "Done! The generated image is now visible.",
+    "Image created successfully. View it on your screen.",
+    "The picture is ready for you to see.",
+    "Your generated image is now available.",
+    "Success! Your image has been created.",
+    "The image generation is finished. Please view it.",
+    "Check out your newly generated image on screen.",
+];
+
+const fixedReply: string = fixedReplies[Math.floor(Math.random() * fixedReplies.length)] || "The image has been generated, please check on the screen.";
 
 const imageContextRegex =
   /(this image|this picture|this photo|基于这张|这张图|这张图片|这张照片)/i;
