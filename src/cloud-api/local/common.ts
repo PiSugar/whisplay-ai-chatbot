@@ -7,4 +7,5 @@ export enum defaultPortMap {
   fasterWhisper = 8803,
   whisper = 8804,
   piperHttp = 8805,
+  llm8850lcm = 8806,
 }

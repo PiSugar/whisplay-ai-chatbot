@@ -47,4 +47,19 @@ export function registerImageGenerationPlugins(): void {
       };
     },
   } as ImageGenerationPlugin);
+
+  pluginRegistry.register({
+    name: "llm8850lcm",
+    displayName: "LLM8850 LCM Image Generation",
+    version: "1.0.0",
+    type: "image-generation",
+    description: "LLM8850 LCM local image generation via HTTP API",
+    activate: () => {
+      const { addLlm8850lcmGenerationTool } = require("../../cloud-api/local/llm8850lcm-image-generation");
+      return {
+        addImageGenerationTools: (tools: LLMTool[]) =>
+          addLlm8850lcmGenerationTool(tools),
+      };
+    },
+  } as ImageGenerationPlugin);
 }

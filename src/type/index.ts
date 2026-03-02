@@ -58,6 +58,7 @@ export enum ImageGenerationServer {
   openai = "openai",
   gemini = "gemini",
   volcengine = "volcengine",
+  llm8850lcm = "llm8850lcm",
 }
 
 export enum VisionServer {
