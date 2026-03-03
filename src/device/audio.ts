@@ -2,6 +2,8 @@ import { spawn, ChildProcess } from "child_process";
 import { isEmpty, noop, set } from "lodash";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
+import { pluginRegistry } from "../plugin";
+import type { ASRPlugin, TTSPlugin, AudioFormat } from "../plugin";
 import { ASRServer, TTSResult, TTSServer } from "../type";
 
 export { getDynamicVoiceDetectLevel } from "./voice-detect";
@@ -10,10 +12,24 @@ dotenv.config();
 
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
 const alsaOutputDevice = `hw:${soundCardIndex},0`;
+const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
+  const normalized = (value || "").toLowerCase();
+  return normalized === "wav" || normalized === "mp3" ? normalized : fallback;
+};
 
-const useWavPlayer = [TTSServer.gemini, TTSServer.piper].includes(ttsServer);
+const defaultTtsAudioFormat: AudioFormat = [TTSServer.gemini, TTSServer.piper].includes(ttsServer)
+  ? "wav"
+  : "mp3";
 
-export const recordFileFormat = [
+const selectedTtsPlugin = pluginRegistry.getPlugin("tts", ttsServer) as TTSPlugin | undefined;
+const ttsAudioFormat: AudioFormat = normalizeAudioFormat(
+  selectedTtsPlugin?.audioFormat,
+  defaultTtsAudioFormat,
+);
+
+const useWavPlayer = ttsAudioFormat === "wav";
+
+const defaultAsrAudioFormat: AudioFormat = [
   ASRServer.vosk,
   ASRServer.whisper,
   ASRServer.whisperhttp,
@@ -22,6 +38,13 @@ export const recordFileFormat = [
 ].includes(asrServer)
   ? "wav"
   : "mp3";
+
+const selectedAsrPlugin = pluginRegistry.getPlugin("asr", asrServer) as ASRPlugin | undefined;
+
+export const recordFileFormat: AudioFormat = normalizeAudioFormat(
+  selectedAsrPlugin?.audioFormat,
+  defaultAsrAudioFormat,
+);
 
 function startPlayerProcess() {
   if (useWavPlayer) {
@@ -274,7 +297,7 @@ const playAudioData = (params: TTSResult): Promise<void> => {
     });
   }
 
-  // play mp3 buffer using mpg123
+  // play wav/mp3 buffer based on configured TTS format
   return new Promise((resolve, reject) => {
     const audioBuffer = base64 ? Buffer.from(base64, "base64") : buffer;
     console.log("Playback duration:", audioDuration);
@@ -285,8 +308,32 @@ const playAudioData = (params: TTSResult): Promise<void> => {
       console.log("Audio playback completed");
     }, audioDuration); // Add 1 second buffer
 
-    const process = player.process;
+    if (ttsAudioFormat === "wav") {
+      const process = spawn("sox", [
+        "-t",
+        "wav",
+        "-",
+        "-t",
+        "alsa",
+        alsaOutputDevice,
+      ]);
+      process.stdout?.on("data", (data) => console.log(data.toString()));
+      process.stderr?.on("data", (data) => console.error(data.toString()));
+      process.on("exit", (code) => {
+        player.isPlaying = false;
+        if (code !== 0) {
+          console.error(`Audio playback error: ${code}`);
+          reject(code);
+        } else {
+          console.log("Audio playback completed");
+          resolve();
+        }
+      });
+      process.stdin?.end(audioBuffer);
+      return;
+    }
 
+    const process = player.process;
     if (!process) {
       return reject(new Error("Audio player is not initialized."));
     }

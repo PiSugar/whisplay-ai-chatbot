@@ -11,6 +11,7 @@ python/status-bar-icon/__pycache__
 dist
 python/__pycache__/
 chatbot.log
+plugins
 use_ollama
 use_npm
 package-lock.json

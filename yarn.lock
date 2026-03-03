@@ -135,6 +135,16 @@
     methods "^1.1.2"
     path-to-regexp "^6.3.0"
 
+"@picovoice/leopard-node@^2.0.2":
+  version "2.0.6"
+  resolved "https://registry.yarnpkg.com/@picovoice/leopard-node/-/leopard-node-2.0.6.tgz#36f54fece5bdadf4a45adae22ca9a8fb54e2675b"
+  integrity sha512-jrcKGTaGugwo4l8rJu291irexFNZ3aiRkAX5+jEDgrh7y3OWllL5WTwHmNL/QDs6wPTbnilg0agNeM25d5y3cg==
+
+"@picovoice/orca-node@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@picovoice/orca-node/-/orca-node-2.0.1.tgz#0b5e08f2cae6ddfc5f7fa5c44951888b2dd72d26"
+  integrity sha512-dJlkg9Zwuv+9njltGNaK6306bKFv/0A5TxXZKGSNsAbSuMqHRcsgeSHwBTCxdAji7cW92yM/NpBSAxsCLYqUzQ==
+
 "@protobufjs/aspromise@^1.1.1", "@protobufjs/aspromise@^1.1.2":
   version "1.1.2"
   resolved "https://registry.npmmirror.com/@protobufjs/aspromise/-/aspromise-1.1.2.tgz#9b8b0cc663d669a7d8f6f5d0893a14d348f30fbf"

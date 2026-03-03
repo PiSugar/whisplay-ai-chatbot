@@ -21,6 +21,7 @@ import { enableRAG } from "../../cloud-api/knowledge";
 import { cameraDir } from "../../utils/dir";
 import {
   clearPendingCapturedImgForChat,
+  getLatestGenImg,
   getLatestDisplayImg,
   setLatestCapturedImg,
   setPendingCapturedImgForChat,
@@ -106,6 +107,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       stop();
       display({
         RGB: "#ff6800",
+        image: "",
       });
     });
     result
@@ -292,13 +294,22 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
             currentAnswerId === ctx.answerId &&
             ctx.partialThinkingCallback(partialThinking),
           (functionName: string, result?: string) => {
+            if (
+              functionName === "generateImage" &&
+              result?.startsWith("[success]")
+            ) {
+              const img = getLatestGenImg();
+              if (img) {
+                display({ image: img });
+              }
+            }
             if (result) {
               display({
                 text: `[${functionName}]${result}`,
               });
             } else {
               display({
-                text: `Invoking [${functionName}]...`,
+                text: `Invoking [${functionName}]... {count}s`,
               });
             }
           },
@@ -319,9 +330,6 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         }
         const img = getLatestDisplayImg();
         if (img) {
-          display({
-            image: img,
-          });
           ctx.transitionTo("image");
         } else {
           ctx.transitionTo("sleep");

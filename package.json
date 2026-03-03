@@ -16,6 +16,8 @@
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.3.1",
     "@google/genai": "1.25.0",
+    "@picovoice/leopard-node": "^2.0.2",
+    "@picovoice/orca-node": "^2.0.1",
     "@qdrant/js-client-rest": "^1.16.2",
     "axios": "^1.8.4",
     "crypto": "^1.0.1",

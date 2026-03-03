@@ -1,3 +1,7 @@
+// IMPORTANT: Plugin system must be imported FIRST to register all plugins
+// before any dependent modules (llm.ts, knowledge.ts) are loaded.
+import { pluginRegistry, ASRProvider, TTSProvider } from "../plugin";
+
 import { noop } from "lodash";
 import dotenv from "dotenv";
 import {
@@ -8,26 +12,6 @@ import {
   VisionServer,
 } from "../type";
 import { chatWithLLMStream, resetChatHistory } from "./llm";
-import { recognizeAudio as VolcengineASR } from "./volcengine/volcengine-asr";
-import {
-  recognizeAudio as TencentASR,
-  synthesizeSpeech as TencentTTS,
-} from "./tencent/tencent-cloud";
-import { recognizeAudio as OpenAIASR } from "./openai/openai-asr";
-import { recognizeAudio as GeminiASR } from "./gemini/gemini-asr";
-import { recognizeAudio as VoskASR } from "./local/vosk-asr";
-import { recognizeAudio as WisperASR } from "./local/whisper-asr";
-import { recognizeAudio as WisperHttpASR } from "./local/whisper-http-asr";
-import { recognizeAudio as LLM8850WhisperASR } from "./local/llm8850-whisper";
-import { recognizeAudio as FasterWhisperASR } from "./local/faster-whisper-asr";
-import VolcengineTTS from "./volcengine/volcengine-tts";
-import OpenAITTS from "./openai/openai-tts";
-import geminiTTS from "./gemini/gemini-tts";
-import piperTTS from "./local/piper-tts";
-import piperHttpTTS from "./local/piper-http-tts";
-import espeakNgTTS from "./local/espeak-ng-tts";
-import LLM8850MeloTTS from "./local/llm8850-melotts";
-import supertonicTTS from "./local/supertonic-tts";
 import {
   RecognizeAudioFunction,
   TTSProcessorFunction,
@@ -63,74 +47,20 @@ if (imageGenerationServer)
   console.log(`Current Image Generation Server: ${imageGenerationServer}`);
 if (visionServer) console.log(`Current Vision Server: ${visionServer}`);
 
-switch (asrServer) {
-  case ASRServer.volcengine:
-    recognizeAudio = VolcengineASR;
-    break;
-  case ASRServer.tencent:
-    recognizeAudio = TencentASR;
-    break;
-  case ASRServer.openai:
-    recognizeAudio = OpenAIASR;
-    break;
-  case ASRServer.gemini:
-    recognizeAudio = GeminiASR;
-    break;
-  case ASRServer.vosk:
-    recognizeAudio = VoskASR;
-    break;
-  case ASRServer.whisper:
-    recognizeAudio = WisperASR;
-    break;
-  case ASRServer.whisperhttp:
-    recognizeAudio = WisperHttpASR;
-    break;
-  case ASRServer.llm8850whisper:
-    recognizeAudio = LLM8850WhisperASR;
-    break;
-  case ASRServer.fasterwhisper:
-    recognizeAudio = FasterWhisperASR;
-    break;
-  default:
-    console.warn(
-      `unknown asr server: ${asrServer}, should be volcengine/tencent/openai/gemini/vosk/whisper/whisper-http/llm8850whisper/fasterwhisper`,
-    );
-    break;
+// Activate ASR plugin
+try {
+  const asrProvider = pluginRegistry.activatePluginSync<"asr">("asr", asrServer);
+  recognizeAudio = asrProvider.recognizeAudio;
+} catch (e: any) {
+  console.warn(e.message);
 }
 
-switch (ttsServer) {
-  case TTSServer.volcengine:
-    ttsProcessor = VolcengineTTS;
-    break;
-  case TTSServer.openai:
-    ttsProcessor = OpenAITTS;
-    break;
-  case TTSServer.tencent:
-    ttsProcessor = TencentTTS;
-    break;
-  case TTSServer.gemini:
-    ttsProcessor = geminiTTS;
-    break;
-  case TTSServer.piper:
-    ttsProcessor = piperTTS;
-    break;
-  case TTSServer.llm8850melotts:
-    ttsProcessor = LLM8850MeloTTS;
-    break;
-  case TTSServer.piperhttp:
-    ttsProcessor = piperHttpTTS;
-    break;
-  case TTSServer.espeakng:
-    ttsProcessor = espeakNgTTS;
-    break;
-  case TTSServer.supertonic:
-    ttsProcessor = supertonicTTS;
-    break;
-  default:
-    console.warn(
-      `unknown tts server: ${ttsServer}, should be volcengine/tencent/openai/gemini/piper/piper-http/espeak-ng/llm8850melotts/supertonic`,
-    );
-    break;
+// Activate TTS plugin
+try {
+  const ttsProvider = pluginRegistry.activatePluginSync<"tts">("tts", ttsServer);
+  ttsProcessor = ttsProvider.ttsProcessor;
+} catch (e: any) {
+  console.warn(e.message);
 }
 
 export {
