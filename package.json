@@ -2,6 +2,9 @@
   "name": "ai-node",
   "version": "1.0.0",
   "main": "index.js",
+  "bin": {
+    "whisplay": "./bin/whisplay"
+  },
   "scripts": {
     "build": "rm -rf dist && tsc",
     "start": "node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/index.js",

@@ -68,13 +68,25 @@ The plugin system is automatically initialized at application startup:
 
 ## Quick Start
 
-### 1. Create a Plugin Directory
+The fastest way to create a new plugin is using the CLI:
+
+```bash
+whisplay plugin create
+```
+
+This will interactively ask for the plugin name, type, and language (TypeScript/JavaScript), then generate a complete project scaffold with the correct interfaces, `package.json`, `tsconfig.json` (for TS), `.env.template`, and `.gitignore`.
+
+### Manual Setup
+
+If you prefer to create a plugin manually:
+
+#### 1. Create a Plugin Directory
 
 ```bash
 mkdir -p plugins/my-custom-tts
 ```
 
-### 2. Write the Plugin Entry File
+#### 2. Write the Plugin Entry File
 
 ```javascript
 // plugins/my-custom-tts/index.js
@@ -687,6 +699,31 @@ module.exports = {
 
 ## Installing Third-Party Plugins
 
+### Quick Install from GitHub (Recommended)
+
+Use the `whisplay` CLI to install a plugin directly from a GitHub repository:
+
+```bash
+# Install a plugin
+whisplay plugin install https://github.com/user/whisplay-plugin-azure-tts.git
+
+# List installed plugins
+whisplay plugin list
+
+# Update a plugin
+whisplay plugin update whisplay-plugin-azure-tts
+
+# Update all plugins
+whisplay plugin update --all
+
+# Remove a plugin
+whisplay plugin remove whisplay-plugin-azure-tts
+```
+
+The CLI will clone the repo into `plugins/`, automatically install dependencies, and run `npm run build` if a build script is defined.
+
+> **Note:** The `whisplay` CLI is installed automatically during `install_dependencies.sh`. You can also run it directly with `bin/whisplay` from the project root.
+
 ### Option 1: Local Plugin Directory
 
 Place the plugin in the `plugins/` folder at the project root:
@@ -707,6 +744,53 @@ whisplay-ai-chatbot/
 Each subdirectory is a plugin. The system automatically loads all subdirectories under `plugins/`.
 
 > **Automatic Dependency Installation:** If a plugin directory contains a `package.json`, the system will automatically run `npm install --production` before loading the plugin (skipped if `node_modules` already exists and is up-to-date). This means plugins can declare their own dependencies in their `package.json` and they will be installed automatically on first launch.
+
+#### Plugin-Scoped `.env` File
+
+Each plugin can include its own `.env` file in its directory for plugin-specific configuration. These variables are **scoped to the plugin** and never pollute `process.env` or leak to other plugins.
+
+```
+plugins/
+└── my-custom-tts/
+    ├── index.js
+    ├── package.json
+    └── .env            # Plugin-scoped environment variables
+```
+
+**Example plugin `.env`:**
+
+```env
+MY_TTS_API_KEY=sk-xxxx
+MY_TTS_ENDPOINT=https://api.example.com/v1/tts
+MY_TTS_VOICE=en-US-Standard-A
+```
+
+The scoped variables are accessible inside the plugin's `activate()` function via the context object:
+
+```javascript
+module.exports = {
+  name: "my-custom-tts",
+  type: "tts",
+  // ...
+  activate(ctx) {
+    // ctx.pluginEnv  — ONLY this plugin's .env variables
+    const apiKey = ctx.pluginEnv.MY_TTS_API_KEY;
+
+    // ctx.env — merged: global process.env + this plugin's .env
+    // (plugin vars override global vars with the same key)
+    const endpoint = ctx.env.MY_TTS_ENDPOINT;
+
+    return { /* provider implementation */ };
+  },
+};
+```
+
+| Property | Description |
+|---|---|
+| `ctx.pluginEnv` | Only variables from this plugin's `.env` file |
+| `ctx.env` | Global `process.env` merged with the plugin's `.env` (plugin vars take precedence) |
+
+> **Security Note:** Plugin `.env` variables are isolated. Plugin A cannot read Plugin B's `.env` variables through `ctx.pluginEnv` or `ctx.env`.
 
 **Example plugin `package.json`:**
 

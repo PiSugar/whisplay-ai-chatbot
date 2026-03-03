@@ -10,6 +10,7 @@ import { imageDir, ttsDir } from "../utils/dir";
 
 class PluginRegistry {
   private plugins = new Map<string, Plugin>();
+  private pluginEnvs = new Map<string, Record<string, string>>();
   private activeProviders = new Map<PluginType, any>();
   private activePluginNames = new Map<PluginType, string>();
 
@@ -17,7 +18,7 @@ class PluginRegistry {
    * Register a plugin. If a plugin with the same type:name already exists, it will be overwritten.
    * This allows third-party plugins to override built-in implementations.
    */
-  register(plugin: Plugin): void {
+  register(plugin: Plugin, pluginEnv?: Record<string, string>): void {
     const key = `${plugin.type}:${plugin.name}`;
     if (this.plugins.has(key)) {
       console.log(
@@ -25,12 +26,21 @@ class PluginRegistry {
       );
     }
     this.plugins.set(key, plugin);
+    if (pluginEnv && Object.keys(pluginEnv).length > 0) {
+      this.pluginEnvs.set(key, pluginEnv);
+    }
   }
 
-  /** Build the PluginContext that is passed to every activate() call */
-  private buildContext(): PluginContext {
+  /**
+   * Build the PluginContext that is passed to every activate() call.
+   * If the plugin registered its own .env, those variables are merged
+   * into ctx.env (overriding globals) and exposed via ctx.pluginEnv.
+   */
+  private buildContext(key: string): PluginContext {
+    const scopedEnv = this.pluginEnvs.get(key) || {};
     return {
-      env: { ...process.env } as Record<string, string | undefined>,
+      env: { ...process.env, ...scopedEnv } as Record<string, string | undefined>,
+      pluginEnv: { ...scopedEnv },
       imageDir,
       ttsDir,
     };
@@ -54,7 +64,7 @@ class PluginRegistry {
         `[Plugin] Plugin not found: ${key}. Available ${type} plugins: ${available || "none"}`,
       );
     }
-    const ctx = this.buildContext();
+    const ctx = this.buildContext(key);
     const provider = (plugin as any).activate(ctx);
     if (provider && typeof provider.then === "function") {
       throw new Error(
@@ -84,7 +94,7 @@ class PluginRegistry {
         `[Plugin] Plugin not found: ${key}. Available ${type} plugins: ${available || "none"}`,
       );
     }
-    const ctx = this.buildContext();
+    const ctx = this.buildContext(key);
     const provider = await (plugin as any).activate(ctx);
     this.activeProviders.set(type, provider);
     this.activePluginNames.set(type, name);
@@ -129,10 +139,11 @@ class PluginRegistry {
   ): { name: string; provider: ProviderTypeMap[T] }[] {
     const plugins = this.getPluginsOfType(type);
     const results: { name: string; provider: ProviderTypeMap[T] }[] = [];
-    const ctx = this.buildContext();
 
     for (const plugin of plugins) {
       try {
+        const key = `${plugin.type}:${plugin.name}`;
+        const ctx = this.buildContext(key);
         const provider = (plugin as any).activate(ctx);
         if (provider && typeof provider.then === "function") {
           console.warn(

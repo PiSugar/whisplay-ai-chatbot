@@ -175,3 +175,13 @@ else
     echo "Using yarn to install dependencies."
     yarn --registry=$NPM_REGISTRY
 fi
+
+# Install whisplay CLI
+echo "Installing whisplay CLI..."
+chmod +x "$(pwd)/bin/whisplay"
+if [ "$use_npm" = true ]; then
+    npm link
+else
+    yarn link
+fi
+echo "whisplay CLI installed. Run 'whisplay help' to get started."

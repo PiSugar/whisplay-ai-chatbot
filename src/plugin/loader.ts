@@ -9,6 +9,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
+import dotenv from "dotenv";
 import { Plugin } from "./types";
 import { pluginRegistry } from "./registry";
 
@@ -22,6 +23,29 @@ const PLUGIN_NPM_PREFIX = "whisplay-plugin-";
 export function loadExternalPlugins(): void {
   loadFromPluginsDirectory();
   loadFromNodeModules();
+}
+
+/**
+ * Parse a plugin's own .env file (if it exists) and return the key-value pairs.
+ * These variables are scoped to the plugin and never written to process.env.
+ */
+function parsePluginEnv(pluginPath: string): Record<string, string> {
+  const envPath = path.join(pluginPath, ".env");
+  if (!fs.existsSync(envPath)) return {};
+
+  try {
+    const envContent = fs.readFileSync(envPath, "utf-8");
+    const parsed = dotenv.parse(envContent);
+    console.log(
+      `[Plugin] Loaded scoped .env for ${path.basename(pluginPath)} (${Object.keys(parsed).length} vars)`,
+    );
+    return parsed;
+  } catch (e: any) {
+    console.warn(
+      `[Plugin] Failed to parse .env for ${path.basename(pluginPath)}: ${e.message}`,
+    );
+    return {};
+  }
 }
 
 function loadFromPluginsDirectory(): void {
@@ -42,6 +66,9 @@ function loadFromPluginsDirectory(): void {
       // Auto-install dependencies if package.json exists
       installPluginDependencies(pluginPath);
 
+      // Parse plugin-scoped .env (never pollutes process.env)
+      const pluginEnv = parsePluginEnv(pluginPath);
+
       const pluginModule = require(pluginPath);
       const plugin: Plugin = pluginModule.default || pluginModule;
 
@@ -52,7 +79,7 @@ function loadFromPluginsDirectory(): void {
         continue;
       }
 
-      pluginRegistry.register(plugin);
+      pluginRegistry.register(plugin, pluginEnv);
       console.log(
         `[Plugin] Loaded external plugin: ${plugin.displayName} (${plugin.type}:${plugin.name})`,
       );
@@ -76,6 +103,10 @@ function loadFromNodeModules(): void {
       if (!entry.startsWith(PLUGIN_NPM_PREFIX)) continue;
 
       try {
+        // Resolve plugin path for scoped .env loading
+        const npmPluginDir = path.join(nodeModulesDir, entry);
+        const pluginEnv = parsePluginEnv(npmPluginDir);
+
         const pluginModule = require(entry);
         const plugin: Plugin = pluginModule.default || pluginModule;
 
@@ -86,7 +117,7 @@ function loadFromNodeModules(): void {
           continue;
         }
 
-        pluginRegistry.register(plugin);
+        pluginRegistry.register(plugin, pluginEnv);
         console.log(
           `[Plugin] Loaded npm plugin: ${plugin.displayName} (${plugin.type}:${plugin.name})`,
         );
