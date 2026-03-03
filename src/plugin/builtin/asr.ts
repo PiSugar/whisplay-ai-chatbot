@@ -120,6 +120,19 @@ export function registerASRPlugins(): void {
   } as ASRPlugin);
 
   pluginRegistry.register({
+    name: "hailowhisper",
+    displayName: "Hailo Whisper ASR",
+    version: "1.0.0",
+    type: "asr",
+    audioFormat: "wav",
+    description: "Hailo-10H NPU-accelerated Whisper speech recognition (AI Hat+ 2)",
+    activate: () => {
+      const { recognizeAudio } = require("../../cloud-api/local/hailo-whisper-asr");
+      return { recognizeAudio };
+    },
+  } as ASRPlugin);
+
+  pluginRegistry.register({
     name: "picovoice",
     displayName: "Picovoice Leopard ASR",
     version: "1.0.0",
