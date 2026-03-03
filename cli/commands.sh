@@ -17,7 +17,7 @@ cmd_update() {
 
   _bold "[2/3] Installing dependencies..."
   source ~/.bashrc 2>/dev/null || true
-  pkg_install
+  bash "$PROJECT_ROOT/install_dependencies.sh"
 
   _bold "[3/3] Building project..."
   pkg_run build

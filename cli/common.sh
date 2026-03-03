@@ -57,14 +57,6 @@ use_npm() {
   [ -f "${PROJECT_ROOT}/use_npm" ]
 }
 
-pkg_install() {
-  if use_npm; then
-    npm install --registry="$NPM_REGISTRY" "$@"
-  else
-    yarn --registry="$NPM_REGISTRY" "$@"
-  fi
-}
-
 pkg_run() {
   if use_npm; then
     npm run "$@"
