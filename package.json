@@ -1,5 +1,5 @@
 {
-  "name": "ai-node",
+  "name": "whisplay-ai-chatbot",
   "version": "1.0.0",
   "main": "index.js",
   "bin": {
