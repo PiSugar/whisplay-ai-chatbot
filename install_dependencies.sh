@@ -28,8 +28,34 @@ echo "Installing Python dependencies..."
 cd python
 pip install -r requirements.txt --break-system-packages
 # download fonts and emojis
-wget -O NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
-wget -O emoji_svg.zip https://storage.whisplay.ai/whisplay-ai-chatbot/emoji_svg.zip
+if command_exists wget; then
+    if [ ! -f "NotoSansSC-Bold.ttf" ]; then
+        wget -O NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
+    else
+        echo "NotoSansSC-Bold.ttf already exists, skip download."
+    fi
+
+    if [ ! -f "emoji_svg.zip" ]; then
+        wget -O emoji_svg.zip https://storage.whisplay.ai/whisplay-ai-chatbot/emoji_svg.zip
+    else
+        echo "emoji_svg.zip already exists, skip download."
+    fi
+elif command_exists curl; then
+    if [ ! -f "NotoSansSC-Bold.ttf" ]; then
+        curl -fL -o NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
+    else
+        echo "NotoSansSC-Bold.ttf already exists, skip download."
+    fi
+
+    if [ ! -f "emoji_svg.zip" ]; then
+        curl -fL -o emoji_svg.zip https://storage.whisplay.ai/whisplay-ai-chatbot/emoji_svg.zip
+    else
+        echo "emoji_svg.zip already exists, skip download."
+    fi
+else
+    echo "Neither wget nor curl is installed."
+    exit 1
+fi
 # overwrite if exists
 unzip -o emoji_svg.zip
 cd ..
