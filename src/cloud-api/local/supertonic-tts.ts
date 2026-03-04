@@ -536,7 +536,7 @@ const supertonicTTS = async (text: string): Promise<TTSResult> => {
       supertonicInstance = new SupertonicTTS();
     }
     const result = await supertonicInstance.synthesize(text);
-    return { filePath: result.audioPath, duration: result.duration };
+    return { filePath: result.audioPath, duration: result.duration * 1000 };
   } catch (error) {
     console.error("Supertonic TTS error:", error);
     return { duration: 0 };
