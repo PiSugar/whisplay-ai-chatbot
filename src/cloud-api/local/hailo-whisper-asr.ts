@@ -17,30 +17,7 @@ const hailoWhisperLanguage =
 const hailoWhisperRequestType =
   process.env.HAILO_WHISPER_REQUEST_TYPE || "base64";
 
-const asrServer = process.env.ASR_SERVER || "";
-
 let pyProcess: ReturnType<typeof spawn> | null = null;
-
-// Auto-start the local service when the host is localhost
-if (
-  asrServer.trim().toLowerCase() === ASRServer.hailowhisper &&
-  ["localhost", "0.0.0.0", "127.0.0.1"].includes(hailoWhisperHost)
-) {
-  pyProcess = spawn(
-    "python3",
-    [
-      resolve(__dirname, "../../../python/speech-service/hailo-whisper-host.py"),
-      "--port",
-      hailoWhisperPort,
-      "--language",
-      hailoWhisperLanguage,
-    ],
-    {
-      detached: true,
-      stdio: "inherit",
-    }
-  );
-}
 
 interface HailoWhisperResponse {
   recognition: string;

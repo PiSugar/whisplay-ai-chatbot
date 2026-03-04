@@ -237,6 +237,14 @@ curl -s http://localhost:8000/api/pull \
   -d '{"model": "qwen2.5-instruct:1.5b", "stream": true}'
 ```
 
+Test if the model is working:
+
+```bash
+curl -s http://localhost:8000/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "qwen2.5-instruct:1.5b", "messages": [{"role": "user", "content": "Hello, world!"}], "stream": true}'
+```
+
 Available models (may vary by GenAI Model Zoo version):
 
 | Model | Size | Notes |
@@ -287,7 +295,7 @@ Full setup details: [TTS ‐ piper‐http wiki](https://github.com/PiSugar/whisp
 **`.env` settings:**
 ```dotenv
 TTS_SERVER=piper-http
-PIPER_HTTP_MODEL=en_US-amy-medium
+PIPER_HTTP_MODEL=/home/pi/piper/en_US-amy-medium
 # PIPER_HTTP_HOST=localhost
 # PIPER_HTTP_PORT=8805
 ```
@@ -371,7 +379,7 @@ ENABLE_THINKING=false
 # Piper TTS
 PIPER_HTTP_HOST=localhost
 PIPER_HTTP_PORT=8805
-PIPER_HTTP_MODEL=en_US-amy-medium
+PIPER_HTTP_MODEL=/home/pi/piper/en_US-amy-medium
 ```
 
 ### Option 2 — Multimodal (Whisper + Hailo LLM + Piper TTS + Hailo VLM)
@@ -395,7 +403,7 @@ ENABLE_THINKING=false
 # Piper TTS
 PIPER_HTTP_HOST=localhost
 PIPER_HTTP_PORT=8805
-PIPER_HTTP_MODEL=en_US-amy-medium
+PIPER_HTTP_MODEL=/home/pi/piper/en_US-amy-medium
 
 # Hailo VLM vision service (OpenAI-compatible endpoint)
 VISION_SERVER=openai
