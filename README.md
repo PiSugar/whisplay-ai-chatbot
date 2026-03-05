@@ -110,11 +110,11 @@ sudo systemctl restart chatbot.service
 
 [Whisplay Chatbot Case (FDM) for Pi5 & LLM8850](https://github.com/PiSugar/suit-cases/tree/main/pi5-whisplay-chatbot-llm8850)
 
-## LLM8850 Support
+## AI Accelerator Card Support
 
-If you have a LLM8850 AI Accelerator, you can set up the LLM8850 services for local ASR, TTS, and LLM API to enable offline capabilities.
+[LLM8850](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/LLM8850-Integration)
 
-Please refer to the [LLM8850 Integration Guide](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/LLM8850-Integration) for detailed setup instructions.
+[Raspberry Pi AI HAT+ 2 (Hailo-10H)](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Raspberry-Pi-AI-HAT+-2)
 
 ## Goals
 
@@ -123,7 +123,7 @@ Please refer to the [LLM8850 Integration Guide](https://github.com/PiSugar/whisp
 - Support LLM8850 Qwen3 llm api (not support tool) ✅
 - Support LLM8850 Qwen3-VL multimodal llm api (not support tool) ✅ 
 - Support LLM8850 image generation ✅
-- Suppprt Raspberry Pi AI Hat+2 (Hailo-10H) whisper, llm,  ✅
+- Suppprt Raspberry Pi AI Hat+2 (Hailo-10H) whisper, llm, vlm ✅
 - Support speaker recognition
 
 ## Star History
