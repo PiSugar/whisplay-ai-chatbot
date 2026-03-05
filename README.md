@@ -90,25 +90,15 @@ If you need to update the environment variables, you can edit the `.env` file di
 sudo systemctl restart chatbot.service
 ```
 
-## Wake Word (Optional)
+## More Features
 
-You can enable wake word detection for hands-free listening. When enabled, the device listens for a configurable wake word, records automatically with voice-based stopping, and returns to sleep after a period of inactivity.
+**[Wake Word](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Wakeword)** for hands-free interaction.
 
-For full setup instructions, custom model configuration, and all available options, see the **[Wake Word wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Wakeword)**.
+**[Image Generation](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Image-Generation)** for generating images from text prompts.
 
-## Image Generation
+**[Battery Level Display](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Battery-Level-Display)** for installation instructions.
 
-Set `IMAGE_GENERATION_SERVER` in `.env` to enable image generation (supported: `openai`, `gemini`, `volcengine`, `llm8850lcm`). Simply describe the image you want in a chat message and it will be generated and shown on screen.
-
-For provider-specific configuration and model options, see the **[Image Generation wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Image-Generation)**.
-
-## Display Battery Level
-
-Battery level display requires the PiSugar Power Manager to be installed on your Raspberry Pi. See the **[Battery Level Display wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Battery-Level-Display)** for installation instructions.
-
-## Data Folder
-
-The chatbot stores temporary recordings, generated images, and conversation history in the `data/` folder. It can be safely deleted at any time to clear state. See the **[Data Folder wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Data-Folder)** for details on sub-folder layout and cleanup options.
+**[Data Folder](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Data-Folder)** for details on sub-folder layout and cleanup options.
 
 ## Enclosure
 

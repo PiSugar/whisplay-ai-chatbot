@@ -16,3 +16,4 @@ use_ollama
 use_npm
 package-lock.json
 docker/volume
+.DS_Store
