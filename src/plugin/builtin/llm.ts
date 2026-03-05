@@ -99,6 +99,54 @@ export function registerLLMPlugins(): void {
   } as LLMPlugin);
 
   pluginRegistry.register({
+    name: "minimax",
+    displayName: "MiniMax LLM",
+    version: "1.0.0",
+    type: "llm",
+    description: "MiniMax large language model",
+    activate: () => {
+      const mod = require("../../cloud-api/minimax/minimax-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+        summaryTextWithLLM: mod.summaryTextWithLLM,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
+    name: "kimi",
+    displayName: "Kimi LLM",
+    version: "1.0.0",
+    type: "llm",
+    description: "Moonshot AI Kimi large language model",
+    activate: () => {
+      const mod = require("../../cloud-api/kimi/kimi-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+        summaryTextWithLLM: mod.summaryTextWithLLM,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
+    name: "qwen",
+    displayName: "Qwen LLM",
+    version: "1.0.0",
+    type: "llm",
+    description: "Alibaba Cloud Qwen (通义千问) large language model",
+    activate: () => {
+      const mod = require("../../cloud-api/qwen/qwen-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+        summaryTextWithLLM: mod.summaryTextWithLLM,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
     name: "llm8850",
     displayName: "LLM8850 LLM",
     version: "1.0.0",
