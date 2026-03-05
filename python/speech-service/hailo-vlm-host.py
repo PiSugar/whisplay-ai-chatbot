@@ -64,29 +64,58 @@ args = parser.parse_args()
 app = Flask(__name__)
 vdevice = None
 vlm = None
+_hef_path = None  # cached HEF path for re-init
+
+
+def _init_vlm():
+    """(Re-)create the VDevice + VLM.  Returns (vdevice, vlm)."""
+    global _hef_path
+    print("[INIT] Initialising Hailo device …")
+    params = VDevice.create_params()
+    params.group_id = SHARED_VDEVICE_GROUP_ID
+    _vdevice = VDevice(params)
+    print("[INIT] Hailo device ready")
+
+    if _hef_path is None:
+        _hef_path = args.hef_path or resolve_hef_path(
+            hef_path=None, app_name=VLM_CHAT_APP, arch=HAILO10H_ARCH
+        )
+    if _hef_path is None:
+        print(
+            "[ERROR] VLM HEF not found. "
+            "Run: hailo-download-resources --group vlm_chat --arch hailo10h"
+        )
+        sys.exit(1)
+
+    print("[INIT] Loading VLM model …")
+    t0 = time.perf_counter()
+    _vlm = VLM(_vdevice, str(_hef_path))
+    print(f"[INIT] VLM loaded in {time.perf_counter() - t0:.2f}s")
+    return _vdevice, _vlm
+
+
+def _reinit_vlm(reason: str = ""):
+    """Release current VLM/VDevice and create fresh ones."""
+    global vdevice, vlm
+    tag = f" ({reason})" if reason else ""
+    print(f"[RECOVERY] Re-initialising VLM{tag} …")
+    # Release old resources
+    for obj in (vlm, vdevice):
+        if obj is not None:
+            try:
+                obj.release()
+            except Exception:
+                pass
+    vlm = None
+    vdevice = None
+    vdevice, vlm = _init_vlm()
+    print("[RECOVERY] VLM re-initialised successfully")
+
 
 if HAILO_AVAILABLE:
     try:
-        print("[INIT] Initialising Hailo device …")
-        params = VDevice.create_params()
-        params.group_id = SHARED_VDEVICE_GROUP_ID
-        vdevice = VDevice(params)
-        print("[INIT] Hailo device ready")
-
-        print("[INIT] Loading VLM model …")
-        hef_path = args.hef_path or resolve_hef_path(
-            hef_path=None, app_name=VLM_CHAT_APP, arch=HAILO10H_ARCH
-        )
-        if hef_path is None:
-            print(
-                "[ERROR] VLM HEF not found. "
-                "Run: hailo-download-resources --group vlm_chat --arch hailo10h"
-            )
-            sys.exit(1)
-
-        t0 = time.perf_counter()
-        vlm = VLM(vdevice, str(hef_path))
-        print(f"[INIT] VLM loaded in {time.perf_counter() - t0:.2f}s — ready on port {args.port}")
+        vdevice, vlm = _init_vlm()
+        print(f"[INIT] Ready on port {args.port}")
     except Exception as exc:
         print(f"[ERROR] Failed to initialise Hailo VLM: {exc}")
         sys.exit(1)
@@ -227,40 +256,62 @@ def chat_completions():
     if not HAILO_AVAILABLE or vlm is None:
         return jsonify(_make_openai_response("", model))
 
-    try:
-        # Ensure a system prompt exists (required by Hailo VLM for proper behavior)
-        has_system = any(m.get("role") == "system" for m in messages if isinstance(m, dict))
-        if not has_system:
-            messages.insert(0, {"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
+    # Ensure a system prompt exists (required by Hailo VLM for proper behavior)
+    has_system = any(m.get("role") == "system" for m in messages if isinstance(m, dict))
+    if not has_system:
+        messages.insert(0, {"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
 
-        prompt, frames = _build_hailo_prompt(messages)
+    prompt, frames = _build_hailo_prompt(messages)
 
-        # VLM.generate_all() requires 'frames' — supply a blank image if none provided
-        if not frames:
-            blank = np.zeros((VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, 3), dtype=np.uint8)
-            frames = [blank]
+    # VLM.generate_all() requires 'frames' — supply a neutral gray image if
+    # none provided (all-black zeros cause HAILO_INVALID_OPERATION).
+    # Also inject an {"type": "image"} token into the prompt so that the
+    # frame count matches the prompt's image token count.
+    if not frames:
+        gray = np.full((VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, 3), 128, dtype=np.uint8)
+        frames = [gray]
+        # Find the first user message and prepend an image token
+        for entry in prompt:
+            if entry.get("role") == "user":
+                entry["content"].insert(0, {"type": "image"})
+                break
 
-        raw_response: str = vlm.generate_all(
-            prompt=prompt,
-            frames=frames,
-            temperature=temperature,
-            max_generated_tokens=max_tokens,
-        )
-
-        # Clean up model artefacts
-        clean = raw_response.split(". [{'type'")[0].split("<|im_end|>")[0].strip()
-        return jsonify(_make_openai_response(clean, model))
-
-    except Exception as exc:
-        traceback.print_exc()  # log full traceback to stderr / journal
-        return jsonify({"error": {"message": str(exc), "type": "server_error"}}), 500
-    finally:
-        # Clear VLM context after each request to prevent context accumulation
+    # Attempt generation with one automatic retry after re-init on NPU errors
+    for attempt in range(2):
         try:
-            if vlm:
-                vlm.clear_context()
-        except Exception:
-            pass
+            raw_response: str = vlm.generate_all(
+                prompt=prompt,
+                frames=frames,
+                temperature=temperature,
+                max_generated_tokens=max_tokens,
+            )
+
+            # Clean up model artefacts
+            clean = raw_response.split(". [{'type'")[0].split("<|im_end|>")[0].strip()
+            return jsonify(_make_openai_response(clean, model))
+
+        except Exception as exc:
+            traceback.print_exc()  # log full traceback to stderr / journal
+            exc_name = type(exc).__name__
+            is_npu_error = "InvalidOperation" in exc_name or "HAILO_INVALID_OPERATION" in str(exc)
+
+            if is_npu_error and attempt == 0:
+                # NPU generator is in a broken state — reinitialise and retry
+                try:
+                    _reinit_vlm(reason=exc_name)
+                    continue  # retry with fresh VLM
+                except Exception as reinit_exc:
+                    print(f"[ERROR] VLM re-init failed: {reinit_exc}")
+                    return jsonify({"error": {"message": f"VLM re-init failed: {reinit_exc}", "type": "server_error"}}), 500
+
+            return jsonify({"error": {"message": str(exc), "type": "server_error"}}), 500
+        finally:
+            # Clear VLM context after each attempt to prevent context accumulation
+            try:
+                if vlm:
+                    vlm.clear_context()
+            except Exception:
+                pass
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
