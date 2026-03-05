@@ -1,0 +1,4 @@
+[submodule "wiki"]
+	path = wiki
+	url = git@github.com:PiSugar/whisplay-ai-chatbot.wiki.git
+	branch = master
