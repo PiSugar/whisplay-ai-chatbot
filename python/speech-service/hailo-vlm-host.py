@@ -235,14 +235,17 @@ def chat_completions():
 
         prompt, frames = _build_hailo_prompt(messages)
 
-        generate_kwargs = dict(
+        # VLM.generate_all() requires 'frames' — supply a blank image if none provided
+        if not frames:
+            blank = np.zeros((VLM_IMAGE_SIZE, VLM_IMAGE_SIZE, 3), dtype=np.uint8)
+            frames = [blank]
+
+        raw_response: str = vlm.generate_all(
             prompt=prompt,
+            frames=frames,
             temperature=temperature,
             max_generated_tokens=max_tokens,
         )
-        if frames:
-            generate_kwargs["frames"] = frames
-        raw_response: str = vlm.generate_all(**generate_kwargs)
 
         # Clean up model artefacts
         clean = raw_response.split(". [{'type'")[0].split("<|im_end|>")[0].strip()
