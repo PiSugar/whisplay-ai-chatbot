@@ -8,6 +8,11 @@
 #   whisplay plugin remove  <plugin-name>  Remove an installed plugin
 #   whisplay plugin list                   List installed plugins
 #   whisplay plugin update  <name|--all>   Update plugin(s)
+#   whisplay service install               Install & register the chatbot systemd service
+#   whisplay service uninstall             Stop, disable and remove the chatbot systemd service
+#   whisplay service enable|disable        Enable or disable auto-start on boot
+#   whisplay service start|stop|restart    Control the running service
+#   whisplay service status                Show service status
 #   whisplay update                        Pull latest code, install deps & build
 #   whisplay index-knowledge               Index the knowledge base
 #   whisplay upgrade-env                   Upgrade .env to latest template
@@ -36,6 +41,7 @@ source "${CLI_DIR}/common.sh"
 source "${CLI_DIR}/plugin.sh"
 source "${CLI_DIR}/plugin-create.sh"
 source "${CLI_DIR}/commands.sh"
+source "${CLI_DIR}/service.sh"
 
 # ── Bootstrap ────────────────────────────────────────────────
 PROJECT_ROOT="$(resolve_project_root)"
@@ -55,6 +61,7 @@ main() {
 
   case "$cmd" in
     plugin)          cmd_plugin "$@" ;;
+    service)         cmd_service "$@" ;;
     update)          cmd_update ;;
     index-knowledge) cmd_index_knowledge ;;
     upgrade-env)     cmd_upgrade_env ;;
