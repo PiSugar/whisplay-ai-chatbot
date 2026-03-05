@@ -22,6 +22,7 @@ import io
 import os
 import sys
 import time
+import traceback
 import uuid
 
 import cv2
@@ -121,11 +122,19 @@ def _decode_base64_image(b64_str: str) -> np.ndarray:
     return img
 
 
-def _build_hailo_prompt(messages: list[dict]) -> tuple[list[dict], list[np.ndarray]]:
+def _build_hailo_prompt(messages) -> tuple[list[dict], list[np.ndarray]]:
     """
     Convert OpenAI-style messages to Hailo VLM prompt format.
     Returns (prompt_list, frames_list).
+
+    Handles non-standard payloads produced by OPENAI_USE_SINGLE_MESSAGE_PAYLOAD:
+      - messages may be a dict instead of a list (wraps it automatically)
+      - image_url value may be a plain data-URI string instead of {"url": "..."}
     """
+    # Normalise: some clients send a single message dict instead of a list
+    if isinstance(messages, dict):
+        messages = [messages]
+
     prompt: list[dict] = []
     frames: list[np.ndarray] = []
 
@@ -133,25 +142,36 @@ def _build_hailo_prompt(messages: list[dict]) -> tuple[list[dict], list[np.ndarr
         role = msg.get("role", "user")
         content = msg.get("content", "")
 
-        hailo_content: list[dict] = []
+        text_parts: list[dict] = []
+        image_parts: list[dict] = []   # collected separately so image comes first
+        frame_buf: list[np.ndarray] = []
 
         if isinstance(content, str):
-            hailo_content.append({"type": "text", "text": content})
+            text_parts.append({"type": "text", "text": content})
         elif isinstance(content, list):
             for part in content:
-                if part.get("type") == "text":
-                    hailo_content.append({"type": "text", "text": part["text"]})
-                elif part.get("type") == "image_url":
-                    # Extract base64 image from data-URI or URL
-                    url = part.get("image_url", {}).get("url", "")
+                ptype = part.get("type", "")
+                if ptype == "text":
+                    text_parts.append({"type": "text", "text": part.get("text", "")})
+                elif ptype == "image_url":
+                    # image_url may be a dict {"url": "..."} or a bare data-URI string
+                    image_url_val = part.get("image_url", {})
+                    if isinstance(image_url_val, str):
+                        url = image_url_val
+                    elif isinstance(image_url_val, dict):
+                        url = image_url_val.get("url", "")
+                    else:
+                        url = ""
                     if url.startswith("data:"):
                         img = _decode_base64_image(url)
-                        frames.append(img)
-                        hailo_content.append({"type": "image"})
-                    # URL-based images are not supported locally; skip with warning
+                        frame_buf.append(img)
+                        image_parts.append({"type": "image"})
                     else:
                         print(f"[WARN] Remote image URLs are not supported, skipping: {url[:60]}")
 
+        # Hailo VLM expects image tokens BEFORE text tokens (per official example)
+        hailo_content = image_parts + text_parts
+        frames.extend(frame_buf)
         prompt.append({"role": role, "content": hailo_content})
 
     return prompt, frames
@@ -195,7 +215,10 @@ def health():
 def chat_completions():
     data = request.get_json(force=True, silent=True) or {}
 
-    messages: list[dict] = data.get("messages", [])
+    messages = data.get("messages", [])
+    # Normalise single-message dict to list (OPENAI_USE_SINGLE_MESSAGE_PAYLOAD compat)
+    if isinstance(messages, dict):
+        messages = [messages]
     max_tokens: int = int(data.get("max_tokens") or args.max_tokens)
     temperature: float = float(data.get("temperature") or args.temperature)
     model: str = data.get("model", "hailo-vlm")
@@ -234,6 +257,7 @@ def chat_completions():
         return jsonify(_make_openai_response(clean, model))
 
     except Exception as exc:
+        traceback.print_exc()  # log full traceback to stderr / journal
         return jsonify({"error": {"message": str(exc), "type": "server_error"}}), 500
 
 
