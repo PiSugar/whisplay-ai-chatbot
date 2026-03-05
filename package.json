@@ -17,8 +17,10 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.55.1",
     "@google-cloud/text-to-speech": "^6.3.1",
     "@google/genai": "1.25.0",
+    "@koa/router": "^12.0.2",
     "@picovoice/leopard-node": "^2.0.2",
     "@picovoice/orca-node": "^2.0.1",
     "@qdrant/js-client-rest": "^1.16.2",
@@ -27,7 +29,6 @@
     "dotenv": "^16.5.0",
     "get-audio-duration": "^4.0.1",
     "https-proxy-agent": "^7.0.6",
-    "@koa/router": "^12.0.2",
     "koa": "^2.15.4",
     "koa-bodyparser": "^4.4.1",
     "koa-static": "^5.0.0",

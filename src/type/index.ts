@@ -32,6 +32,7 @@ export enum LLMServer {
   ollama = "ollama",
   gemini = "gemini",
   grok = "grok",
+  anthropic = "anthropic",
   llm8850 = "llm8850",
   whisplayim = "whisplay-im",
   imagetooldirect = "image-tool-direct",

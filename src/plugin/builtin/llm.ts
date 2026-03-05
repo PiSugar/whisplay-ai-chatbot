@@ -83,6 +83,22 @@ export function registerLLMPlugins(): void {
   } as LLMPlugin);
 
   pluginRegistry.register({
+    name: "anthropic",
+    displayName: "Anthropic Claude LLM",
+    version: "1.0.0",
+    type: "llm",
+    description: "Anthropic Claude language model",
+    activate: () => {
+      const mod = require("../../cloud-api/anthropic/anthropic-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+        summaryTextWithLLM: mod.summaryTextWithLLM,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
     name: "llm8850",
     displayName: "LLM8850 LLM",
     version: "1.0.0",
