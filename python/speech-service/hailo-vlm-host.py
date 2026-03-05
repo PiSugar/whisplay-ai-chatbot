@@ -97,6 +97,7 @@ else:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 VLM_IMAGE_SIZE = 336  # Required resolution for Hailo VLM
+DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant that analyzes images and answers questions about them."
 
 
 def _decode_base64_image(b64_str: str) -> np.ndarray:
@@ -227,30 +228,21 @@ def chat_completions():
         return jsonify(_make_openai_response("", model))
 
     try:
+        # Ensure a system prompt exists (required by Hailo VLM for proper behavior)
+        has_system = any(m.get("role") == "system" for m in messages if isinstance(m, dict))
+        if not has_system:
+            messages.insert(0, {"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
+
         prompt, frames = _build_hailo_prompt(messages)
 
-        if not frames:
-            # Text-only fallback — use the last user message
-            text_parts = [
-                p["text"]
-                for msg in messages
-                if msg.get("role") == "user"
-                for p in (msg.get("content") if isinstance(msg.get("content"), list) else [{"type": "text", "text": msg.get("content", "")}])
-                if p.get("type") == "text"
-            ]
-            return jsonify(
-                _make_openai_response(
-                    "No image provided. Please include an image for vision analysis.",
-                    model,
-                )
-            )
-
-        raw_response: str = vlm.generate_all(
+        generate_kwargs = dict(
             prompt=prompt,
-            frames=frames,
             temperature=temperature,
             max_generated_tokens=max_tokens,
         )
+        if frames:
+            generate_kwargs["frames"] = frames
+        raw_response: str = vlm.generate_all(**generate_kwargs)
 
         # Clean up model artefacts
         clean = raw_response.split(". [{'type'")[0].split("<|im_end|>")[0].strip()
@@ -259,6 +251,13 @@ def chat_completions():
     except Exception as exc:
         traceback.print_exc()  # log full traceback to stderr / journal
         return jsonify({"error": {"message": str(exc), "type": "server_error"}}), 500
+    finally:
+        # Clear VLM context after each request to prevent context accumulation
+        try:
+            if vlm:
+                vlm.clear_context()
+        except Exception:
+            pass
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
