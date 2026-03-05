@@ -3,6 +3,7 @@ import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag } from "../utils";
 import { WebDisplayServer } from "./web-display";
+import { webAudioBridge } from "./web-audio-bridge";
 import dotEnv from "dotenv";
 
 dotEnv.config();
@@ -386,11 +387,24 @@ export class WhisplayDisplay {
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) console.log("send data:", data);
 
-    if (!this.deviceEnabled && normalizedStatus.camera_capture) {
+    if (normalizedStatus.camera_capture) {
       const capturePath = normalizedStatus.capture_image_path || this.currentStatus.capture_image_path;
       if (capturePath) {
-        this.sendCameraDaemonCommand("capture", { path: capturePath });
-        this.handleCameraCaptureEvent();
+        const webCamEnabled = parseBoolEnv("WEB_CAMERA_ENABLED", false);
+        if (webCamEnabled && webAudioBridge.isCameraAvailable()) {
+          // Request capture from browser camera regardless of physical device state.
+          webAudioBridge
+            .requestCameraCapture(capturePath)
+            .then(() => this.handleCameraCaptureEvent())
+            .catch((e) =>
+              console.error("[WebCamera] Capture failed:", e),
+            );
+        } else if (!this.deviceEnabled) {
+          // No physical hardware and no web camera: use the Pi camera daemon.
+          this.sendCameraDaemonCommand("capture", { path: capturePath });
+          this.handleCameraCaptureEvent();
+        }
+        // When deviceEnabled=true and no web camera: chatbot-ui.py handles the capture.
       }
     }
 

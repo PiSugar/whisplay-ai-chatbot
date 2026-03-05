@@ -5,6 +5,7 @@ import { ttsServer, asrServer } from "../cloud-api/server";
 import { pluginRegistry } from "../plugin";
 import type { ASRPlugin, TTSPlugin, AudioFormat } from "../plugin";
 import { ASRServer, TTSResult, TTSServer } from "../type";
+import { webAudioBridge } from "./web-audio-bridge";
 
 export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
@@ -139,6 +140,12 @@ const recordAudio = async (
   duration: number = 10,
   voiceDetectLevel: number = 30,
 ): Promise<string> => {
+  // Delegate to browser microphone when web audio is enabled and a client is connected.
+  if (webAudioBridge.isAvailable()) {
+    console.log(`[WebAudio] Starting browser recording, max ${duration} seconds...`);
+    return webAudioBridge.startRecording(outputPath, duration);
+  }
+
   return new Promise((resolve, reject) => {
     const args = [
       "-t",
@@ -199,6 +206,12 @@ const recordAudio = async (
 const recordAudioManually = (
   outputPath: string
 ): { result: Promise<string>; stop: () => void } => {
+  // Delegate to browser microphone when web audio is enabled and a client is connected.
+  if (webAudioBridge.isAvailable()) {
+    console.log(`[WebAudio] Starting manual browser recording...`);
+    return webAudioBridge.startManualRecording(outputPath);
+  }
+
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
@@ -238,6 +251,9 @@ const recordAudioManually = (
 };
 
 const stopRecording = (): void => {
+  // Also stop any in-progress web recording.
+  webAudioBridge.stopRecording();
+
   if (!isEmpty(recordingProcessList)) {
     killAllRecordingProcesses();
     try {
@@ -264,6 +280,12 @@ setTimeout(() => {
 }, 5000);
 
 const playAudioData = (params: TTSResult): Promise<void> => {
+  // Delegate to browser speaker when web audio is enabled and a client is connected.
+  if (webAudioBridge.isAvailable()) {
+    console.log("[WebAudio] Sending audio to browser for playback.");
+    return webAudioBridge.playAudioData(params, ttsAudioFormat);
+  }
+
   const { duration: audioDuration, filePath, base64, buffer } = params;
   if (audioDuration <= 0 || (!filePath && !base64 && !buffer)) {
     console.log("No audio data to play, skipping playback.");
@@ -357,6 +379,9 @@ const playAudioData = (params: TTSResult): Promise<void> => {
 };
 
 const stopPlaying = (): void => {
+  // Also stop any in-progress web playback.
+  webAudioBridge.stopPlayback();
+
   if (player.isPlaying) {
     try {
       console.log("Stopping audio playback");

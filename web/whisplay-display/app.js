@@ -202,6 +202,20 @@ function connectWebSocket() {
     }
     if (message.type === "state") {
       applyState(message.payload);
+    } else if (message.type === "start_record") {
+      startWebAudioRecording();
+    } else if (message.type === "stop_record") {
+      stopWebAudioRecording();
+    } else if (message.type === "play_audio") {
+      playWebAudio(message.data, message.format, message.duration);
+    } else if (message.type === "stop_audio") {
+      stopWebAudio();
+    } else if (message.type === "start_camera_stream") {
+      startWebCameraStream();
+    } else if (message.type === "stop_camera_stream") {
+      stopWebCameraStream();
+    } else if (message.type === "capture_photo") {
+      sendWebCameraCapture();
     }
   });
 
@@ -251,3 +265,215 @@ btn.addEventListener("touchend", (event) => {
   release();
 });
 window.addEventListener("touchend", release);
+
+// ── Web Audio Recording ──────────────────────────────────────────────────────
+// When WEB_AUDIO_ENABLED=true on the server, it sends "start_record" /
+// "stop_record" commands here. The browser captures with MediaRecorder and
+// streams binary frames (prefix byte 0x01) back to the server.
+
+const FRAME_AUDIO   = 0x01;
+const FRAME_CAM_LIVE = 0x02;
+const FRAME_CAM_CAPTURE = 0x03;
+
+let mediaRecorder = null;
+let audioStream = null;
+
+async function startWebAudioRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") return;
+  updateMicIndicator(true);
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const preferredMimes = [
+      "audio/webm;codecs=opus",
+      "audio/ogg;codecs=opus",
+      "audio/webm",
+    ];
+    const mimeType = preferredMimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+    const options = mimeType ? { mimeType } : {};
+
+    mediaRecorder = new MediaRecorder(audioStream, options);
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (!event.data || event.data.size === 0) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      event.data.arrayBuffer().then((buf) => {
+        const payload = new Uint8Array(1 + buf.byteLength);
+        payload[0] = FRAME_AUDIO;
+        payload.set(new Uint8Array(buf), 1);
+        ws.send(payload);
+      });
+    };
+
+    mediaRecorder.onstop = () => {
+      updateMicIndicator(false);
+      if (audioStream) {
+        audioStream.getTracks().forEach((t) => t.stop());
+        audioStream = null;
+      }
+      mediaRecorder = null;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "record_complete" }));
+      }
+    };
+
+    // Emit data chunks every 500 ms so the server can monitor progress.
+    mediaRecorder.start(500);
+  } catch (e) {
+    console.error("[WebAudio] getUserMedia (audio) failed:", e);
+    updateMicIndicator(false);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "record_complete" }));
+    }
+  }
+}
+
+function stopWebAudioRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+}
+
+function updateMicIndicator(active) {
+  const el = document.getElementById("micIndicator");
+  if (el) el.style.display = active ? "block" : "none";
+  refreshWebAudioCard();
+}
+
+function refreshWebAudioCard() {
+  const card = document.getElementById("webAudioCard");
+  if (!card) return;
+  const mic = document.getElementById("micIndicator");
+  const cam = document.getElementById("camIndicator");
+  const anyActive =
+    (mic && mic.style.display !== "none") ||
+    (cam && cam.style.display !== "none");
+  card.style.display = anyActive ? "block" : "none";
+}
+
+// ── Web Audio Playback ───────────────────────────────────────────────────────
+// When WEB_AUDIO_ENABLED=true, the server sends "play_audio" with base64 data.
+// We decode and play it via the Web Audio API.
+
+let audioCtx = null;
+let currentAudioSource = null;
+
+function ensureAudioContext() {
+  if (!audioCtx || audioCtx.state === "closed") {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+async function playWebAudio(base64Data, _format, _duration) {
+  try {
+    const ctx = ensureAudioContext();
+    const binary = atob(base64Data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const decoded = await ctx.decodeAudioData(bytes.buffer);
+    stopWebAudio();
+    currentAudioSource = ctx.createBufferSource();
+    currentAudioSource.buffer = decoded;
+    currentAudioSource.connect(ctx.destination);
+    currentAudioSource.onended = () => {
+      currentAudioSource = null;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "play_complete" }));
+      }
+    };
+    currentAudioSource.start(0);
+  } catch (e) {
+    console.error("[WebAudio] Playback failed:", e);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "play_complete" }));
+    }
+  }
+}
+
+function stopWebAudio() {
+  if (currentAudioSource) {
+    try { currentAudioSource.stop(); } catch {}
+    currentAudioSource = null;
+  }
+}
+
+// ── Web Camera Streaming ─────────────────────────────────────────────────────
+// When WEB_CAMERA_ENABLED=true, the server sends "start_camera_stream" and
+// "stop_camera_stream" commands. We capture from getUserMedia and stream JPEG
+// frames (prefix byte 0x02). For single captures, prefix byte 0x03 is used.
+
+let webCamStream = null;
+let webCamVideo = null;
+let webCamCanvas = null;
+let webCamSendTimer = null;
+
+async function startWebCameraStream() {
+  if (webCamStream) return;
+  try {
+    webCamStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+    });
+    if (!webCamVideo) {
+      webCamVideo = document.createElement("video");
+      webCamVideo.autoplay = true;
+      webCamVideo.muted = true;
+      webCamVideo.playsInline = true;
+      webCamCanvas = document.createElement("canvas");
+    }
+    webCamVideo.srcObject = webCamStream;
+    await webCamVideo.play().catch(() => {});
+    updateCamIndicator(true);
+    webCamSendTimer = setInterval(() => sendWebCameraFrameInternal(false), 200);
+  } catch (e) {
+    console.error("[WebCamera] getUserMedia (video) failed:", e);
+    webCamStream = null;
+  }
+}
+
+function stopWebCameraStream() {
+  if (webCamSendTimer) { clearInterval(webCamSendTimer); webCamSendTimer = null; }
+  if (webCamStream) { webCamStream.getTracks().forEach((t) => t.stop()); webCamStream = null; }
+  updateCamIndicator(false);
+}
+
+function sendWebCameraCapture() {
+  sendWebCameraFrameInternal(true);
+}
+
+function sendWebCameraFrameInternal(isCapture) {
+  if (!webCamVideo || !webCamCanvas || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const w = webCamVideo.videoWidth || 640;
+  const h = webCamVideo.videoHeight || 480;
+  webCamCanvas.width = w;
+  webCamCanvas.height = h;
+  const ctx2d = webCamCanvas.getContext("2d");
+  ctx2d.drawImage(webCamVideo, 0, 0, w, h);
+  const quality = isCapture ? 0.95 : 0.75;
+  webCamCanvas.toBlob(
+    (blob) => {
+      if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
+      blob.arrayBuffer().then((buf) => {
+        const prefixByte = isCapture ? FRAME_CAM_CAPTURE : FRAME_CAM_LIVE;
+        const payload = new Uint8Array(1 + buf.byteLength);
+        payload[0] = prefixByte;
+        payload.set(new Uint8Array(buf), 1);
+        ws.send(payload);
+      });
+    },
+    "image/jpeg",
+    quality,
+  );
+}
+
+function updateCamIndicator(active) {
+  const el = document.getElementById("camIndicator");
+  if (el) el.style.display = active ? "block" : "none";
+  refreshWebAudioCard();
+}
+
+// Unlock AudioContext on first user interaction (required by browsers).
+document.addEventListener("click", () => { try { ensureAudioContext(); } catch {} }, { once: true });
+document.addEventListener("touchstart", () => { try { ensureAudioContext(); } catch {} }, { once: true });
+
