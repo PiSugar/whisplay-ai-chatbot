@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# ============================================================
+# whisplay — Whisplay AI Chatbot CLI
+#
+# Usage:
+#   whisplay plugin create              Create a new plugin from template
+#   whisplay plugin install <github-url>   Install a plugin from GitHub
+#   whisplay plugin remove  <plugin-name>  Remove an installed plugin
+#   whisplay plugin list                   List installed plugins
+#   whisplay plugin update  <name|--all>   Update plugin(s)
+#   whisplay service install               Install & register the chatbot systemd service
+#   whisplay service uninstall             Stop, disable and remove the chatbot systemd service
+#   whisplay service enable|disable        Enable or disable auto-start on boot
+#   whisplay service start|stop|restart    Control the running service
+#   whisplay service status                Show service status
+#   whisplay update                        Pull latest code, install deps & build
+#   whisplay index-knowledge               Index the knowledge base
+#   whisplay upgrade-env                   Upgrade .env to latest template
+#   whisplay help                          Show this help message
+# ============================================================
+
+set -euo pipefail
+
+# ── Resolve CLI_DIR (directory containing this script) ───────
+_resolve_cli_dir() {
+  local source="${BASH_SOURCE[0]}"
+  while [ -L "$source" ]; do
+    local dir
+    dir="$(cd -P "$(dirname "$source")" && pwd)"
+    source="$(readlink "$source")"
+    [[ "$source" != /* ]] && source="$dir/$source"
+  done
+  cd -P "$(dirname "$source")" && pwd
+}
+
+SCRIPT_DIR="$(_resolve_cli_dir)"
+CLI_DIR="${SCRIPT_DIR}/../cli"
+
+# ── Source modules ───────────────────────────────────────────
+source "${CLI_DIR}/common.sh"
+source "${CLI_DIR}/plugin.sh"
+source "${CLI_DIR}/plugin-create.sh"
+source "${CLI_DIR}/commands.sh"
+source "${CLI_DIR}/service.sh"
+
+# ── Bootstrap ────────────────────────────────────────────────
+PROJECT_ROOT="$(resolve_project_root)"
+if [ -z "$PROJECT_ROOT" ]; then
+  echo "Error: Cannot locate whisplay project root." >&2
+  echo "Make sure you are running from the project directory or the CLI is properly installed." >&2
+  exit 1
+fi
+
+PLUGINS_DIR="${PROJECT_ROOT}/plugins"
+NPM_REGISTRY="https://registry.npmmirror.com"
+
+# ── Dispatch ─────────────────────────────────────────────────
+main() {
+  local cmd="${1:-help}"
+  shift || true
+
+  case "$cmd" in
+    plugin)          cmd_plugin "$@" ;;
+    service)         cmd_service "$@" ;;
+    update)          cmd_update ;;
+    index-knowledge) cmd_index_knowledge ;;
+    upgrade-env)     cmd_upgrade_env ;;
+    version|--version|-v) cmd_version ;;
+    help|--help|-h)  cmd_help ;;
+    *)
+      _red "Unknown command: ${cmd}"
+      echo ""
+      cmd_help
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

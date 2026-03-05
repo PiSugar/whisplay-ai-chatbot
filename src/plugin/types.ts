@@ -72,8 +72,18 @@ export interface ProviderTypeMap {
  * accessing process.env directly.
  */
 export interface PluginContext {
-  /** Environment variables snapshot injected by the host */
+  /**
+   * Merged environment variables: global process.env overridden by
+   * the plugin's own `.env` file (if present). Plugins should read
+   * all configuration from here.
+   */
   env: Record<string, string | undefined>;
+  /**
+   * Environment variables loaded exclusively from the plugin's own `.env`
+   * file. Empty object if the plugin has no `.env`. These variables are
+   * scoped to this plugin and never pollute process.env or other plugins.
+   */
+  pluginEnv: Record<string, string>;
   /** Host-managed image output directory for image generation plugins */
   imageDir: string;
   /** Host-managed TTS working/output directory for TTS plugins */

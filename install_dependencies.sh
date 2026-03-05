@@ -28,8 +28,34 @@ echo "Installing Python dependencies..."
 cd python
 pip install -r requirements.txt --break-system-packages
 # download fonts and emojis
-wget -O NotoSansSC-Bold.ttf https://cdn.pisugar.com/EchoView/NotoSansSC-Bold.ttf
-wget -O emoji_svg.zip https://cdn.pisugar.com/EchoView/emoji_svg.zip
+if command_exists wget; then
+    if [ ! -f "NotoSansSC-Bold.ttf" ]; then
+        wget -O NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
+    else
+        echo "NotoSansSC-Bold.ttf already exists, skip download."
+    fi
+
+    if [ ! -f "emoji_svg.zip" ]; then
+        wget -O emoji_svg.zip https://storage.whisplay.ai/whisplay-ai-chatbot/emoji_svg.zip
+    else
+        echo "emoji_svg.zip already exists, skip download."
+    fi
+elif command_exists curl; then
+    if [ ! -f "NotoSansSC-Bold.ttf" ]; then
+        curl -fL -o NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
+    else
+        echo "NotoSansSC-Bold.ttf already exists, skip download."
+    fi
+
+    if [ ! -f "emoji_svg.zip" ]; then
+        curl -fL -o emoji_svg.zip https://storage.whisplay.ai/whisplay-ai-chatbot/emoji_svg.zip
+    else
+        echo "emoji_svg.zip already exists, skip download."
+    fi
+else
+    echo "Neither wget nor curl is installed."
+    exit 1
+fi
 # overwrite if exists
 unzip -o emoji_svg.zip
 cd ..
@@ -175,3 +201,22 @@ else
     echo "Using yarn to install dependencies."
     yarn --registry=$NPM_REGISTRY
 fi
+
+# Install whisplay CLI
+echo "Installing whisplay CLI..."
+chmod +x "$(pwd)/bin/whisplay"
+WHISPLAY_BIN="$(pwd)/bin/whisplay"
+
+# Try symlink to /usr/local/bin (may need sudo on some systems)
+if sudo ln -sf "$WHISPLAY_BIN" /usr/local/bin/whisplay 2>/dev/null; then
+    echo "whisplay CLI installed to /usr/local/bin/whisplay"
+else
+    # Fallback: add project bin/ to PATH via .bashrc
+    WHISPLAY_BIN_DIR="$(pwd)/bin"
+    if ! grep -q "$WHISPLAY_BIN_DIR" "$HOME/.bashrc" 2>/dev/null; then
+        echo "export PATH=\"$WHISPLAY_BIN_DIR:\$PATH\"" >> "$HOME/.bashrc"
+        echo "whisplay CLI added to PATH via ~/.bashrc (restart shell or run: source ~/.bashrc)"
+    fi
+    export PATH="$WHISPLAY_BIN_DIR:$PATH"
+fi
+echo "whisplay CLI installed. Run 'whisplay help' to get started."

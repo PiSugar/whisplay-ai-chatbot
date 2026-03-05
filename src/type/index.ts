@@ -22,6 +22,7 @@ export enum ASRServer {
   whisperhttp = "whisper-http",
   llm8850whisper = "llm8850whisper",
   fasterwhisper = "faster-whisper",
+  hailowhisper = "hailowhisper",
   picovoice = "picovoice",
 }
 
@@ -31,6 +32,10 @@ export enum LLMServer {
   ollama = "ollama",
   gemini = "gemini",
   grok = "grok",
+  anthropic = "anthropic",
+  minimax = "minimax",
+  kimi = "kimi",
+  qwen = "qwen",
   llm8850 = "llm8850",
   whisplayim = "whisplay-im",
   imagetooldirect = "image-tool-direct",

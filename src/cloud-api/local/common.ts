@@ -8,4 +8,6 @@ export enum defaultPortMap {
   whisper = 8804,
   piperHttp = 8805,
   llm8850lcm = 8806,
+  hailoWhisper = 8807,
+  hailoVlm = 8808,
 }

@@ -8,6 +8,13 @@ import serve from "koa-static";
 import { WebSocketServer, WebSocket, RawData } from "ws";
 import { dataDir, cameraFeedDir } from "../utils/dir";
 import { getImageMimeType } from "../utils/image";
+import {
+  webAudioBridge,
+  FRAME_AUDIO_CHUNK,
+  FRAME_LIVE_CAMERA,
+  FRAME_CAMERA_CAPTURE,
+  type WebAudioBridgeServer,
+} from "./web-audio-bridge";
 import type { Status } from "./display";
 
 type ButtonHandler = () => void;
@@ -19,7 +26,7 @@ interface WebDisplayOptions {
   onButtonRelease: ButtonHandler;
 }
 
-export class WebDisplayServer {
+export class WebDisplayServer implements WebAudioBridgeServer {
   private app: Koa;
   private router: Router;
   private currentStatus: Status | null = null;
@@ -55,10 +62,16 @@ export class WebDisplayServer {
       if (this.currentStatus) {
         socket.send(JSON.stringify({ type: "state", payload: this.buildStatePayload() }));
       }
-      socket.on("message", (message) => this.handleWsMessage(socket, message));
+      socket.on("message", (message, isBinary) =>
+        this.handleWsMessage(socket, message, isBinary),
+      );
       socket.on("close", () => this.wsClients.delete(socket));
       socket.on("error", () => this.wsClients.delete(socket));
     });
+
+    // Register this server with the web-audio bridge so it can send commands
+    // to connected browser clients.
+    webAudioBridge.setServer(this);
 
     this.server.listen(this.port, this.host, () => {
       console.log(
@@ -77,19 +90,43 @@ export class WebDisplayServer {
     this.currentStatus = { ...status };
     const nextCameraMode = this.currentStatus.camera_mode;
     if (!prevCameraMode && nextCameraMode) {
-      this.sendCameraDaemonCommand("start_stream");
+      if (webAudioBridge.isCameraEnabled()) {
+        // Use browser camera: tell the web client to start streaming frames.
+        webAudioBridge.notifyCameraStreamState(true);
+      } else {
+        this.sendCameraDaemonCommand("start_stream");
+      }
     } else if (prevCameraMode && !nextCameraMode) {
-      this.sendCameraDaemonCommand("stop_stream");
+      if (webAudioBridge.isCameraEnabled()) {
+        webAudioBridge.notifyCameraStreamState(false);
+      } else {
+        this.sendCameraDaemonCommand("stop_stream");
+      }
     }
     this.broadcastState();
   }
 
   close(): void {
+    webAudioBridge.setServer(null);
     this.wsServer?.close();
     this.wsServer = null;
     this.wsClients.clear();
     this.server?.close();
     this.server = null;
+  }
+
+  /** Broadcast a text or binary message to every connected browser client. */
+  broadcastToWebClients(message: string | Buffer): void {
+    for (const client of this.wsClients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    }
+  }
+
+  /** Return the number of currently connected browser clients. */
+  getWebClientCount(): number {
+    return this.wsClients.size;
   }
 
   private resolveWebRoot(): string {
@@ -178,13 +215,37 @@ export class WebDisplayServer {
     }
   }
 
-  private handleWsMessage(socket: WebSocket, message: RawData): void {
+  private handleWsMessage(
+    socket: WebSocket,
+    message: RawData,
+    isBinary: boolean,
+  ): void {
+    // ── Binary frames: audio / camera data from browser ─────────────────────
+    if (isBinary) {
+      const buf = Buffer.isBuffer(message)
+        ? message
+        : Buffer.from(message as ArrayBuffer);
+      if (buf.length < 2) return;
+      const frameType = buf[0];
+      const payload = buf.slice(1);
+      if (frameType === FRAME_AUDIO_CHUNK) {
+        webAudioBridge.handleAudioChunk(payload);
+      } else if (frameType === FRAME_LIVE_CAMERA) {
+        webAudioBridge.handleLiveCameraFrame(payload);
+      } else if (frameType === FRAME_CAMERA_CAPTURE) {
+        webAudioBridge.handleCameraCaptureResult(payload);
+      }
+      return;
+    }
+
+    // ── Text / JSON frames ────────────────────────────────────────────────────
     let data: any;
     try {
       data = JSON.parse(message.toString());
     } catch {
       return;
     }
+
     if (data?.type === "button") {
       const action = String(data.action || "");
       if (action === "press") {
@@ -192,6 +253,14 @@ export class WebDisplayServer {
       } else if (action === "release") {
         this.onButtonRelease();
       }
+      return;
+    }
+    if (data?.type === "record_complete") {
+      webAudioBridge.handleRecordComplete();
+      return;
+    }
+    if (data?.type === "play_complete") {
+      webAudioBridge.handlePlayComplete();
       return;
     }
     if (data?.type === "ping") {
