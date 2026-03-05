@@ -2,7 +2,7 @@
 
 <img src="https://docs.pisugar.com/img/whisplay_logo@4x-8.png" alt="Whisplay AI Chatbot" width="200" />
 
-This is a pocket-sized AI chatbot device built using a Raspberry Pi Zero 2w. Just press the button, speak, and it talks back—like a futuristic walkie-talkie with a mind of its own.
+This is a pocket-sized AI chatbot device built using a Raspberry Pi Zero 2w / 5. Just press the button, speak, and it talks back—like a futuristic walkie-talkie with a mind of its own.
 
 Test Video Playlist:
 [https://www.youtube.com/watch?v=lOVA0Gui-4Q](https://www.youtube.com/playlist?list=PLpTS9YM-tG_mW5H7Xs2EO0qvlAI-Jm1e_)
@@ -23,7 +23,7 @@ Tutorial (offline version build on RPi 5):
 
 - Raspberry Pi zero 2w (Recommand RRi 5, 8G RAM for offline build)
 - PiSugar Whisplay HAT (including LCD screen, on-board speaker and microphone)
-- PiSugar 3 1200mAh
+- PiSugar 3 1200mAh (Plus version 5000mAh for RPi 5)
 
 ## Pre-build Image
 
@@ -92,48 +92,23 @@ sudo systemctl restart chatbot.service
 
 ## Wake Word (Optional)
 
-You can enable wake word detection for hands-free listening. When enabled, the device will listen for the wake word, start automatic recording with sentence-based stopping, and enter ASR after a detected utterance. If no speech is detected for 60 seconds, it returns to sleep. After the LLM finishes answering, it continues listening for the current session unless the user says an end keyword.
+You can enable wake word detection for hands-free listening. When enabled, the device listens for a configurable wake word, records automatically with voice-based stopping, and returns to sleep after a period of inactivity.
 
-Enable it by setting the following environment variables in `.env`:
-
-```bash
-WAKE_WORD_ENABLED=true
-WAKE_WORDS=hey_amy
-WAKE_WORD_IDLE_TIMEOUT_SEC=60
-WAKE_WORD_RECORD_MAX_SEC=60
-WAKE_WORD_END_KEYWORDS=byebye,goodbye,stop
-```
-
-Advanced options:
-
-```bash
-WAKE_WORD_MODEL_PATHS=/path/to/custom.tflite
-WAKE_WORD_THRESHOLD=0.5
-WAKE_WORD_COOLDOWN_SEC=1.5
-```
+For full setup instructions, custom model configuration, and all available options, see the **[Wake Word wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Wakeword)**.
 
 ## Image Generation
 
-You can enable image generation by setting the `IMAGE_GENERATION_SERVER` variable in the `.env` file. Options include: OPENAI, GEMINI, VOLCENGINE.
+Set `IMAGE_GENERATION_SERVER` in `.env` to enable image generation (supported: `openai`, `gemini`, `volcengine`, `llm8850lcm`). Simply describe the image you want in a chat message and it will be generated and shown on screen.
 
-Then you can use prompts like "A children's book drawing of a veterinarian using a stethoscope to listen to the heartbeat of a baby otter." to generate images.
-
-The generated images will be displayed on the screen and saved in the `data/images` folder.
+For provider-specific configuration and model options, see the **[Image Generation wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Image-Generation)**.
 
 ## Display Battery Level
 
-The battery level display depends on the pisugar-power-manager. If you are using PiSugar2 or PiSugar3, you need to install the pisugar-power-manager first. You can find the installation instructions in the [PiSugar Power Manager repository](https://github.com/PiSugar/pisugar-power-manager-rs).
-
-Or use the following command to install it:
-
-```bash
-wget https://cdn.pisugar.com/release/pisugar-power-manager.sh
-bash pisugar-power-manager.sh -c release
-```
+Battery level display requires the PiSugar Power Manager to be installed on your Raspberry Pi. See the **[Battery Level Display wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Battery-Level-Display)** for installation instructions.
 
 ## Data Folder
 
-The chatbot saves conversation history and generated images in the `data` folder. It's a temporal folder and can be deleted if you want to clear the history.
+The chatbot stores temporary recordings, generated images, and conversation history in the `data/` folder. It can be safely deleted at any time to clear state. See the **[Data Folder wiki page](https://github.com/PiSugar/whisplay-ai-chatbot/wiki/Data-Folder)** for details on sub-folder layout and cleanup options.
 
 ## Enclosure
 
@@ -153,22 +128,12 @@ Please refer to the [LLM8850 Integration Guide](https://github.com/PiSugar/whisp
 
 ## Goals
 
-- Integrate the tool with the API ✅
-- Enable the AI assistant to adjust the volume autonomously ✅
-- Reset the conversation history if there is no speech for five minutes ✅
-- Support local llm server ✅
-- Support local asr (whisper/vosk) ✅
-- Support local tts (piper) ✅
-- Support image generation (openai/gemini/volcengine) ✅
-- Refactor python render thread, better performance ✅
-- Add Google Gemini API support ✅
-- Add Grok API support ✅
-- RPI camera support ✅
 - Support LLM8850 whisper ✅
 - Support LLM8850 melottsTTS ✅
 - Support LLM8850 Qwen3 llm api (not support tool) ✅
-- Support LLM8850 FastVLM
-- Support LLM8850 image generation
+- Support LLM8850 Qwen3-VL multimodal llm api (not support tool) ✅ 
+- Support LLM8850 image generation ✅
+- Suppprt Raspberry Pi AI Hat+2 (Hailo-10H) whisper, llm,  ✅
 - Support speaker recognition
 
 ## Star History
