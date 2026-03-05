@@ -24,7 +24,7 @@
     "@picovoice/leopard-node": "^2.0.2",
     "@picovoice/orca-node": "^2.0.1",
     "@qdrant/js-client-rest": "^1.16.2",
-    "axios": "^1.8.4",
+    "axios": "^1.13.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.5.0",
     "get-audio-duration": "^4.0.1",
