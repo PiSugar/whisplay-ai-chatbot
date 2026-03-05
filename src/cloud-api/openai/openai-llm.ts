@@ -34,6 +34,8 @@ const useSingleMessagePayload =
   "true";
 const useCapturedImageInChat =
   (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() === "true";
+const openaiUseStream =
+  (process.env.OPENAI_USE_STREAM || "true").toLowerCase() === "true";
 
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
@@ -144,36 +146,52 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           ...(msg.tool_calls ? { tool_calls: msg.tool_calls } : {}),
         };
       });
-  const chatCompletion = await openai.chat.completions.create({
-    model: openaiLLMModel,
-    messages: requestMessages as any,
-    stream: true,
-    tools: shouldIncludeTools ? llmTools : undefined,
-  }).catch((error) => {
-    console.log("Error during OpenAI chat completion request:", error.message);
-    endResolve();
-    endCallback();
-    return [];
-  }) ;
-  let partialAnswer = "";
-  let partialThinking = "";
-  const functionCallsPackages: any[] = [];
-  for await (const chunk of chatCompletion) {
-    if (chunk.choices[0].delta.content) {
-      partialCallback(chunk.choices[0].delta.content);
-      partialAnswer += chunk.choices[0].delta.content;
+  let answer = "";
+  let functionCalls: FunctionCall[] = [];
+  if (openaiUseStream) {
+    const chatCompletion = await openai.chat.completions.create({
+      model: openaiLLMModel,
+      messages: requestMessages as any,
+      stream: true,
+      tools: shouldIncludeTools ? llmTools : undefined,
+    }).catch((error) => {
+      console.log("Error during OpenAI chat completion request:", error.message);
+      endResolve();
+      endCallback();
+      return [];
+    });
+    let partialAnswer = "";
+    const functionCallsPackages: any[] = [];
+    for await (const chunk of chatCompletion) {
+      if (chunk.choices[0].delta.content) {
+        partialCallback(chunk.choices[0].delta.content);
+        partialAnswer += chunk.choices[0].delta.content;
+      }
+      if (chunk.choices[0].delta.tool_calls) {
+        functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
+      }
     }
-    // openai does not have "thinking" field
-    // if (chunk.choices[0].delta.thinking) {
-    //   partialThinkingCallback?.(chunk.choices[0].delta.thinking);
-    //   partialThinking += chunk.choices[0].delta.thinking;
-    // }
-    if (chunk.choices[0].delta.tool_calls) {
-      functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
+    answer = partialAnswer;
+    functionCalls = combineFunction(functionCallsPackages);
+  } else {
+    const chatCompletion = await openai.chat.completions.create({
+      model: openaiLLMModel,
+      messages: requestMessages as any,
+      stream: false,
+      tools: shouldIncludeTools ? llmTools : undefined,
+    }).catch((error) => {
+      console.log("Error during OpenAI chat completion request:", error.message);
+      endResolve();
+      endCallback();
+      return null;
+    });
+    if (chatCompletion && chatCompletion.choices && chatCompletion.choices.length > 0) {
+      const msg = chatCompletion.choices[0].message;
+      answer = msg?.content || "";
+      partialCallback(answer);
+      functionCalls = combineFunction((msg?.tool_calls as any) || []);
     }
   }
-  const answer = partialAnswer;
-  const functionCalls = combineFunction(functionCallsPackages);
   messages.push({
     role: "assistant",
     content: answer,
