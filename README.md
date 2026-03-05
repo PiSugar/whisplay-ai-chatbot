@@ -57,7 +57,7 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    ```
 6. Optionally, set up the chatbot service to start on boot:
    ```bash
-   sudo bash startup.sh
+   bash startup.sh
    ```
    Please note that this will disable the graphical interface and set the system to multi-user mode, which is suitable for headless operation.
    You can find the output logs at `chatbot.log`. Running `tail -f chatbot.log` will also display the logs in real-time.
