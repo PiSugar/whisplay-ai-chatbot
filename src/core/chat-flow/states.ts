@@ -35,6 +35,7 @@ import {
   onCameraModeExit,
   resetCameraModeControl,
 } from "./camera-mode";
+import { DEFAULT_EMOJI } from "../../utils";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -120,7 +121,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       });
     display({
       status: "listening",
-      emoji: "😐",
+      emoji: DEFAULT_EMOJI,
       RGB: "#00ff00",
       text: "Listening...",
       rag_icon_visible: false,
@@ -137,7 +138,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     onButtonReleased(noop);
     display({
       status: "detecting",
-      emoji: "😐",
+      emoji: DEFAULT_EMOJI,
       RGB: "#00ff00",
       text: "Detecting voice level...",
       rag_icon_visible: false,
@@ -145,7 +146,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     getDynamicVoiceDetectLevel().then((level) => {
       display({
         status: "listening",
-        emoji: "😐",
+        emoji: DEFAULT_EMOJI,
         RGB: "#00ff00",
         text: `(Detect level: ${level}%) Listening...`,
         rag_icon_visible: false,

@@ -5,6 +5,9 @@ import moment from "moment";
 import { exec } from "child_process";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import mp3Duration from "mp3-duration";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // 输入 [[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]]
 // 输出 [{"function":{"arguments":" {\"volume\": 21}","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}]
@@ -38,6 +41,15 @@ export const combineFunction = (packages: FunctionCall[][]): FunctionCall[] => {
 
 // combineFunction([[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]])
 
+const _isEmoji = (s: string): boolean =>
+  /^[\p{Emoji_Presentation}\u200d\ufe0f]+$/u.test(s);
+
+/** Default emoji shown on the display, configurable via DEFAULT_EMOJI env var. */
+export const DEFAULT_EMOJI: string = (() => {
+  const env = (process.env.DEFAULT_EMOJI ?? "").trim();
+  return env && _isEmoji(env) ? env : "😐";
+})();
+
 export const extractEmojis = (str: string): string => {
   const array = [
     ...str.matchAll(/([\p{Emoji_Presentation}\u200d\ufe0f])/gu),
@@ -46,7 +58,7 @@ export const extractEmojis = (str: string): string => {
   if (array.length > 0) {
     return array[0];
   }
-  return "😐";
+  return DEFAULT_EMOJI;
 };
 
 export const getCurrentTimeTag = (): string => {

@@ -6,7 +6,7 @@ import {
 import { display } from "../device/display";
 import { recognizeAudio, ttsProcessor } from "../cloud-api/server";
 import { isImMode } from "../cloud-api/llm";
-import { extractEmojis } from "../utils";
+import { DEFAULT_EMOJI, extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
 import { recordingsDir } from "../utils/dir";
 import dotEnv from "dotenv";
@@ -60,7 +60,7 @@ class ChatFlow implements ChatFlowContext {
       (sentences: string[]) => {
         if (!this.isAnswerFlow()) return;
         const fullText = sentences.join(" ");
-        let emoji = "😐";
+        let emoji = DEFAULT_EMOJI;
         if (this.currentFlowName === "external_answer") {
           emoji = this.currentExternalEmoji || extractEmojis(fullText) || emoji;
         } else {
