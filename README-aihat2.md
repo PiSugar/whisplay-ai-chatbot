@@ -33,7 +33,7 @@ The sections below cover each service independently.
 │   ║                                                                   ║           │
 │   ║  hailo-whisper-host.py :8807  (Whisper-Base.hef)  ← ASR           ║           │
 │   ║                         ── OR ──                                  ║           │
-│   ║  hailo-ollama serve    :8000  (qwen2.5-instruct)  ← LLM           ║           │
+│   ║  hailo-ollama          :8000  (qwen2.5-instruct)  ← LLM           ║           │
 │   ║                         ── OR ──                                  ║           │
 │   ║  hailo-vlm-host.py     :8808  (VLM .hef)          ← Vision        ║           │
 │   ╚═══════════════════════════════════════════════════════════════════╝           │
@@ -155,6 +155,12 @@ sudo systemctl start hailo-whisper.service
 sudo systemctl status hailo-whisper.service
 ```
 
+View logs:
+
+```bash
+journalctl -u hailo-whisper -f
+```
+
 ### Whisplay `.env`
 
 ```dotenv
@@ -162,10 +168,6 @@ ASR_SERVER=hailowhisper
 HAILO_WHISPER_HOST=localhost
 HAILO_WHISPER_PORT=8807
 HAILO_WHISPER_LANGUAGE=en
-
-# NPU is occupied by ASR — use cloud or CPU LLM, e.g.:
-LLM_SERVER=gemini
-GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ---
@@ -198,7 +200,7 @@ which hailo-ollama   # should return /usr/bin/hailo-ollama
 
 ```bash
 # Start the server in one terminal
-hailo-ollama serve
+hailo-ollama
 
 # In another terminal — pull a model (streaming progress)
 curl -s http://localhost:8000/api/pull \
@@ -239,7 +241,7 @@ After=network.target
 [Service]
 User=pi
 Environment="PATH=/usr/local/bin:/usr/bin:/bin:/home/pi/.local/bin"
-ExecStart=/usr/bin/hailo-ollama serve
+ExecStart=/usr/bin/hailo-ollama
 Restart=on-failure
 StandardOutput=append:/home/pi/hailo-ollama.log
 StandardError=append:/home/pi/hailo-ollama-err.log
@@ -255,17 +257,19 @@ sudo systemctl start hailo-ollama.service
 sudo systemctl status hailo-ollama.service
 ```
 
+View logs:
+
+```bash
+journalctl -u hailo-ollama -f
+```
+
 ### Whisplay `.env`
 
 ```dotenv
 LLM_SERVER=ollama
 OLLAMA_ENDPOINT=http://localhost:8000
 OLLAMA_MODEL=qwen2.5-instruct:1.5b
-
-# NPU is occupied by LLM — use cloud or CPU ASR, e.g.:
-ASR_SERVER=fasterwhisper
-FASTER_WHISPER_HOST=localhost
-FASTER_WHISPER_PORT=8081
+OLLAMA_ENABLE_TOOLS=false
 ```
 
 ---
@@ -297,7 +301,11 @@ hailo-download-resources --group vlm_chat --arch hailo10h
 ```bash
 source ~/hailo-apps/setup_env.sh
 python3 ~/whisplay-ai-chatbot/python/speech-service/hailo-vlm-host.py --port 8808
+```
 
+Test in another terminal with:
+
+```bash
 # Health check
 curl http://localhost:8808/health
 
@@ -345,6 +353,12 @@ sudo systemctl start hailo-vlm.service
 sudo systemctl status hailo-vlm.service
 ```
 
+View logs:
+
+```bash
+journalctl -u hailo-vlm -f
+```
+
 ### Whisplay `.env`
 
 ```dotenv
@@ -355,11 +369,6 @@ OPENAI_VISION_MODEL=hailo-vlm
 OPENAI_USE_SINGLE_MESSAGE_PAYLOAD=true
 ENABLE_CAMERA=true
 USE_CAPTURED_IMAGE_IN_CHAT=true
-
-# NPU is occupied by VLM — use cloud ASR and LLM, e.g.:
-ASR_SERVER=gemini
-LLM_SERVER=gemini
-GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ---
@@ -403,13 +412,6 @@ before sending requests.
 | Hailo Whisper ASR | `sudo systemctl start hailo-whisper` | `sudo systemctl stop hailo-whisper` | `sudo systemctl status hailo-whisper` |
 | Hailo Ollama LLM  | `sudo systemctl start hailo-ollama`  | `sudo systemctl stop hailo-ollama`  | `sudo systemctl status hailo-ollama` |
 | Hailo VLM Vision  | `sudo systemctl start hailo-vlm`     | `sudo systemctl stop hailo-vlm`     | `sudo systemctl status hailo-vlm` |
-
-View logs:
-```bash
-journalctl -u hailo-whisper -f
-journalctl -u hailo-ollama -f
-journalctl -u hailo-vlm -f
-```
 
 ---
 
