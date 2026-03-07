@@ -261,6 +261,40 @@ def chat_completions():
     if not has_system:
         messages.insert(0, {"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
 
+    # ── Truncate history to the most recent turns ─────────────────────────
+    # The small on-device VLM (~1-3B params) degrades rapidly when the prompt
+    # exceeds ~3 user turns (garbled / repetitive output).  Keep only:
+    #   - system prompt(s)
+    #   - the first user message that contains an image (visual anchor)
+    #   - the most recent MAX_CONTEXT_TURNS user/assistant pairs
+    MAX_CONTEXT_TURNS = 3
+    non_system = [m for m in messages if m.get("role") != "system"]
+    system_msgs = [m for m in messages if m.get("role") == "system"]
+    user_count = sum(1 for m in non_system if m.get("role") == "user")
+
+    if user_count > MAX_CONTEXT_TURNS:
+        # Locate the first message containing an image
+        first_image_msg = None
+        for m in non_system:
+            content = m.get("content", "")
+            if isinstance(content, list) and any(
+                p.get("type") == "image_url" for p in content
+            ):
+                first_image_msg = m
+                break
+
+        # Keep only the tail of the conversation
+        recent = non_system[-(MAX_CONTEXT_TURNS * 2):]
+        trimmed = list(system_msgs)
+        if first_image_msg and first_image_msg not in recent:
+            trimmed.append(first_image_msg)
+        trimmed.extend(recent)
+        print(
+            f"[VLM] Trimmed history: {len(messages)} → {len(trimmed)} msgs "
+            f"({user_count} user turns, keeping last {MAX_CONTEXT_TURNS})"
+        )
+        messages = trimmed
+
     prompt, frames = _build_hailo_prompt(messages)
 
     # VLM.generate_all() requires 'frames' — supply a neutral gray image if
@@ -275,6 +309,15 @@ def chat_completions():
             if entry.get("role") == "user":
                 entry["content"].insert(0, {"type": "image"})
                 break
+
+    # ── Always clear VLM KV-cache before generation ─────────────────────
+    # Each request carries the full (truncated) history in the prompt, so
+    # stale KV-cache from prior requests only adds noise.
+    try:
+        if vlm:
+            vlm.clear_context()
+    except Exception:
+        pass
 
     # Attempt generation with one automatic retry after re-init on NPU errors
     for attempt in range(2):
@@ -305,13 +348,6 @@ def chat_completions():
                     return jsonify({"error": {"message": f"VLM re-init failed: {reinit_exc}", "type": "server_error"}}), 500
 
             return jsonify({"error": {"message": str(exc), "type": "server_error"}}), 500
-        finally:
-            # Clear VLM context after each attempt to prevent context accumulation
-            try:
-                if vlm:
-                    vlm.clear_context()
-            except Exception:
-                pass
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
