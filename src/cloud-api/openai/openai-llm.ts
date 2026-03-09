@@ -33,6 +33,8 @@ const useCapturedImageInChat =
   (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() === "true";
 const openaiUseStream =
   (process.env.OPENAI_USE_STREAM || "true").toLowerCase() === "true";
+const openaiUseImagePath =
+  (process.env.OPENAI_USE_IMAGE_PATH || "false").toLowerCase() === "true";
 
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
@@ -100,7 +102,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         {
           type: "image_url",
           image_url: {
-            url: buildImageDataUrl(capturedImagePath),
+            url: openaiUseImagePath ? capturedImagePath : buildImageDataUrl(capturedImagePath),
           },
         },
       ]
