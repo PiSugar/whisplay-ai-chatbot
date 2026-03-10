@@ -19,6 +19,19 @@ const fixedReplies: string[] = [
     "Check out your newly generated image on screen.",
 ];
 
+const fixedFailureReplies: string[] = [
+    "Sorry, the image generation failed. Please try again later.",
+    "Oops, something went wrong with the image generation.",
+    "I wasn't able to generate the image this time. Please try again.",
+    "Image generation encountered an error. Let's try again.",
+    "Unfortunately, the image could not be created right now.",
+    "The image generation didn't work out. Please give it another try.",
+    "I had trouble generating your image. Please try once more.",
+    "Sorry, I couldn't create the image. Something went wrong.",
+    "Image generation failed unexpectedly. Please retry.",
+    "Apologies, the image could not be generated at this time.",
+];
+
 
 
 const imageContextRegex =
@@ -32,6 +45,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   invokeFunctionCallback?: (functionName: string, result?: string) => void,
 ): Promise<void> => {
   const fixedReply: string = fixedReplies[Math.floor(Math.random() * fixedReplies.length)] || "The image has been generated, please check on the screen.";
+  const fixedFailureReply: string = fixedFailureReplies[Math.floor(Math.random() * fixedFailureReplies.length)] || "Sorry, the image generation failed. Please try again later.";
   try {
     const lastUserMessage = [...inputMessages]
       .reverse()
@@ -51,7 +65,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         "generateImage",
         `${ToolReturnTag.Error}generateImage tool not found`,
       );
-      partialCallback(fixedReply);
+      partialCallback(fixedFailureReply);
       endCallBack();
       return;
     }
@@ -63,7 +77,11 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     });
     invokeFunctionCallback?.("generateImage", result);
 
-    partialCallback(fixedReply);
+    if (result && result.startsWith(ToolReturnTag.Error)) {
+      partialCallback(fixedFailureReply);
+    } else {
+      partialCallback(fixedReply);
+    }
     endCallBack();
   } catch (error: any) {
     console.error("[ImageToolLLM] Error:", error);
@@ -71,7 +89,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       "generateImage",
       `${ToolReturnTag.Error}${error?.message || "Image generation failed"}`,
     );
-    partialCallback(fixedReply);
+    partialCallback(fixedFailureReply);
     endCallBack();
   }
 };
