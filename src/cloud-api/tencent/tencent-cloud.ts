@@ -8,8 +8,10 @@ dotenv.config();
 // Tencent Cloud ASR
 const SECRET_ID = process.env.TENCENT_SECRET_ID || "";
 const SECRET_KEY = process.env.TENCENT_SECRET_KEY || "";
-const ASR_ENDPOINT = process.env.TENCENT_ASR_ENDPOINT || "asr.tencentcloudapi.com";
-const TTS_ENDPOINT = process.env.TENCENT_TTS_ENDPOINT || "tts.tencentcloudapi.com";
+const ASR_ENDPOINT =
+  process.env.TENCENT_ASR_ENDPOINT || "asr.tencentcloudapi.com";
+const TTS_ENDPOINT =
+  process.env.TENCENT_TTS_ENDPOINT || "tts.tencentcloudapi.com";
 
 const isTencentASRConfigValid = () => {
   if (!SECRET_ID || !SECRET_KEY || !ASR_ENDPOINT) {
@@ -17,7 +19,7 @@ const isTencentASRConfigValid = () => {
     return false;
   }
   return true;
-}
+};
 
 const isTencentTTSConfigValid = () => {
   if (!SECRET_ID || !SECRET_KEY || !TTS_ENDPOINT) {
@@ -25,14 +27,17 @@ const isTencentTTSConfigValid = () => {
     return false;
   }
   return true;
-}
+};
 
 interface Authorization {
   authorization: string;
   timestamp: number;
 }
 
-const getAuthorization = (payload: string, service: "asr" | "tts"): Authorization => {
+const getAuthorization = (
+  payload: string,
+  service: "asr" | "tts",
+): Authorization => {
   const timestamp = Math.floor(Date.now() / 1000);
   const date = new Date(timestamp * 1000).toISOString().slice(0, 10);
 
@@ -46,7 +51,10 @@ const getAuthorization = (payload: string, service: "asr" | "tts"): Authorizatio
     return kSigning;
   };
 
-  const hashedPayload = crypto.createHash("sha256").update(payload).digest("hex");
+  const hashedPayload = crypto
+    .createHash("sha256")
+    .update(payload)
+    .digest("hex");
   const httpRequestMethod = "POST";
   const canonicalUri = "/";
   const canonicalQueryString = "";
@@ -60,7 +68,10 @@ const getAuthorization = (payload: string, service: "asr" | "tts"): Authorizatio
     .update(canonicalRequest)
     .digest("hex")}`;
   const signingKey = getSignatureKey(SECRET_KEY, date, service);
-  const signature = crypto.createHmac("sha256", signingKey).update(stringToSign).digest("hex");
+  const signature = crypto
+    .createHmac("sha256", signingKey)
+    .update(stringToSign)
+    .digest("hex");
   const authorization = `${algorithm} Credential=${SECRET_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
   return {
@@ -69,15 +80,17 @@ const getAuthorization = (payload: string, service: "asr" | "tts"): Authorizatio
   };
 };
 
-const recognizeAudio = async (audioPath: string): Promise<string | undefined> => {
+const recognizeAudio = async (
+  audioPath: string,
+): Promise<string | undefined> => {
   if (!isTencentASRConfigValid()) {
     console.error("Tencent Cloud ASR configuration is incorrect");
-    return '';
+    return "";
   }
   console.time("Audio recognition");
   if (!fs.existsSync(audioPath)) {
     console.error("Audio file does not exist");
-    return '';
+    return "";
   }
   const audioData = fs.readFileSync(audioPath).toString("base64");
 
@@ -101,15 +114,22 @@ const recognizeAudio = async (audioPath: string): Promise<string | undefined> =>
   };
 
   try {
-    const res = await axios.post(`https://${ASR_ENDPOINT}`, payload, { headers });
+    const res = await axios.post(`https://${ASR_ENDPOINT}`, payload, {
+      headers,
+    });
     console.log("Audio recognized result:", res.data.Response.Result);
     return res.data.Response.Result;
   } catch (err: any) {
-    console.error("Audio recognition failed:", err.response?.data || err.message);
+    console.error(
+      "Audio recognition failed:",
+      err.response?.data || err.message,
+    );
   }
 };
 
-const synthesizeSpeech = async (text: string): Promise<{ data: Buffer; duration: number } | undefined> => {
+const synthesizeSpeech = async (
+  text: string,
+): Promise<{ data: Buffer; duration: number } | undefined> => {
   if (!isTencentTTSConfigValid()) {
     console.error("Tencent Cloud TTS configuration is incorrect");
     return;
@@ -139,13 +159,22 @@ const synthesizeSpeech = async (text: string): Promise<{ data: Buffer; duration:
   };
 
   try {
-    const res = await axios.post(`https://${TTS_ENDPOINT}`, payload, { headers });
+    const res = await axios.post(`https://${TTS_ENDPOINT}`, payload, {
+      headers,
+    });
     console.log("Speech synthesis completed");
+    if (res.data.Response.Audio === undefined) {
+      console.error("Speech synthesis error:", res.data);
+      return;
+    }
     const buffer = Buffer.from(await res.data.Response.Audio.arrayBuffer());
     const duration = 0; // Replace with actual duration calculation if needed
     return { data: buffer, duration: duration * 1000 };
   } catch (err: any) {
-    console.error("Speech synthesis failed:", err.response?.data || err.message);
+    console.error(
+      "Speech synthesis failed:",
+      err.response?.data || err.message,
+    );
   }
 };
 
