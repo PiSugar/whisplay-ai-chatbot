@@ -1,7 +1,7 @@
 #!/bin/bash
 NVM_VERSION="0.39.3"
 NVM_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/nvm/v$NVM_VERSION.tar.gz"
-NPM_REGISTRY="https://registry.npmmirror.com"
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
 NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v20.19.5.sh"
 
 # read parameters --use-npm

@@ -46,6 +46,14 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    source ~/.bashrc
    ```
    Running `source ~/.bashrc` is necessary to load the new environment variables.
+
+   **Custom npm registry:** All scripts respect the `NPM_REGISTRY` environment variable. If not set, the official npm registry (`https://registry.npmjs.org`) is used. To use a mirror (e.g. in China), export it before running any script:
+   ```bash
+   export NPM_REGISTRY="https://registry.npmmirror.com"
+   bash install_dependencies.sh
+   ```
+   This also applies to `build.sh` and all `whisplay` CLI commands (`plugin install`, `plugin update`, `update`, etc.).
+
 3. Create a `.env` file based on the `.env.template` file and fill in the necessary environment variables.
 4. Build the project:
    ```bash
