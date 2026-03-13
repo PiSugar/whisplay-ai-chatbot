@@ -481,7 +481,7 @@ def handle_client(client_socket, addr, whisplay):
                     if battery_color:
                         battery_tuple = ColorUtils.get_rgb255_from_any(battery_color)
                     else:
-                        battery_tuple = (0, 0, 0)
+                        battery_tuple = None
                         
                     if brightness:
                         whisplay.set_backlight(brightness)

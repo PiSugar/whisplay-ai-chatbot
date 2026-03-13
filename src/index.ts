@@ -28,7 +28,7 @@ battery.addListener("batteryLevel", (data: number) => {
 const isNetworkConnected: () => Promise<boolean> = () => {
   return new Promise((resolve) => {
     dns.lookup("cloudflare.com", (err) => {
-      if (err && err.code === "ENOTFOUND") {
+      if (err) {
         resolve(false);
       } else {
         resolve(true);
