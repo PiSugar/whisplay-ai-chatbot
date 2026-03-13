@@ -173,19 +173,19 @@ if ! command_exists npm; then
     fi
 fi
 
-# check if yarn is installed
+# check if yarn is installed, fallback to npm if installation fails
 if [ "$use_npm" = false ] && ! command_exists yarn; then
     echo "yarn is not installed. Installing yarn..."
     npm config set registry $NPM_REGISTRY
     npm install -g yarn
     export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
 
-    # Verify installation
+    # Verify installation, fallback to npm if yarn install failed
     if command_exists yarn; then
         echo "yarn installed successfully."
     else
-        echo "Failed to install yarn."
-        exit 1
+        echo "WARNING: Failed to install yarn. Falling back to npm."
+        use_npm=true
     fi
 fi
 
@@ -199,7 +199,11 @@ if [ "$use_npm" = true ]; then
     npm i --registry=$NPM_REGISTRY
 else
     echo "Using yarn to install dependencies."
-    yarn --registry=$NPM_REGISTRY
+    if ! yarn --registry=$NPM_REGISTRY; then
+        echo "WARNING: yarn failed. Falling back to npm."
+        use_npm=true
+        npm i --registry=$NPM_REGISTRY
+    fi
 fi
 
 # Install whisplay CLI

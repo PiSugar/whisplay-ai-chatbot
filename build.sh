@@ -29,7 +29,21 @@ if [ "$use_npm" = true ]; then
   npm install --registry=$NPM_REGISTRY
   npm run build
 else
-  echo "Using yarn to build the project."
-  yarn --registry=$NPM_REGISTRY
-  yarn build
+  if ! command -v yarn >/dev/null 2>&1; then
+    echo "WARNING: yarn not found. Falling back to npm."
+    use_npm=true
+  fi
+
+  if [ "$use_npm" = true ]; then
+    echo "Using npm to build the project."
+    npm install --registry=$NPM_REGISTRY
+    npm run build
+  else
+    echo "Using yarn to build the project."
+    if ! yarn --registry=$NPM_REGISTRY || ! yarn build; then
+      echo "WARNING: yarn failed. Falling back to npm."
+      npm install --registry=$NPM_REGISTRY
+      npm run build
+    fi
+  fi
 fi

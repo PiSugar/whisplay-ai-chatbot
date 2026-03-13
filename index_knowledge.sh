@@ -13,6 +13,19 @@ if [ "$use_npm" = true ]; then
   echo "Using npm to index the knowledge."
   npm run index-knowledge
 else
-  echo "Using yarn to index the knowledge."
-  yarn run index-knowledge
+  if ! command -v yarn >/dev/null 2>&1; then
+    echo "WARNING: yarn not found. Falling back to npm."
+    use_npm=true
+  fi
+
+  if [ "$use_npm" = true ]; then
+    echo "Using npm to index the knowledge."
+    npm run index-knowledge
+  else
+    echo "Using yarn to index the knowledge."
+    if ! yarn run index-knowledge; then
+      echo "WARNING: yarn failed. Falling back to npm."
+      npm run index-knowledge
+    fi
+  fi
 fi
