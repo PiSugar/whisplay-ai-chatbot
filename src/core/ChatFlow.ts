@@ -47,6 +47,7 @@ class ChatFlow implements ChatFlowContext {
   whisplayIMBridge: WhisplayIMBridgeServer | null = null;
   pendingExternalReply: string = "";
   pendingExternalEmoji: string = "";
+  pendingExternalImageUrl: string = "";
   currentExternalEmoji: string = "";
   stateMachine: FlowStateMachine;
   isFromWakeListening: boolean = false;
@@ -114,9 +115,10 @@ class ChatFlow implements ChatFlowContext {
       this.whisplayIMBridge = new WhisplayIMBridgeServer();
       this.whisplayIMBridge.on(
         "reply",
-        (payload: { reply: string; emoji?: string }) => {
+        (payload: { reply: string; emoji?: string; imagePath?: string }) => {
           this.pendingExternalReply = payload.reply;
           this.pendingExternalEmoji = payload.emoji || "";
+          this.pendingExternalImageUrl = payload.imagePath || "";
           this.transitionTo("external_answer");
         },
       );

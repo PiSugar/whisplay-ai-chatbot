@@ -227,16 +227,19 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
               status: "idle",
               emoji: "🦞",
               RGB: "#000055",
+              image_icon_visible: false,
             });
           } else {
             display({
               status: "error",
               emoji: "⚠️",
               text: "OpenClaw send failed",
+              image_icon_visible: false,
             });
           }
         })
         .finally(() => {
+          clearPendingCapturedImgForChat();
           ctx.transitionTo("sleep");
         });
       return;
@@ -353,7 +356,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     onButtonReleased(noop);
   },
   external_answer: (ctx: ChatFlowContext) => {
-    if (!ctx.pendingExternalReply) {
+    if (!ctx.pendingExternalReply && !ctx.pendingExternalImageUrl) {
       ctx.transitionTo("sleep");
       return;
     }
@@ -364,27 +367,44 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonPressed(() => {
       ctx.streamResponser.stop();
+      display({ image: "" });
       ctx.transitionTo("listening");
     });
     onButtonReleased(noop);
     const replyText = ctx.pendingExternalReply;
     const replyEmoji = ctx.pendingExternalEmoji;
+    const replyImageUrl = ctx.pendingExternalImageUrl;
     ctx.currentExternalEmoji = replyEmoji;
     ctx.pendingExternalReply = "";
     ctx.pendingExternalEmoji = "";
-    void ctx.streamExternalReply(replyText, replyEmoji);
-    ctx.streamResponser.getPlayEndPromise().then(() => {
-      if (ctx.currentFlowName !== "external_answer") return;
-      if (ctx.wakeSessionActive || ctx.endAfterAnswer) {
-        if (ctx.endAfterAnswer) {
-          ctx.endWakeSession();
-          ctx.transitionTo("sleep");
+    ctx.pendingExternalImageUrl = "";
+
+    // Display the image if one was provided
+    if (replyImageUrl) {
+      display({ image: replyImageUrl });
+    }
+
+    if (replyText) {
+      void ctx.streamExternalReply(replyText, replyEmoji);
+      ctx.streamResponser.getPlayEndPromise().then(() => {
+        if (ctx.currentFlowName !== "external_answer") return;
+        if (ctx.wakeSessionActive || ctx.endAfterAnswer) {
+          if (ctx.endAfterAnswer) {
+            ctx.endWakeSession();
+            ctx.transitionTo("sleep");
+          } else {
+            ctx.transitionTo("wake_listening");
+          }
+        } else if (replyImageUrl) {
+          // Stay in image display mode after TTS finishes
+          ctx.transitionTo("image");
         } else {
-          ctx.transitionTo("wake_listening");
+          ctx.transitionTo("sleep");
         }
-      } else {
-        ctx.transitionTo("sleep");
-      }
-    });
+      });
+    } else {
+      // Image only, no text to speak — go to image display mode
+      ctx.transitionTo("image");
+    }
   },
 };

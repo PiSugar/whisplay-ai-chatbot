@@ -1,5 +1,13 @@
 import { EventEmitter } from "events";
 import http, { IncomingMessage, ServerResponse } from "http";
+import fs from "fs";
+import path from "path";
+import { imageDir } from "../utils/dir";
+import {
+  setPendingCapturedImgForChat,
+  hasPendingCapturedImgForChat,
+  consumePendingCapturedImgForChat,
+} from "../utils/image";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -8,6 +16,7 @@ type WhisplayIMPayload = {
   message?: string;
   messages?: Array<{ role: string; content: string }>;
   emoji?: string;
+  imageBase64?: string;
 };
 
 type PendingPoll = {
@@ -72,6 +81,17 @@ export class WhisplayIMBridgeServer extends EventEmitter {
             reply?: string;
           };
           if (pathname === this.inboxPath) {
+            // Handle image in inbox: imageBase64 (data URL or raw base64)
+            const imageBase64 = (payload as any).imageBase64 || "";
+            if (imageBase64) {
+              const localPath = this.saveBase64Image(imageBase64);
+              if (localPath) {
+                setPendingCapturedImgForChat(localPath);
+                console.log(`[WhisplayIM] Inbox image saved as pending for chat: ${localPath}`);
+                // Store local path so we can re-encode for poll response
+                (payload as any)._localImagePath = localPath;
+              }
+            }
             this.enqueue(payload);
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");
@@ -80,8 +100,19 @@ export class WhisplayIMBridgeServer extends EventEmitter {
           }
           if (pathname === this.sendPath) {
             const reply = payload.reply || payload.message || "";
-            if (reply) {
-              this.emit("reply", { reply, emoji: payload.emoji || "" });
+            const imageBase64 = (payload as any).imageBase64 || "";
+            const replyEvent: { reply: string; emoji: string; imagePath?: string } = {
+              reply,
+              emoji: payload.emoji || "",
+            };
+            if (imageBase64) {
+              const localPath = this.saveBase64Image(imageBase64);
+              if (localPath) {
+                replyEvent.imagePath = localPath;
+              }
+            }
+            if (reply || replyEvent.imagePath) {
+              this.emit("reply", replyEvent);
             }
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");
@@ -146,6 +177,60 @@ export class WhisplayIMBridgeServer extends EventEmitter {
   private respondWithMessage(res: ServerResponse, payload: WhisplayIMPayload): void {
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ message: payload.message || "", messages: payload.messages || [] }));
+    const responseBody: any = {
+      message: payload.message || "",
+      messages: payload.messages || [],
+    };
+    // Re-encode locally saved image as base64 for poll response
+    const localImagePath = (payload as any)._localImagePath || "";
+    if (localImagePath && fs.existsSync(localImagePath)) {
+      responseBody.imageBase64 = this.fileToBase64DataUrl(localImagePath);
+    } else if (payload.imageBase64) {
+      responseBody.imageBase64 = payload.imageBase64;
+    }
+    res.end(JSON.stringify(responseBody));
+  }
+
+  private fileToBase64DataUrl(filePath: string): string {
+    try {
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeType =
+        ext === ".png" ? "image/png"
+        : ext === ".gif" ? "image/gif"
+        : ext === ".webp" ? "image/webp"
+        : "image/jpeg";
+      const base64 = fs.readFileSync(filePath).toString("base64");
+      return `data:${mimeType};base64,${base64}`;
+    } catch {
+      return "";
+    }
+  }
+
+  private saveBase64Image(imageBase64: string): string {
+    if (!imageBase64) return "";
+    try {
+      let data: string;
+      let ext = ".jpg";
+      if (imageBase64.startsWith("data:")) {
+        const match = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
+        if (match) {
+          const format = match[1];
+          data = match[2];
+          ext = `.${format === "jpeg" ? "jpg" : format}`;
+        } else {
+          data = imageBase64.replace(/^data:[^;]+;base64,/, "");
+        }
+      } else {
+        data = imageBase64;
+      }
+      const filename = `im-${Date.now()}${ext}`;
+      const localPath = path.join(imageDir, filename);
+      fs.writeFileSync(localPath, Buffer.from(data, "base64"));
+      console.log(`[WhisplayIM] Saved base64 image to ${localPath}`);
+      return localPath;
+    } catch (err) {
+      console.error(`[WhisplayIM] Failed to save base64 image: ${err}`);
+      return "";
+    }
   }
 }
