@@ -225,7 +225,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           if (ok) {
             display({
               status: "idle",
-              emoji: "🦞",
+              emoji: "😊",
               RGB: "#000055",
               image_icon_visible: false,
             });

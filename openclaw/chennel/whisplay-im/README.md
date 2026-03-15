@@ -72,6 +72,43 @@ curl -X POST \
   http://<device-host>:18888/whisplay-im/send
 ```
 
+### Send agent status to device
+
+This api is called by OpenClaw to push live agent status (thinking, tool calls, etc.) to the device for display.
+
+```bash
+# Thinking status
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"thinking","emoji":"🤔","text":"Processing your request..."}' \
+  http://<device-host>:18888/whisplay-im/status
+
+# Tool calling status
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"tool_calling","emoji":"🔧","tool":"generateImage","text":"Generating image..."}' \
+  http://<device-host>:18888/whisplay-im/status
+
+# Idle status (agent finished)
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"idle","emoji":"🦞"}' \
+  http://<device-host>:18888/whisplay-im/status
+```
+
+Supported status values:
+| Status | Description | Default Emoji |
+|---|---|---|
+| `thinking` | Agent is processing the message | 🤔 |
+| `tool_calling` | Agent is invoking a tool/function | 🔧 |
+| `answering` | Agent is delivering a reply | 🦞 |
+| `idle` | Agent has finished processing | 🦞 |
+
+Optional fields: `emoji` (override default), `text` (scroll text), `tool` (tool/function name).
+
 ## Image Support
 
 All images are transmitted as base64 data URLs (`data:image/<format>;base64,...`).
@@ -99,4 +136,6 @@ When the agent generates or sends an image:
 - `poll` returns an empty payload if no messages are available.
 - `send` supports optional `emoji` to control the device display.
 - `imageBase64` is optional in all endpoints and must be a base64-encoded data URL.
+- `status` endpoint is fire-and-forget; the device displays the latest status immediately.
+- The plugin automatically sends `thinking` → `tool_calling` (if applicable) → `answering` → `idle` status during message processing.
 

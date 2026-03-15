@@ -31,6 +31,7 @@ export class WhisplayIMBridgeServer extends EventEmitter {
   private inboxPath: string;
   private pollPath: string;
   private sendPath: string;
+  private statusPath: string;
   private queue: WhisplayIMPayload[] = [];
   private pending: PendingPoll[] = [];
 
@@ -40,6 +41,7 @@ export class WhisplayIMBridgeServer extends EventEmitter {
     this.inboxPath = process.env.WHISPLAY_IM_INBOX_PATH || "/whisplay-im/inbox";
     this.pollPath = process.env.WHISPLAY_IM_POLL_PATH || "/whisplay-im/poll";
     this.sendPath = process.env.WHISPLAY_IM_SEND_PATH || "/whisplay-im/send";
+    this.statusPath = process.env.WHISPLAY_IM_STATUS_PATH || "/whisplay-im/status";
     this.token = process.env.WHISPLAY_IM_TOKEN || "";
   }
 
@@ -113,6 +115,20 @@ export class WhisplayIMBridgeServer extends EventEmitter {
             }
             if (reply || replyEvent.imagePath) {
               this.emit("reply", replyEvent);
+            }
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ ok: true }));
+            return;
+          }
+
+          if (pathname === this.statusPath) {
+            const status = (payload as any).status || "";
+            const emoji = (payload as any).emoji || "";
+            const text = (payload as any).text || "";
+            const tool = (payload as any).tool || "";
+            if (status) {
+              this.emit("status", { status, emoji, text, tool });
             }
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");
