@@ -1,7 +1,7 @@
 #!/bin/bash
 NVM_VERSION="0.39.3"
 NVM_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/nvm/v$NVM_VERSION.tar.gz"
-NPM_REGISTRY="https://registry.npmmirror.com"
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
 NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v18.19.1.sh"
 
 # if file use_npm exists and is true, use npm
@@ -29,7 +29,21 @@ if [ "$use_npm" = true ]; then
   npm install --registry=$NPM_REGISTRY
   npm run build
 else
-  echo "Using yarn to build the project."
-  yarn --registry=$NPM_REGISTRY
-  yarn build
+  if ! command -v yarn >/dev/null 2>&1; then
+    echo "WARNING: yarn not found. Falling back to npm."
+    use_npm=true
+  fi
+
+  if [ "$use_npm" = true ]; then
+    echo "Using npm to build the project."
+    npm install --registry=$NPM_REGISTRY
+    npm run build
+  else
+    echo "Using yarn to build the project."
+    if ! yarn --registry=$NPM_REGISTRY || ! yarn build; then
+      echo "WARNING: yarn failed. Falling back to npm."
+      npm install --registry=$NPM_REGISTRY
+      npm run build
+    fi
+  fi
 fi

@@ -31,7 +31,7 @@ plugin_install() {
   # Install dependencies if package.json exists
   if [ -f "${dest}/package.json" ]; then
     _bold "Installing dependencies for ${dirname}..."
-    (cd "$dest" && npm install --production)
+    (cd "$dest" && npm install --production --registry="$NPM_REGISTRY")
   fi
 
   # Run build if a build script is defined
@@ -83,7 +83,7 @@ _plugin_update_one() {
   (cd "$dest" && git pull --ff-only)
 
   if [ -f "${dest}/package.json" ]; then
-    (cd "$dest" && npm install --production)
+    (cd "$dest" && npm install --production --registry="$NPM_REGISTRY")
   fi
 
   if [ -f "${dest}/package.json" ] && grep -q '"build"' "${dest}/package.json"; then

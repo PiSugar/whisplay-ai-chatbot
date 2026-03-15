@@ -35,6 +35,10 @@ const openaiUseStream =
   (process.env.OPENAI_USE_STREAM || "true").toLowerCase() === "true";
 const openaiUseImagePath =
   (process.env.OPENAI_USE_IMAGE_PATH || "false").toLowerCase() === "true";
+const openaiMaxMessagesLength = parseInt(
+  process.env.OPENAI_MAX_MESSAGES_LENGTH || "0",
+  10,
+);
 
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
@@ -86,6 +90,14 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     );
   });
   messages.push(...inputMessages);
+  // Trim messages to MAX_MESSAGES_LENGTH (keep first system prompt + last N messages)
+  if (openaiMaxMessagesLength > 0 && messages.length > openaiMaxMessagesLength + 1) {
+    const firstSystemMessage = messages[0];
+    const restMessages = messages.slice(1);
+    const trimmed = restMessages.slice(-openaiMaxMessagesLength);
+    messages.length = 0;
+    messages.push(firstSystemMessage, ...trimmed);
+  }
   const lastUserMessage = [...inputMessages]
     .reverse()
     .find((msg) => msg.role === "user");

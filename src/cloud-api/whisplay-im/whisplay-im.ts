@@ -1,9 +1,14 @@
 import dotenv from "dotenv";
+import fs from "fs";
 import { Message } from "../../type";
 import {
   ChatWithLLMStreamFunction,
   SummaryTextWithLLMFunction,
 } from "../interface";
+import {
+  hasPendingCapturedImgForChat,
+  consumePendingCapturedImgForChat,
+} from "../../utils/image";
 
 dotenv.config();
 
@@ -18,6 +23,9 @@ const whisplayTimeoutMs = parseInt(
   process.env.WHISPLAY_IM_TIMEOUT_MS || "30000",
 );
 
+const useCapturedImageInChat =
+  (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() === "true";
+
 const whisplayInboxUrl = `http://${whisplayBridgeHost}:${whisplayBridgePort}${whisplayInboxPath}`;
 
 const resetChatHistory = (): void => {};
@@ -29,20 +37,38 @@ export const sendWhisplayIMMessage = async (
     .reverse()
     .find((msg) => msg.role === "user");
 
+  // Check for pending captured image to include
+  const capturedImagePath =
+    useCapturedImageInChat && hasPendingCapturedImgForChat()
+      ? consumePendingCapturedImgForChat()
+      : "";
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), whisplayTimeoutMs);
 
   try {
+    const body: Record<string, any> = {
+      message: lastUserMessage?.content || "",
+      messages: inputMessages,
+    };
+
+    // Attach image as base64 if available
+    if (capturedImagePath && fs.existsSync(capturedImagePath)) {
+      const ext = capturedImagePath.split(".").pop()?.toLowerCase() || "jpg";
+      const mimeType =
+        ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+      const base64 = fs.readFileSync(capturedImagePath).toString("base64");
+      body.imageBase64 = `data:${mimeType};base64,${base64}`;
+      console.log(`[WhisplayIM] Attaching captured image: ${capturedImagePath}`);
+    }
+
     const response = await fetch(whisplayInboxUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(whisplayToken ? { Authorization: `Bearer ${whisplayToken}` } : {}),
       },
-      body: JSON.stringify({
-        message: lastUserMessage?.content || "",
-        messages: inputMessages,
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 

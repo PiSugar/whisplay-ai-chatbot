@@ -47,6 +47,7 @@ class ChatFlow implements ChatFlowContext {
   whisplayIMBridge: WhisplayIMBridgeServer | null = null;
   pendingExternalReply: string = "";
   pendingExternalEmoji: string = "";
+  pendingExternalImageUrl: string = "";
   currentExternalEmoji: string = "";
   stateMachine: FlowStateMachine;
   isFromWakeListening: boolean = false;
@@ -114,10 +115,52 @@ class ChatFlow implements ChatFlowContext {
       this.whisplayIMBridge = new WhisplayIMBridgeServer();
       this.whisplayIMBridge.on(
         "reply",
-        (payload: { reply: string; emoji?: string }) => {
+        (payload: { reply: string; emoji?: string; imagePath?: string }) => {
           this.pendingExternalReply = payload.reply;
           this.pendingExternalEmoji = payload.emoji || "";
+          this.pendingExternalImageUrl = payload.imagePath || "";
           this.transitionTo("external_answer");
+        },
+      );
+      this.whisplayIMBridge.on(
+        "status",
+        (payload: { status: string; emoji?: string; text?: string; tool?: string }) => {
+          const statusText = payload.tool
+            ? `[${payload.tool}] ${payload.text || ""}`
+            : payload.text || "";
+          const statusMap: Record<string, Partial<{ status: string; emoji: string; text: string; RGB: string; scroll_speed: number }>> = {
+            thinking: {
+              status: "Thinking",
+              emoji: payload.emoji || "🤔",
+              text: statusText,
+              RGB: "#ff6800",
+              scroll_speed: 6,
+            },
+            tool_calling: {
+              status: "Tool calling",
+              emoji: payload.emoji || "🔧",
+              text: statusText,
+              RGB: "#ff6800",
+              scroll_speed: 4,
+            },
+            answering: {
+              status: "answering...",
+              emoji: payload.emoji || "💬",
+              RGB: "#00c8a3",
+            },
+            idle: {
+              status: "idle",
+              emoji: payload.emoji || "😊",
+              RGB: "#000055",
+            },
+          };
+          const displayPayload = statusMap[payload.status] || {
+            status: payload.status,
+            emoji: payload.emoji || "🤖",
+            text: statusText,
+            RGB: "#ff6800",
+          };
+          display(displayPayload);
         },
       );
       this.whisplayIMBridge.start();

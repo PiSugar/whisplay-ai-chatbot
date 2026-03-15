@@ -52,7 +52,7 @@ if [ -z "$PROJECT_ROOT" ]; then
 fi
 
 PLUGINS_DIR="${PROJECT_ROOT}/plugins"
-NPM_REGISTRY="https://registry.npmmirror.com"
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
 
 # ── Dispatch ─────────────────────────────────────────────────
 main() {

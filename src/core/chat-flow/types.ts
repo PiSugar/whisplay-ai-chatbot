@@ -32,6 +32,7 @@ export interface ChatFlowContext {
   endAfterAnswer: boolean;
   pendingExternalReply: string;
   pendingExternalEmoji: string;
+  pendingExternalImageUrl: string;
   currentExternalEmoji: string;
   isFromWakeListening: boolean;
 
