@@ -59,7 +59,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       emoji: "😴",
       RGB: "#000055",
       rag_icon_visible: false,
-      ...(getCurrentStatus().text === "Listening..."
+      ...(getCurrentStatus().text.endsWith("Listening...") || !getCurrentStatus().text
         ? {
           text: `Long Press the button to say something${ctx.enableCamera ? ",\ndouble click to launch camera" : ""
             }.`,
