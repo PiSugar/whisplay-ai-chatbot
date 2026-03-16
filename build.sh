@@ -1,8 +1,5 @@
 #!/bin/bash
-NVM_VERSION="0.39.3"
-NVM_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/nvm/v$NVM_VERSION.tar.gz"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
-NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v18.19.1.sh"
 
 # if file use_npm exists and is true, use npm
 if [ -f "use_npm" ]; then
