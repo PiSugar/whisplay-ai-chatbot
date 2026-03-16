@@ -205,10 +205,10 @@ body {
 /* ── Menu button (bottom-left) ──────────────────────────────────────────── */
 .menu-btn {
   position: absolute;
-  left: 10px;
-  bottom: 16px;
-  width: 48px;
-  height: 48px;
+  left: 6px;
+  bottom: 10px;
+  width: 56px;
+  height: 56px;
   border: none;
   background: rgba(255,255,255,.06);
   color: var(--muted);
@@ -217,6 +217,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 6;
+  border-radius: 12px;
+  touch-action: manipulation;
 }
 
 .menu-btn:active {
@@ -286,16 +288,18 @@ body {
 }
 
 .menu-close {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: rgba(255,255,255,.08);
   color: var(--text);
-  font-size: 16px;
+  font-size: 20px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 10px;
+  touch-action: manipulation;
 }
 
 .menu-close:active {
@@ -318,6 +322,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 8px 0;
 }
 
 .vol-icon {
@@ -329,17 +334,23 @@ body {
   flex: 1;
   -webkit-appearance: none;
   appearance: none;
-  height: 6px;
+  height: 10px;
   background: rgba(255,255,255,.12);
+  border-radius: 5px;
   outline: none;
+  padding: 12px 0;
+  box-sizing: content-box;
+  background-clip: content-box;
+  touch-action: manipulation;
 }
 
 .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   background: var(--accent);
+  border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,.4);
 }

@@ -62,10 +62,6 @@ export const recordFileFormat: AudioFormat = normalizeAudioFormat(
   defaultAsrAudioFormat,
 );
 
-function startPlayerProcess() {
-  return null;
-}
-
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
 const needsInputWarmup = detectSoundCardType() === "es8388";
