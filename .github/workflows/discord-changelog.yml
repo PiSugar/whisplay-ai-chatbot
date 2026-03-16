@@ -1,6 +1,9 @@
 name: Discord Changelog Notification
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types: [published]
 
@@ -8,25 +11,45 @@ jobs:
   notify-discord:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Post to Discord #changelog
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
         run: |
-          # Prepare release info
-          TAG="${{ github.event.release.tag_name }}"
-          NAME="${{ github.event.release.name }}"
-          URL="${{ github.event.release.html_url }}"
-          PRERELEASE="${{ github.event.release.prerelease }}"
-
-          # Truncate body to 1800 chars (Discord embed limit is 4096, keep safe margin)
-          BODY=$(cat <<'RELEASE_BODY_EOF'
+          # Detect trigger type and extract info
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            NAME="${{ github.event.release.name }}"
+            URL="${{ github.event.release.html_url }}"
+            PRERELEASE="${{ github.event.release.prerelease }}"
+            BODY=$(cat <<'RELEASE_BODY_EOF'
           ${{ github.event.release.body }}
           RELEASE_BODY_EOF
-          )
+            )
+          else
+            # Triggered by tag push
+            TAG="${GITHUB_REF#refs/tags/}"
+            NAME="$TAG"
+            URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+            PRERELEASE="false"
+
+            # Generate changelog from git log (commits since previous tag)
+            PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              BODY=$(git log --pretty=format:"• %s (%an)" "$PREV_TAG..$TAG" 2>/dev/null | head -30)
+            else
+              BODY=$(git log --pretty=format:"• %s (%an)" "$TAG" 2>/dev/null | head -15)
+            fi
+          fi
+
           BODY="${BODY:0:1800}"
 
           # Set color: green for stable, yellow for prerelease
-          if [ "$PRERELEASE" = "true" ]; then
+          if [ "$PRERELEASE" = "true" ] || echo "$TAG" | grep -qiE '(alpha|beta|rc|dev)'; then
             COLOR=16776960  # yellow
             BADGE="🧪 Pre-release"
           else
