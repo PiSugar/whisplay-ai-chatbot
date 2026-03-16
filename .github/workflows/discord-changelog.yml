@@ -1,0 +1,97 @@
+name: Discord Changelog Notification
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+
+jobs:
+  notify-discord:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Post to Discord #changelog
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
+        run: |
+          # Detect trigger type and extract info
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            NAME="${{ github.event.release.name }}"
+            URL="${{ github.event.release.html_url }}"
+            PRERELEASE="${{ github.event.release.prerelease }}"
+            BODY=$(cat <<'RELEASE_BODY_EOF'
+          ${{ github.event.release.body }}
+          RELEASE_BODY_EOF
+            )
+          else
+            # Triggered by tag push
+            TAG="${GITHUB_REF#refs/tags/}"
+            NAME="$TAG"
+            URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+            PRERELEASE="false"
+
+            # Generate changelog from git log (commits since previous tag)
+            PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              BODY=$(git log --pretty=format:"• %s (%an)" "$PREV_TAG..$TAG" 2>/dev/null | head -30)
+            else
+              BODY=$(git log --pretty=format:"• %s (%an)" "$TAG" 2>/dev/null | head -15)
+            fi
+          fi
+
+          BODY="${BODY:0:1800}"
+
+          # Set color: green for stable, yellow for prerelease
+          if [ "$PRERELEASE" = "true" ] || echo "$TAG" | grep -qiE '(alpha|beta|rc|dev)'; then
+            COLOR=16776960  # yellow
+            BADGE="🧪 Pre-release"
+          else
+            COLOR=3066993   # green
+            BADGE="🚀 New Release"
+          fi
+
+          # Build Discord embed payload
+          PAYLOAD=$(jq -n \
+            --arg title "$BADGE: $NAME" \
+            --arg url "$URL" \
+            --arg desc "$BODY" \
+            --argjson color "$COLOR" \
+            --arg tag "$TAG" \
+            --arg repo "${{ github.repository }}" \
+            --arg avatar "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            '{
+              username: "GitHub Release",
+              avatar_url: $avatar,
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $desc,
+                color: $color,
+                fields: [
+                  { name: "Tag", value: $tag, inline: true },
+                  { name: "Repository", value: $repo, inline: true }
+                ],
+                timestamp: now | todate
+              }]
+            }')
+
+          # Send to Discord
+          HTTP_CODE=$(curl -s -o /tmp/discord_response.txt -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK_URL")
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Posted to Discord #changelog (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Failed to post (HTTP $HTTP_CODE)"
+            cat /tmp/discord_response.txt
+            exit 1
+          fi
