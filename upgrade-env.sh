@@ -24,6 +24,19 @@ if [ "$use_npm" = true ]; then
   echo "Using npm to upgrade the env."
   npm run upgrade-env
 else
-  echo "Using yarn to upgrade the env."
-  yarn upgrade-env
+  if ! command -v yarn >/dev/null 2>&1; then
+    echo "WARNING: yarn not found. Falling back to npm."
+    use_npm=true
+  fi
+
+  if [ "$use_npm" = true ]; then
+    echo "Using npm to upgrade the env."
+    npm run upgrade-env
+  else
+    echo "Using yarn to upgrade the env."
+    if ! yarn upgrade-env; then
+      echo "WARNING: yarn failed. Falling back to npm."
+      npm run upgrade-env
+    fi
+  fi
 fi
