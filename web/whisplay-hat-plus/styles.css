@@ -150,6 +150,14 @@ body {
   word-break: break-word;
 }
 
+.text-content .inline-emoji {
+  height: 1.2em;
+  width: 1.2em;
+  vertical-align: -0.2em;
+  object-fit: contain;
+  margin: 0 1px;
+}
+
 /* ── LED dot indicator ──────────────────────────────────────────────────── */
 .led-dot {
   width: 12px;

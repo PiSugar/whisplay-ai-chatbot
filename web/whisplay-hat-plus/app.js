@@ -65,6 +65,40 @@ function emojiToSvgUrl(emoji) {
   return `/emoji-svg/${codepoints}.svg`;
 }
 
+// Render text with emojis replaced by SVG images (same set as the emoji-area)
+function renderTextWithEmoji(text, container) {
+  container.innerHTML = '';
+  if (!text) return;
+  // Match regional flag pairs OR extended pictographic with optional modifiers/ZWJ chains
+  const emojiRe = /(?:\p{RI}{2}|\p{ExtPict}(?:\p{EMod}|\uFE0F|\u200D(?:\p{ExtPict}|\p{RI}{2}))*)/gu;
+  let lastIdx = 0;
+  let m;
+  while ((m = emojiRe.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      container.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+    }
+    const emoji = m[0];
+    const img = document.createElement('img');
+    img.className = 'inline-emoji';
+    img.src = emojiToSvgUrl(emoji);
+    img.alt = emoji;
+    img.onerror = function () {
+      const stripped = emoji.replace(/\uFE0F/g, '');
+      if (stripped !== emoji) {
+        this.src = emojiToSvgUrl(stripped);
+        this.onerror = function () { this.replaceWith(document.createTextNode(emoji)); };
+      } else {
+        this.replaceWith(document.createTextNode(emoji));
+      }
+    };
+    container.appendChild(img);
+    lastIdx = emojiRe.lastIndex;
+  }
+  if (lastIdx < text.length) {
+    container.appendChild(document.createTextNode(text.slice(lastIdx)));
+  }
+}
+
 let lastEmoji = "";
 
 function updateEmoji(emoji) {
@@ -128,7 +162,7 @@ function updateText(text, sync, speed) {
 
   if (nextText !== lastText) {
     const isContinuation = nextText.startsWith(lastText);
-    textContent.textContent = nextText;
+    renderTextWithEmoji(nextText, textContent);
     if (!isContinuation) {
       scrollTop = 0;
       scrollTarget = null;
