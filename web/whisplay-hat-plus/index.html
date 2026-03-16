@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=480, initial-scale=1, user-scalable=no" />
+  <title>Whisplay Hat Plus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Main fullscreen display -->
+  <div class="screen">
+    <!-- Status bar -->
+    <div class="header">
+      <div class="status-bar">
+        <div class="status-left">
+          <div class="led-dot" id="ledDot"></div>
+          <div class="status" id="statusText">starting</div>
+        </div>
+        <div class="status-icons">
+          <img class="status-icon" id="imageIcon" src="/img/image.png" alt="image" />
+          <img class="status-icon" id="ragIcon" src="/img/rag.png" alt="rag" />
+          <img class="status-icon" id="netIcon" src="/img/wifi.png" alt="network" />
+          <div class="battery">
+            <div class="battery-shell">
+              <div class="battery-fill" id="batteryFill"></div>
+            </div>
+            <span id="batteryText">--%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emoji display -->
+    <div class="emoji-area">
+      <div class="emoji" id="emojiText">...</div>
+    </div>
+
+    <!-- Scrolling text body -->
+    <div class="body">
+      <div class="text-viewport">
+        <div class="text-content" id="textContent"></div>
+      </div>
+    </div>
+
+    <!-- Record button area -->
+    <div class="button-area">
+      <button class="record-btn" id="recordBtn">
+        <svg class="mic-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Image/camera overlay -->
+    <div class="image-layer" id="imageLayer">
+      <img id="imageDisplay" alt="display" />
+    </div>
+
+    <!-- Brightness dim overlay -->
+    <div class="dim" id="dim"></div>
+
+    <!-- Menu button (bottom-left) -->
+    <button class="menu-btn" id="menuBtn">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+        <circle cx="12" cy="5" r="2"/>
+        <circle cx="12" cy="12" r="2"/>
+        <circle cx="12" cy="19" r="2"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Menu overlay -->
+  <div class="menu-overlay" id="menuOverlay">
+    <div class="menu-panel">
+      <div class="menu-header">
+        <span class="menu-title">Settings</span>
+        <button class="menu-close" id="menuClose">✕</button>
+      </div>
+      <div class="menu-section">
+        <div class="menu-label">Volume</div>
+        <div class="volume-control">
+          <svg class="vol-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M3 9v6h4l5 5V4L7 9H3z"/>
+          </svg>
+          <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="60" />
+          <span class="volume-value" id="volumeValue">60%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

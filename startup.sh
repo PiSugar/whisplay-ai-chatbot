@@ -107,6 +107,50 @@ RestartSec=2
 WantedBy=multi-user.target
 EOF
 
+# ── Hat Plus kiosk service (DSI display) ─────────────────────────────────
+# Check if this is a Hat Plus device (ES8388 sound card present)
+if grep -qi 'es8388' /proc/asound/cards 2>/dev/null; then
+    echo ""
+    echo "Detected Hat Plus hardware (ES8388). Setting up kiosk UI service..."
+
+    # Ensure graphical target for Chromium kiosk
+    if [ "$(systemctl get-default)" != "graphical.target" ]; then
+        echo "Hat Plus requires graphical interface for DSI display kiosk."
+        sudo systemctl set-default graphical.target
+        echo "Graphical interface enabled."
+    fi
+
+    sudo tee /etc/systemd/system/whisplay-hat-plus-ui.service > /dev/null <<HATEOF
+[Unit]
+Description=Whisplay Hat Plus Kiosk UI
+After=graphical.target chatbot.service
+Wants=chatbot.service
+PartOf=chatbot.service
+
+[Service]
+Type=simple
+User=$TARGET_USER
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u $TARGET_USER)
+Environment=HOME=$USER_HOME
+Environment=WHISPLAY_HAT_PLUS_PORT=17881
+WorkingDirectory=$USER_HOME/whisplay-ai-chatbot
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash $USER_HOME/whisplay-ai-chatbot/scripts/start-hat-plus-ui.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
+HATEOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable whisplay-hat-plus-ui.service
+    sudo systemctl restart whisplay-hat-plus-ui.service
+    echo "Hat Plus kiosk UI service configured."
+fi
+
 # start the service
 echo "Service file created. Reloading Systemd..."
 sudo systemctl daemon-reload

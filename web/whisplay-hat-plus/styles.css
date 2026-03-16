@@ -1,0 +1,352 @@
+:root {
+  --bg: #0b1016;
+  --accent: #44f28a;
+  --text: #e4ecf4;
+  --muted: #7f8a99;
+  --danger: #f55;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Space Grotesk", sans-serif;
+  background: #000;
+  color: var(--text);
+  width: 480px;
+  height: 640px;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* ── Full-screen layout ─────────────────────────────────────────────────── */
+.screen {
+  width: 480px;
+  height: 640px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  position: relative;
+  background: var(--bg);
+}
+
+/* ── Status bar ─────────────────────────────────────────────────────────── */
+.header {
+  padding: 10px 16px 6px;
+  background: var(--bg);
+  z-index: 2;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-icons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
+.status-icon {
+  width: 18px;
+  height: 18px;
+  display: none;
+  object-fit: contain;
+  filter: brightness(0.9);
+}
+
+.battery {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.battery-shell {
+  width: 28px;
+  height: 14px;
+  border: 1px solid rgba(255,255,255,.3);
+  position: relative;
+  padding: 2px;
+}
+
+.battery-shell::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  top: 4px;
+  width: 2px;
+  height: 6px;
+  background: rgba(255,255,255,.5);
+}
+
+.battery-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+}
+
+/* ── Emoji ──────────────────────────────────────────────────────────────── */
+.emoji-area {
+  text-align: center;
+  padding: 8px 16px 4px;
+  z-index: 2;
+}
+
+.emoji {
+  font-size: 56px;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+}
+
+.emoji img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+/* ── Text body ──────────────────────────────────────────────────────────── */
+.body {
+  padding: 8px 18px 10px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.text-viewport {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.text-content {
+  position: absolute;
+  left: 0; top: 0; right: 0;
+  font-size: 20px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── LED dot indicator ──────────────────────────────────────────────────── */
+.led-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #16202e;
+  box-shadow: 0 0 6px rgba(68,242,138,.3);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* ── Record button area ─────────────────────────────────────────────────── */
+.button-area {
+  padding: 12px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.record-btn {
+  width: 80px;
+  height: 80px;
+  border: 2px solid rgba(255,255,255,.12);
+  background: linear-gradient(145deg, #1a2a3f, #0e141f);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
+}
+
+.record-btn:active,
+.record-btn.pressed {
+  transform: scale(.92);
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  background: linear-gradient(145deg, #2a4a6f, #162438);
+  border-color: var(--accent);
+}
+
+.mic-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.record-btn.pressed .mic-icon {
+  color: var(--danger);
+}
+
+/* ── Menu button (bottom-left) ──────────────────────────────────────────── */
+.menu-btn {
+  position: absolute;
+  left: 10px;
+  bottom: 16px;
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: rgba(255,255,255,.06);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+}
+
+.menu-btn:active {
+  background: rgba(255,255,255,.15);
+}
+
+/* ── Image / camera overlay ─────────────────────────────────────────────── */
+.image-layer {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  z-index: 5;
+}
+
+.image-layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Dim overlay (brightness) ───────────────────────────────────────────── */
+.dim {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 10;
+}
+
+/* ── Menu overlay ───────────────────────────────────────────────────────── */
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 50;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.menu-overlay.open {
+  display: flex;
+}
+
+.menu-panel {
+  width: 100%;
+  max-width: 480px;
+  background: #131c2a;
+  padding: 20px 24px 32px;
+  box-shadow: 0 -10px 40px rgba(0,0,0,.6);
+}
+
+.menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.menu-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.menu-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255,255,255,.08);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-close:active {
+  background: rgba(255,255,255,.15);
+}
+
+.menu-section {
+  margin-bottom: 20px;
+}
+
+.menu-label {
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 12px;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vol-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.volume-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(255,255,255,.12);
+  outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+
+.volume-value {
+  font-size: 14px;
+  color: var(--text);
+  min-width: 40px;
+  text-align: right;
+}

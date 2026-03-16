@@ -4,7 +4,9 @@ import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag } from "../utils";
 import { WebDisplayServer } from "./web-display";
+import { HatPlusDisplayServer } from "./hat-plus-display";
 import { webAudioBridge } from "./web-audio-bridge";
+import { detectHatModel } from "../utils/hat-detect";
 import dotEnv from "dotenv";
 
 dotEnv.config();
@@ -86,9 +88,14 @@ export class WhisplayDisplay {
   private textCounterTemplate: string | null = null;
   private textCounterStartAt = 0;
   private daemonSocketPath = "/tmp/whisplay-daemon.sock";
+  private hatPlusDisplay: HatPlusDisplayServer | null = null;
 
   constructor() {
-    const envDeviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
+    const hatModel = detectHatModel();
+    console.log(`[Display] Detected hat model: ${hatModel}`);
+    const deviceDefault = hatModel !== "hat-plus";
+    const hatPlusDefault = hatModel === "hat-plus";
+    const envDeviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", deviceDefault);
     const daemonDetected = existsSync(this.daemonSocketPath);
     this.deviceEnabled = envDeviceEnabled || daemonDetected;
     if (!envDeviceEnabled && daemonDetected) {
@@ -113,6 +120,20 @@ export class WhisplayDisplay {
         onTextInput: (text: string) => this.handleTextInputEvent(text),
       });
       this.webDisplay.updateStatus(this.currentStatus);
+    }
+
+    // Hat Plus DSI display server
+    const hatPlusEnabled = parseBoolEnv("WHISPLAY_HAT_PLUS_ENABLED", hatPlusDefault);
+    if (hatPlusEnabled) {
+      const port = parseInt(process.env.WHISPLAY_HAT_PLUS_PORT || "17881", 10);
+      const host = process.env.WHISPLAY_HAT_PLUS_HOST || "0.0.0.0";
+      this.hatPlusDisplay = new HatPlusDisplayServer({
+        host,
+        port,
+        onButtonPress: () => this.handleButtonPressedEvent(),
+        onButtonRelease: () => this.handleButtonReleasedEvent(),
+      });
+      this.hatPlusDisplay.updateStatus(this.currentStatus);
     }
 
     if (this.deviceEnabled) {
@@ -371,6 +392,7 @@ export class WhisplayDisplay {
       const data = JSON.stringify({ text: renderedText, brightness: 100 });
       this.sendToDisplay(data);
       this.webDisplay?.updateStatus(this.currentStatus);
+      this.hatPlusDisplay?.updateStatus(this.currentStatus);
     }, 1000);
   }
 
@@ -486,6 +508,7 @@ export class WhisplayDisplay {
 
     this.sendToDisplay(data);
     this.webDisplay?.updateStatus(this.currentStatus);
+    this.hatPlusDisplay?.updateStatus(this.currentStatus);
   }
 
   private handleButtonPressedEvent(): void {
@@ -518,6 +541,8 @@ export class WhisplayDisplay {
   stopWebDisplay(): void {
     this.webDisplay?.close();
     this.webDisplay = null;
+    this.hatPlusDisplay?.close();
+    this.hatPlusDisplay = null;
   }
 
   private ensureCameraDaemon(): void {

@@ -28,13 +28,18 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # Find the unified Whisplay sound card first; keep legacy names as fallback.
 card_index=""
 card_name=""
+card_control="Speaker"
 audio_supported=false
 if [ "$is_linux" = true ] && [ -r "/proc/asound/cards" ] && command -v amixer >/dev/null 2>&1; then
-  card_info=$(awk '/whisplaysound|wm8960soundcard|es8389soundcard/ {print $1 " " $2; exit}' /proc/asound/cards)
+  card_info=$(awk '/whisplaysound|wm8960soundcard|es8388|es8389soundcard/ {print $1 " " $2; exit}' /proc/asound/cards)
   if [ -n "$card_info" ]; then
     card_index=$(echo "$card_info" | awk '{print $1}')
     card_name=$(echo "$card_info" | awk '{print $2}' | tr -d '[]:')
     audio_supported=true
+    if echo "$card_name" | grep -Eqi 'es8388|es8389'; then
+      card_control="Output 1"
+      echo "Detected ES8388 sound card (Hat Plus)"
+    fi
     echo "Using sound card: ${card_name:-unknown} (index ${card_index})"
   else
     echo "Whisplay sound card not found; using default audio devices."
@@ -132,7 +137,13 @@ if [ "$audio_supported" = true ]; then
   if [ "$card_name" = "whisplaysound" ]; then
     amixer -c "$card_name" cset name='speaker' "$initial_volume_percent" >/dev/null 2>&1 || true
   else
-    amixer -c "$card_index" set Speaker "${initial_volume_percent}%" >/dev/null 2>&1 || true
+    amixer -c "$card_index" set "$card_control" "${initial_volume_percent}%" >/dev/null 2>&1 || true
+  fi
+
+  # ES8388: reduce mic PGA gain to avoid ADC clipping.
+  if [ "$card_control" = "Output 1" ]; then
+    amixer -c "$card_index" cset numid=12 4,4 >/dev/null 2>&1 || true
+    echo "ES8388 Mic PGA set to 12dB"
   fi
 fi
 

@@ -7,6 +7,7 @@ import type { ASRPlugin, TTSPlugin, AudioFormat } from "../plugin";
 import { ASRServer, TTSResult, TTSServer } from "../type";
 import { alsaInputDevice, alsaOutputDevice } from "./audio-device";
 import { webAudioBridge } from "./web-audio-bridge";
+import { detectSoundCardType } from "../utils/hat-detect";
 
 export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
@@ -67,6 +68,20 @@ function startPlayerProcess() {
 
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
+const needsInputWarmup = detectSoundCardType() === "es8388";
+
+const warmUpAudioInput = async (): Promise<void> => {
+  if (!needsInputWarmup) return;
+  await new Promise<void>((resolve) => {
+    const process = spawn("sox", [
+      "-t", "alsa", alsaInputDevice,
+      "-t", "wav", "/dev/null",
+      "trim", "0", "0.3",
+    ]);
+    process.on("exit", () => resolve());
+    process.on("error", () => resolve());
+  });
+};
 
 const removeRecordingProcess = (child: ChildProcess): void => {
   recordingProcessList = recordingProcessList.filter((item) => item !== child);
@@ -157,6 +172,8 @@ const recordAudio = async (
     return webAudioBridge.startRecording(outputPath, duration);
   }
 
+  await warmUpAudioInput();
+
   return new Promise((resolve, reject) => {
     const voiceDetectEndLevel = Math.max(
       1,
@@ -231,35 +248,49 @@ const recordAudioManually = (
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {
     currentRecordingReject = reject;
-    const recordingProcess = spawn("sox", [
-      "-t",
-      "alsa",
-      alsaInputDevice,
-      "-t",
-      recordFileFormat,
-      "-c",
-      "1",
-      "-r",
-      "16000",
-      outputPath,
-    ]);
+    let warmupProcess: ChildProcess | null = null;
+    let recordingProcess: ChildProcess | null = null;
+    let stopped = false;
 
-    recordingProcess.on("error", (err) => {
-      removeRecordingProcess(recordingProcess);
-      reject(err);
-    });
-
-    recordingProcess.stderr?.on("data", (data) => {
-      console.error(data.toString());
-    });
-    recordingProcessList.push(recordingProcess);
-    stopFunc = () => {
-      killRecordingProcess(recordingProcess);
+    const startRecording = () => {
+      warmupProcess = null;
+      if (stopped) return;
+      const process = spawn("sox", [
+        "-t", "alsa", alsaInputDevice,
+        "-t", recordFileFormat,
+        "-c", "1", "-r", "16000",
+        outputPath,
+      ]);
+      recordingProcess = process;
+      process.on("error", (err) => {
+        removeRecordingProcess(process);
+        reject(err);
+      });
+      process.stderr?.on("data", (data) => console.error(data.toString()));
+      recordingProcessList.push(process);
+      process.on("exit", () => {
+        removeRecordingProcess(process);
+        resolve(outputPath);
+      });
     };
-    recordingProcess.on("exit", () => {
-      removeRecordingProcess(recordingProcess);
-      resolve(outputPath);
-    });
+
+    if (needsInputWarmup) {
+      warmupProcess = spawn("sox", [
+        "-t", "alsa", alsaInputDevice,
+        "-t", "wav", "/dev/null",
+        "trim", "0", "0.3",
+      ]);
+      warmupProcess.on("exit", startRecording);
+      warmupProcess.on("error", startRecording);
+    } else {
+      startRecording();
+    }
+
+    stopFunc = () => {
+      stopped = true;
+      warmupProcess?.kill();
+      if (recordingProcess) killRecordingProcess(recordingProcess);
+    };
   });
   return {
     result,
