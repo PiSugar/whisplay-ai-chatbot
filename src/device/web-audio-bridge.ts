@@ -53,6 +53,7 @@ interface RecordingState {
 }
 
 interface PlaybackState {
+  playId: number;
   resolve: () => void;
   reject: (e: unknown) => void;
   timer: NodeJS.Timeout | null;
@@ -75,6 +76,7 @@ class WebAudioBridge {
   private recording: RecordingState | null = null;
   private playback: PlaybackState | null = null;
   private capture: CaptureState | null = null;
+  private playIdCounter: number = 0;
 
   // ── Registration ──────────────────────────────────────────────────────────
 
@@ -305,15 +307,17 @@ class WebAudioBridge {
 
       this.stopCurrentPlayback();
 
-      // Timeout guard: resolve after duration + 3 s even if browser never confirms.
+      const playId = ++this.playIdCounter;
+
+      // Timeout guard: resolve after duration + 5 s even if browser never confirms.
       const timer = setTimeout(() => {
-        if (this.playback) {
+        if (this.playback && this.playback.playId === playId) {
           this.playback = null;
           resolve();
         }
-      }, audioDuration + 3000);
+      }, audioDuration + 5000);
 
-      this.playback = { resolve, reject, timer };
+      this.playback = { playId, resolve, reject, timer };
 
       let audioBase64: string;
       let audioFormat: string = format;
@@ -338,6 +342,7 @@ class WebAudioBridge {
       this.server.broadcastToWebClients(
         JSON.stringify({
           type: "play_audio",
+          playId,
           data: audioBase64,
           format: audioFormat,
           duration: audioDuration,
@@ -361,9 +366,11 @@ class WebAudioBridge {
   }
 
   /** Browser signals that playback has finished. */
-  handlePlayComplete(): void {
+  handlePlayComplete(playId?: number): void {
     const pb = this.playback;
     if (!pb) return;
+    // Ignore stale play_complete from a previous chunk.
+    if (playId !== undefined && playId !== pb.playId) return;
     this.playback = null;
     if (pb.timer) clearTimeout(pb.timer);
     pb.resolve();

@@ -260,7 +260,7 @@ export class WebDisplayServer implements WebAudioBridgeServer {
       return;
     }
     if (data?.type === "play_complete") {
-      webAudioBridge.handlePlayComplete();
+      webAudioBridge.handlePlayComplete(data.playId);
       return;
     }
     if (data?.type === "ping") {
