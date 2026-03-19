@@ -213,7 +213,9 @@ class WhisplayBoard:
         self.blue_pwm.start(0)
 
         # Initialize button
-        GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        # The WhisPlay HAT has an external pull-down resistor on the button line.
+        # Button pressed = HIGH, released = LOW. No internal pull needed.
+        GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_OFF)
         GPIO.add_event_detect(
             self.BUTTON_PIN, GPIO.BOTH, callback=self._button_event_rpi, bouncetime=50
         )
@@ -333,7 +335,9 @@ class WhisplayBoard:
         self.green_pwm.start(0)
         self.blue_pwm.start(0)
 
-        # Initialize button (input with pull-up, polled for state changes)
+        # Initialize button (input, polled for state changes)
+        # The WhisPlay HAT has an external pull-down resistor on the button line.
+        # Button pressed = HIGH, released = LOW. No internal pull needed.
         chip_num, line_offset = pin_map[self.BUTTON_PIN]
         chip = self._gpio_chips[chip_num]
         btn_line = chip.get_line(line_offset)
@@ -341,10 +345,10 @@ class WhisplayBoard:
             btn_line.request(
                 consumer='whisplay-btn',
                 type=gpiod.LINE_REQ_DIR_IN,
-                flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP
+                flags=gpiod.LINE_REQ_FLAG_BIAS_DISABLE
             )
         except Exception:
-            # Fallback: no internal pull-up (relies on external pull-up resistor)
+            # Fallback: no bias flag (older libgpiod or unsupported)
             btn_line.request(
                 consumer='whisplay-btn',
                 type=gpiod.LINE_REQ_DIR_IN
