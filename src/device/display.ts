@@ -70,7 +70,8 @@ export class WhisplayDisplay {
   constructor() {
     this.deviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
     this.cameraEnabled = parseBoolEnv("ENABLE_CAMERA", false);
-    if (this.cameraEnabled) {
+    const webCameraEnabled = parseBoolEnv("WEB_CAMERA_ENABLED", false);
+    if (this.cameraEnabled && !webCameraEnabled) {
       this.ensureCameraDaemon();
     }
     const webEnabled = parseBoolEnv("WHISPLAY_WEB_ENABLED", false);

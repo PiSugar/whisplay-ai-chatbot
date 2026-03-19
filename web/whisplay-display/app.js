@@ -25,6 +25,7 @@ let maxScroll = 0;
 let lastText = "";
 let lastImageRevision = -1;
 let isPressed = false;
+let activePointerId = null;
 
 function setIconVisible(iconEl, visible) {
   iconEl.style.display = visible ? "block" : "none";
@@ -243,6 +244,7 @@ function setPressed(value) {
 }
 
 const press = () => {
+  if (isPressed) return;
   setPressed(true);
   sendButton("press");
 };
@@ -252,19 +254,37 @@ const release = () => {
   sendButton("release");
 };
 
-btn.addEventListener("mousedown", press);
-btn.addEventListener("mouseup", release);
-btn.addEventListener("mouseleave", release);
-window.addEventListener("mouseup", release);
-btn.addEventListener("touchstart", (event) => {
+btn.addEventListener("pointerdown", (event) => {
   event.preventDefault();
+  activePointerId = event.pointerId;
+  try {
+    btn.setPointerCapture(event.pointerId);
+  } catch {}
   press();
 });
-btn.addEventListener("touchend", (event) => {
-  event.preventDefault();
+
+btn.addEventListener("pointerup", (event) => {
+  if (activePointerId !== null && event.pointerId !== activePointerId) return;
   release();
+  activePointerId = null;
 });
-window.addEventListener("touchend", release);
+
+btn.addEventListener("pointercancel", (event) => {
+  if (activePointerId !== null && event.pointerId !== activePointerId) return;
+  release();
+  activePointerId = null;
+});
+
+btn.addEventListener("lostpointercapture", () => {
+  release();
+  activePointerId = null;
+});
+
+window.addEventListener("pointerup", (event) => {
+  if (activePointerId !== null && event.pointerId !== activePointerId) return;
+  release();
+  activePointerId = null;
+});
 
 // ── Web Audio Recording ──────────────────────────────────────────────────────
 // When WEB_AUDIO_ENABLED=true on the server, it sends "start_record" /
@@ -277,12 +297,31 @@ const FRAME_CAM_CAPTURE = 0x03;
 
 let mediaRecorder = null;
 let audioStream = null;
+let audioStartInProgress = false;
+let stopRequestedBeforeStart = false;
+let pendingAudioChunkSends = [];
 
 async function startWebAudioRecording() {
+  if (audioStartInProgress) return;
   if (mediaRecorder && mediaRecorder.state !== "inactive") return;
+  stopRequestedBeforeStart = false;
+  audioStartInProgress = true;
+  pendingAudioChunkSends = [];
   updateMicIndicator(true);
   try {
     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    if (stopRequestedBeforeStart) {
+      if (audioStream) {
+        audioStream.getTracks().forEach((t) => t.stop());
+        audioStream = null;
+      }
+      updateMicIndicator(false);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "record_complete" }));
+      }
+      return;
+    }
 
     const preferredMimes = [
       "audio/webm;codecs=opus",
@@ -297,11 +336,17 @@ async function startWebAudioRecording() {
     mediaRecorder.ondataavailable = (event) => {
       if (!event.data || event.data.size === 0) return;
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      event.data.arrayBuffer().then((buf) => {
+      const sendTask = event.data.arrayBuffer().then((buf) => {
         const payload = new Uint8Array(1 + buf.byteLength);
         payload[0] = FRAME_AUDIO;
         payload.set(new Uint8Array(buf), 1);
         ws.send(payload);
+      });
+      pendingAudioChunkSends.push(sendTask);
+      sendTask.finally(() => {
+        pendingAudioChunkSends = pendingAudioChunkSends.filter(
+          (task) => task !== sendTask,
+        );
       });
     };
 
@@ -312,23 +357,31 @@ async function startWebAudioRecording() {
         audioStream = null;
       }
       mediaRecorder = null;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "record_complete" }));
-      }
+      Promise.allSettled(pendingAudioChunkSends).finally(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "record_complete" }));
+        }
+      });
     };
 
     // Emit data chunks every 500 ms so the server can monitor progress.
     mediaRecorder.start(500);
+    if (stopRequestedBeforeStart && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
   } catch (e) {
     console.error("[WebAudio] getUserMedia (audio) failed:", e);
     updateMicIndicator(false);
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "record_complete" }));
     }
+  } finally {
+    audioStartInProgress = false;
   }
 }
 
 function stopWebAudioRecording() {
+  stopRequestedBeforeStart = true;
   if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
   }

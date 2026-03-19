@@ -129,6 +129,7 @@ class WebAudioBridge {
 
       const timer = setTimeout(() => {
         if (this.recording) {
+          this.recording.stopRequested = true;
           this.server?.broadcastToWebClients(
             JSON.stringify({ type: "stop_record" }),
           );
@@ -282,7 +283,7 @@ class WebAudioBridge {
 
   /** Browser signals that MediaRecorder has stopped; assemble the file. */
   handleRecordComplete(): void {
-    if (this.recording) {
+    if (this.recording?.stopRequested) {
       this.finishRecording();
     }
   }
