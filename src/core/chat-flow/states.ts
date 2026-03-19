@@ -304,6 +304,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
             ctx.partialThinkingCallback(partialThinking),
           (functionName: string, result?: string) => {
             if (
+              functionName === "endConversation" &&
+              result?.startsWith("[success]")
+            ) {
+              ctx.endAfterAnswer = true;
+            }
+            if (
               functionName === "generateImage" &&
               result?.startsWith("[success]")
             ) {
