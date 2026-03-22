@@ -1,16 +1,33 @@
 #!/bin/bash
-# Set working directory
-export NVM_DIR="/home/pi/.nvm"
+# Set working directory and environment
+os_name=$(uname -s 2>/dev/null || echo "unknown")
+is_linux=false
+is_darwin=false
+is_windows=false
+case "$os_name" in
+  Linux*) is_linux=true ;;
+  Darwin*) is_darwin=true ;;
+  MINGW*|MSYS*|CYGWIN*) is_windows=true ;;
+esac
+
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 
-# Find the sound card index for wm8960soundcard
-card_index=$(awk '/wm8960soundcard/ {print $1}' /proc/asound/cards | head -n1)
-# Default to 1 if not found
-if [ -z "$card_index" ]; then
-  card_index=1
+# Find the sound card index for wm8960soundcard (Linux only)
+card_index=""
+audio_supported=false
+if [ "$is_linux" = true ] && [ -r "/proc/asound/cards" ] && command -v amixer >/dev/null 2>&1; then
+  card_index=$(awk '/wm8960soundcard/ {print $1}' /proc/asound/cards | head -n1)
+  # Default to 1 if not found
+  if [ -z "$card_index" ]; then
+    card_index=1
+  fi
+  audio_supported=true
+  echo "Using sound card index: $card_index"
+else
+  echo "Audio setup skipped for OS: $os_name"
 fi
-echo "Using sound card index: $card_index"
 
 # Output current environment information (for debugging)
 echo "===== Start time: $(date) =====" 
@@ -18,8 +35,16 @@ echo "Current user: $(whoami)"
 echo "Working directory: $(pwd)" 
 working_dir=$(pwd)
 echo "PATH: $PATH" 
-echo "Python version: $(python3 --version)" 
-echo "Node version: $(node --version)"
+if command -v python3 >/dev/null 2>&1; then
+  echo "Python version: $(python3 --version)"
+else
+  echo "Python version: not found"
+fi
+if command -v node >/dev/null 2>&1; then
+  echo "Node version: $(node --version)"
+else
+  echo "Node version: not found"
+fi
 sleep 5
 
 # Start the service
@@ -72,8 +97,10 @@ else
   exit 1
 fi
 
-# Adjust initial volume
-amixer -c $card_index set Speaker $initial_volume_level
+# Adjust initial volume (Linux only)
+if [ "$audio_supported" = true ]; then
+  amixer -c $card_index set Speaker $initial_volume_level
+fi
 
 if [ "$serve_ollama" = true ]; then
   echo "Starting Ollama server..."
@@ -90,10 +117,18 @@ fi
 
 if [ "$use_npm" = true ]; then
   echo "Using npm to start the application..."
-  SOUND_CARD_INDEX=$card_index npm start
+  if [ -n "$card_index" ]; then
+    SOUND_CARD_INDEX=$card_index npm start
+  else
+    npm start
+  fi
 else
   echo "Using yarn to start the application..."
-  SOUND_CARD_INDEX=$card_index yarn start
+  if [ -n "$card_index" ]; then
+    SOUND_CARD_INDEX=$card_index yarn start
+  else
+    yarn start
+  fi
 fi
 
 # After the service ends, perform cleanup
@@ -101,7 +136,11 @@ echo "Cleaning up after service..."
 
 if [ "$serve_ollama" = true ]; then
   echo "Stopping Ollama server..."
-  pkill ollama
+  if command -v pkill >/dev/null 2>&1; then
+    pkill ollama
+  else
+    echo "pkill not available; please stop ollama manually if needed."
+  fi
 fi
 
 # Record end status

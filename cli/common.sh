@@ -3,7 +3,27 @@
 # cli/common.sh — Shared helpers for the Whisplay CLI
 # ============================================================
 
-VERSION="1.0.0"
+# ── Version from git tag ─────────────────────────────────────
+_resolve_version() {
+  local root
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if command -v git &>/dev/null && git -C "$root" rev-parse --git-dir &>/dev/null; then
+    local tag
+    tag="$(git -C "$root" describe --tags --abbrev=0 2>/dev/null || true)"
+    if [ -n "$tag" ]; then
+      # Strip leading 'v' if present
+      echo "${tag#v}"
+      return
+    fi
+  fi
+  # Fallback: read from package.json
+  if [ -f "$root/package.json" ]; then
+    grep -o '"version": *"[^"]*"' "$root/package.json" | head -1 | sed 's/.*"\([^"]*\)"/\1/'
+    return
+  fi
+  echo "unknown"
+}
+VERSION="$(_resolve_version)"
 
 # ── Resolve project root ─────────────────────────────────────
 # Walk up from the caller script's real location to find the project root.

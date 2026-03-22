@@ -25,6 +25,7 @@ let maxScroll = 0;
 let lastText = "";
 let lastImageRevision = -1;
 let isPressed = false;
+let activePointerId = null;
 
 function setIconVisible(iconEl, visible) {
   iconEl.style.display = visible ? "block" : "none";
@@ -207,7 +208,7 @@ function connectWebSocket() {
     } else if (message.type === "stop_record") {
       stopWebAudioRecording();
     } else if (message.type === "play_audio") {
-      playWebAudio(message.data, message.format, message.duration);
+      playWebAudio(message.data, message.format, message.duration, message.playId);
     } else if (message.type === "stop_audio") {
       stopWebAudio();
     } else if (message.type === "start_camera_stream") {
@@ -243,6 +244,7 @@ function setPressed(value) {
 }
 
 const press = () => {
+  if (isPressed) return;
   setPressed(true);
   sendButton("press");
 };
@@ -252,19 +254,37 @@ const release = () => {
   sendButton("release");
 };
 
-btn.addEventListener("mousedown", press);
-btn.addEventListener("mouseup", release);
-btn.addEventListener("mouseleave", release);
-window.addEventListener("mouseup", release);
-btn.addEventListener("touchstart", (event) => {
+btn.addEventListener("pointerdown", (event) => {
   event.preventDefault();
+  activePointerId = event.pointerId;
+  try {
+    btn.setPointerCapture(event.pointerId);
+  } catch {}
   press();
 });
-btn.addEventListener("touchend", (event) => {
-  event.preventDefault();
+
+btn.addEventListener("pointerup", (event) => {
+  if (activePointerId !== null && event.pointerId !== activePointerId) return;
   release();
+  activePointerId = null;
 });
-window.addEventListener("touchend", release);
+
+btn.addEventListener("pointercancel", (event) => {
+  if (activePointerId !== null && event.pointerId !== activePointerId) return;
+  release();
+  activePointerId = null;
+});
+
+btn.addEventListener("lostpointercapture", () => {
+  release();
+  activePointerId = null;
+});
+
+window.addEventListener("pointerup", (event) => {
+  if (activePointerId !== null && event.pointerId !== activePointerId) return;
+  release();
+  activePointerId = null;
+});
 
 // ── Web Audio Recording ──────────────────────────────────────────────────────
 // When WEB_AUDIO_ENABLED=true on the server, it sends "start_record" /
@@ -277,12 +297,31 @@ const FRAME_CAM_CAPTURE = 0x03;
 
 let mediaRecorder = null;
 let audioStream = null;
+let audioStartInProgress = false;
+let stopRequestedBeforeStart = false;
+let pendingAudioChunkSends = [];
 
 async function startWebAudioRecording() {
+  if (audioStartInProgress) return;
   if (mediaRecorder && mediaRecorder.state !== "inactive") return;
+  stopRequestedBeforeStart = false;
+  audioStartInProgress = true;
+  pendingAudioChunkSends = [];
   updateMicIndicator(true);
   try {
     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    if (stopRequestedBeforeStart) {
+      if (audioStream) {
+        audioStream.getTracks().forEach((t) => t.stop());
+        audioStream = null;
+      }
+      updateMicIndicator(false);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "record_complete" }));
+      }
+      return;
+    }
 
     const preferredMimes = [
       "audio/webm;codecs=opus",
@@ -297,11 +336,17 @@ async function startWebAudioRecording() {
     mediaRecorder.ondataavailable = (event) => {
       if (!event.data || event.data.size === 0) return;
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      event.data.arrayBuffer().then((buf) => {
+      const sendTask = event.data.arrayBuffer().then((buf) => {
         const payload = new Uint8Array(1 + buf.byteLength);
         payload[0] = FRAME_AUDIO;
         payload.set(new Uint8Array(buf), 1);
         ws.send(payload);
+      });
+      pendingAudioChunkSends.push(sendTask);
+      sendTask.finally(() => {
+        pendingAudioChunkSends = pendingAudioChunkSends.filter(
+          (task) => task !== sendTask,
+        );
       });
     };
 
@@ -312,23 +357,31 @@ async function startWebAudioRecording() {
         audioStream = null;
       }
       mediaRecorder = null;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "record_complete" }));
-      }
+      Promise.allSettled(pendingAudioChunkSends).finally(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "record_complete" }));
+        }
+      });
     };
 
     // Emit data chunks every 500 ms so the server can monitor progress.
     mediaRecorder.start(500);
+    if (stopRequestedBeforeStart && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
   } catch (e) {
     console.error("[WebAudio] getUserMedia (audio) failed:", e);
     updateMicIndicator(false);
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "record_complete" }));
     }
+  } finally {
+    audioStartInProgress = false;
   }
 }
 
 function stopWebAudioRecording() {
+  stopRequestedBeforeStart = true;
   if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
   }
@@ -351,52 +404,125 @@ function refreshWebAudioCard() {
   card.style.display = anyActive ? "block" : "none";
 }
 
-// ── Web Audio Playback ───────────────────────────────────────────────────────
+// ── Web Audio Playback (queued) ───────────────────────────────────────────────
 // When WEB_AUDIO_ENABLED=true, the server sends "play_audio" with base64 data.
-// We decode and play it via the Web Audio API.
+// We queue incoming audio and play chunks sequentially via Web Audio API.
+// This prevents overlapping playback on browsers where onended is unreliable
+// (e.g. Chromium on Raspberry Pi).
 
 let audioCtx = null;
 let currentAudioSource = null;
+let audioQueue = [];
+let isProcessingAudio = false;
+let playbackFallbackTimer = null;
+let currentPlayId = null;
 
 function ensureAudioContext() {
   if (!audioCtx || audioCtx.state === "closed") {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
 
-async function playWebAudio(base64Data, _format, _duration) {
-  try {
-    const ctx = ensureAudioContext();
-    const binary = atob(base64Data);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const decoded = await ctx.decodeAudioData(bytes.buffer);
-    stopWebAudio();
-    currentAudioSource = ctx.createBufferSource();
-    currentAudioSource.buffer = decoded;
-    currentAudioSource.connect(ctx.destination);
-    currentAudioSource.onended = () => {
-      currentAudioSource = null;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "play_complete" }));
-      }
-    };
-    currentAudioSource.start(0);
-  } catch (e) {
-    console.error("[WebAudio] Playback failed:", e);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "play_complete" }));
-    }
+function sendPlayComplete(playId) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    const msg = { type: "play_complete" };
+    if (playId !== undefined && playId !== null) msg.playId = playId;
+    ws.send(JSON.stringify(msg));
   }
 }
 
-function stopWebAudio() {
+// Stop the current source WITHOUT sending play_complete (internal use).
+function stopWebAudioSilent() {
+  if (playbackFallbackTimer) {
+    clearTimeout(playbackFallbackTimer);
+    playbackFallbackTimer = null;
+  }
   if (currentAudioSource) {
+    // Remove onended BEFORE stop() to prevent spurious play_complete.
+    currentAudioSource.onended = null;
     try { currentAudioSource.stop(); } catch {}
     currentAudioSource = null;
   }
+}
+
+function playWebAudio(base64Data, format, duration, playId) {
+  audioQueue.push({ base64Data, format, duration, playId });
+  if (!isProcessingAudio) {
+    processAudioQueue();
+  }
+}
+
+async function processAudioQueue() {
+  if (isProcessingAudio) return;
+  isProcessingAudio = true;
+  while (audioQueue.length > 0) {
+    const item = audioQueue.shift();
+    await playWebAudioItem(item.base64Data, item.format, item.duration, item.playId);
+  }
+  isProcessingAudio = false;
+}
+
+function playWebAudioItem(base64Data, _format, duration, playId) {
+  return new Promise(async (resolve) => {
+    currentPlayId = playId;
+    try {
+      const ctx = ensureAudioContext();
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+      const binary = atob(base64Data);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
+
+      stopWebAudioSilent();
+      currentAudioSource = ctx.createBufferSource();
+      currentAudioSource.buffer = decoded;
+      currentAudioSource.connect(ctx.destination);
+
+      let finished = false;
+      const onFinished = () => {
+        if (finished) return;
+        finished = true;
+        if (playbackFallbackTimer) {
+          clearTimeout(playbackFallbackTimer);
+          playbackFallbackTimer = null;
+        }
+        currentAudioSource = null;
+        sendPlayComplete(playId);
+        resolve();
+      };
+
+      currentAudioSource.onended = onFinished;
+
+      // Fallback timer: use decoded buffer duration (most accurate) with a margin.
+      // This covers browsers where onended does not fire reliably.
+      const bufferMs = decoded.duration * 1000;
+      const fallbackMs = Math.max(bufferMs, duration || 0) + 2000;
+      playbackFallbackTimer = setTimeout(() => {
+        console.warn("[WebAudio] Fallback timer fired — onended did not fire");
+        playbackFallbackTimer = null;
+        if (!finished) {
+          stopWebAudioSilent();
+          onFinished();
+        }
+      }, fallbackMs);
+
+      currentAudioSource.start(0);
+    } catch (e) {
+      console.error("[WebAudio] Playback failed:", e);
+      sendPlayComplete(playId);
+      resolve();
+    }
+  });
+}
+
+// Stop playback, clear queue, and notify server (used by "stop_audio" command).
+function stopWebAudio() {
+  audioQueue.length = 0;
+  isProcessingAudio = false;
+  stopWebAudioSilent();
 }
 
 // ── Web Camera Streaming ─────────────────────────────────────────────────────

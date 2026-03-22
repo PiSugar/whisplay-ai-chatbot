@@ -100,11 +100,16 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     ctx.answerId += 1;
     ctx.wakeSessionActive = false;
     ctx.endAfterAnswer = false;
+    onButtonDoubleClick(null);
     ctx.currentRecordFilePath = `${ctx.recordingsDir
       }/user-${Date.now()}.${recordFileFormat}`;
     onButtonPressed(noop);
+    const listeningStartedAt = Date.now();
     const { result, stop } = recordAudioManually(ctx.currentRecordFilePath);
     onButtonReleased(() => {
+      if (Date.now() - listeningStartedAt < 500) {
+        return;
+      }
       stop();
       display({
         RGB: "#ff6800",
@@ -298,6 +303,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
             currentAnswerId === ctx.answerId &&
             ctx.partialThinkingCallback(partialThinking),
           (functionName: string, result?: string) => {
+            if (
+              functionName === "endConversation" &&
+              result?.startsWith("[success]")
+            ) {
+              ctx.endAfterAnswer = true;
+            }
             if (
               functionName === "generateImage" &&
               result?.startsWith("[success]")

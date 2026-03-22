@@ -91,4 +91,18 @@ cmd_help() {
 
 cmd_version() {
   echo "whisplay v${VERSION}"
+  # Show commit info if available
+  if command -v git &>/dev/null && git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null; then
+    local full
+    full="$(git -C "$PROJECT_ROOT" describe --tags --long 2>/dev/null || true)"
+    if [ -n "$full" ] && [[ "$full" == *-*-* ]]; then
+      local commits_ahead
+      commits_ahead="$(echo "$full" | sed 's/.*-\([0-9]*\)-g.*/\1/')"
+      if [ "$commits_ahead" != "0" ]; then
+        local short_hash
+        short_hash="$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null)"
+        _dim "(${commits_ahead} commits ahead of tag, ${short_hash})"
+      fi
+    fi
+  fi
 }

@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible bug in whisplay-ai-chatbot.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For installation, setup, and usage questions, please ask in our Discord forum first:
+        https://discord.gg/H7pb4M32
+
+        Use this form for confirmed bugs with clear reproduction steps.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem briefly.
+      placeholder: The issue is...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps needed to reproduce the problem.
+      placeholder: |
+        1. Run ...
+        2. Click ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: What actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include device model, OS, install method, and relevant versions.
+      placeholder: |
+        Device:
+        OS:
+        Install method:
+        Node version:
+        Python version:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste any relevant logs, screenshots, or error messages.
+      render: shell
