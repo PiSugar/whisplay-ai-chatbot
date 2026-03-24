@@ -37,6 +37,7 @@ import {
   resetCameraModeControl,
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
+import { getMusicPlaybackStatus } from "../../device/music-player";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -103,7 +104,29 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       RGB: "#00ff88",
     });
   },
+  music: (ctx: ChatFlowContext) => {
+    onButtonDoubleClick(null);
+    onButtonPressed(() => {
+      ctx.transitionTo("listening");
+    });
+    onButtonReleased(noop);
+
+    const playback = getMusicPlaybackStatus();
+    display({
+      status: "music",
+      emoji: "🎹",
+      RGB: "#0066aa",
+      text:
+        ctx.musicDisplayText ||
+        (playback.isPlaying
+          ? `Now playing: ${playback.title}`
+          : "Music mode. Press the button to talk."),
+      rag_icon_visible: false,
+    });
+  },
   listening: (ctx: ChatFlowContext) => {
+    ctx.enterMusicAfterAnswer = false;
+    ctx.musicDisplayText = "";
     ctx.isFromWakeListening = false;
     ctx.answerId += 1;
     ctx.wakeSessionActive = false;
@@ -141,6 +164,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
   },
   wake_listening: (ctx: ChatFlowContext) => {
+    ctx.enterMusicAfterAnswer = false;
+    ctx.musicDisplayText = "";
     ctx.isFromWakeListening = true;
     ctx.answerId += 1;
     ctx.currentRecordFilePath = `${ctx.recordingsDir
@@ -218,6 +243,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
   },
   answer: (ctx: ChatFlowContext) => {
+    ctx.enterMusicAfterAnswer = false;
+    ctx.musicDisplayText = "";
     display({
       status: "answering...",
       RGB: "#00c8a3",
@@ -326,6 +353,13 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
                 display({ image: img });
               }
             }
+            if (
+              functionName === "playMusic" &&
+              result?.startsWith("[success]")
+            ) {
+              ctx.enterMusicAfterAnswer = true;
+              ctx.musicDisplayText = result.replace(/^\[success\]/, "").trim();
+            }
             if (result) {
               display({
                 text: `[${functionName}]${result}`,
@@ -349,6 +383,10 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           } else {
             ctx.transitionTo("wake_listening");
           }
+          return;
+        }
+        if (ctx.enterMusicAfterAnswer) {
+          ctx.transitionTo("music");
           return;
         }
         const img = getLatestDisplayImg();

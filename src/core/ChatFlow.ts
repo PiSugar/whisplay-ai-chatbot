@@ -16,6 +16,7 @@ import { FlowStateMachine } from "./chat-flow/stateMachine";
 import { flowStates } from "./chat-flow/states";
 import { ChatFlowContext, FlowName } from "./chat-flow/types";
 import { playWakeupChime } from "../device/audio";
+import { stopMusicPlayback } from "../device/music-player";
 
 dotEnv.config();
 
@@ -51,6 +52,8 @@ class ChatFlow implements ChatFlowContext {
   currentExternalEmoji: string = "";
   stateMachine: FlowStateMachine;
   isFromWakeListening: boolean = false;
+  enterMusicAfterAnswer: boolean = false;
+  musicDisplayText: string = "";
 
   constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -196,6 +199,9 @@ class ChatFlow implements ChatFlowContext {
   };
 
   transitionTo = (flowName: FlowName): void => {
+    if (this.currentFlowName === "music" && flowName !== "music") {
+      stopMusicPlayback();
+    }
     console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
     this.stateMachine.transitionTo(flowName);
   };
