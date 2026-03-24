@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { webAudioBridge } from "./web-audio-bridge";
 
 type Track = {
   filePath: string;
@@ -270,6 +271,11 @@ class LocalMusicPlayer {
   }
 
   private stopCurrentProcess(): void {
+    // Stop web playback if active (prevents echo when switching from web to local)
+    if (webAudioBridge.isAvailable()) {
+      webAudioBridge.stopPlayback();
+    }
+    
     if (!this.currentProcess) {
       this.currentTrack = null;
       return;
@@ -298,6 +304,50 @@ class LocalMusicPlayer {
       command: "sox",
       args: [filePath, "-t", "alsa", `hw:${this.soundCardIndex},0`],
     };
+  }
+
+  /**
+   * Play audio file through web browser (WebAudioBridge).
+   * Returns true if played via web, false if should fallback to local.
+   */
+  private async playViaWeb(filePath: string): Promise<boolean> {
+    if (!webAudioBridge.isAvailable()) {
+      return false;
+    }
+
+    try {
+      // First, explicitly stop any existing web playback to prevent echo
+      webAudioBridge.stopPlayback();
+      
+      // Small delay to ensure previous audio context is fully released
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Get file extension to determine format
+      const ext = path.extname(filePath).toLowerCase();
+      const format = ext === ".mp3" ? "mp3" : "wav";
+
+      // Read the audio file
+      const buffer = fs.readFileSync(filePath);
+      
+      // Get actual audio duration using music-metadata if possible
+      // For now, use a reasonable estimate based on file size
+      // MP3 typical bitrate ~192kbps = 24KB/s
+      const fileSizeMB = buffer.length / (1024 * 1024);
+      const estimatedDuration = Math.min(600, Math.max(30, fileSizeMB * 40)); // ~40s per MB, max 10 min
+
+      await webAudioBridge.playAudioData(
+        {
+          buffer,
+          duration: estimatedDuration * 1000, // convert to ms
+          filePath,
+        },
+        format as "mp3" | "wav"
+      );
+      return true;
+    } catch (err: any) {
+      console.error(`[Music] Web playback failed: ${err?.message}, falling back to local playback`);
+      return false;
+    }
   }
 
   async playByQuery(query: string): Promise<{
@@ -331,6 +381,21 @@ class LocalMusicPlayer {
 
     this.stopCurrentProcess();
 
+    // Try web playback first if available (WEB_AUDIO_ENABLED=true and browser connected)
+    const playedViaWeb = await this.playViaWeb(best.track.filePath);
+    
+    if (playedViaWeb) {
+      this.currentTrack = best.track;
+      // Web playback doesn't use a child process, but we track the track for status
+      return {
+        ok: true,
+        message: `Now playing: ${best.track.title}`,
+        trackPath: best.track.filePath,
+        trackTitle: best.track.title,
+      };
+    }
+
+    // Fall back to local playback
     const { command, args } = this.buildPlaybackCommand(best.track.filePath);
     const process = spawn(command, args);
     this.currentProcess = process;
@@ -360,11 +425,17 @@ class LocalMusicPlayer {
   }
 
   stop(): { ok: boolean; message: string } {
-    if (!this.currentProcess) {
+    // If we have a current track but no process, it might be web playback
+    if (!this.currentProcess && !this.currentTrack) {
       return {
         ok: false,
         message: "No music is currently playing.",
       };
+    }
+
+    // Stop web playback if active
+    if (webAudioBridge.isAvailable() && this.currentTrack && !this.currentProcess) {
+      webAudioBridge.stopPlayback();
     }
 
     this.stopCurrentProcess();
