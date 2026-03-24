@@ -7,6 +7,7 @@ import {
   display,
   getCurrentStatus,
   onCameraCapture,
+  onTextInput,
 } from "../../device/display";
 import {
   recordAudio,
@@ -45,6 +46,13 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonReleased(noop);
     onCameraModeExit(null);
+    onTextInput((text: string) => {
+      if (ctx.currentFlowName !== "sleep") return;
+      ctx.answerId += 1;
+      ctx.asrText = text;
+      display({ status: "recognizing", text });
+      ctx.transitionTo("answer");
+    });
     if (ctx.enableCamera) {
       const captureImgPath = `${cameraDir}/capture-${moment().format(
         "YYYYMMDD-HHmmss",

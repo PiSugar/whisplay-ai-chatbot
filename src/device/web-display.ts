@@ -19,11 +19,14 @@ import type { Status } from "./display";
 
 type ButtonHandler = () => void;
 
+type TextInputHandler = (text: string) => void;
+
 interface WebDisplayOptions {
   host: string;
   port: number;
   onButtonPress: ButtonHandler;
   onButtonRelease: ButtonHandler;
+  onTextInput?: TextInputHandler;
 }
 
 export class WebDisplayServer implements WebAudioBridgeServer {
@@ -36,6 +39,7 @@ export class WebDisplayServer implements WebAudioBridgeServer {
   private port: number;
   private onButtonPress: ButtonHandler;
   private onButtonRelease: ButtonHandler;
+  private onTextInput: TextInputHandler;
   private server: http.Server | null = null;
   private wsServer: WebSocketServer | null = null;
   private wsClients = new Set<WebSocket>();
@@ -45,6 +49,7 @@ export class WebDisplayServer implements WebAudioBridgeServer {
     this.port = options.port;
     this.onButtonPress = options.onButtonPress;
     this.onButtonRelease = options.onButtonRelease;
+    this.onTextInput = options.onTextInput || (() => {});
     this.app = new Koa();
     this.router = new Router();
     this.cameraFramePath = this.resolveCameraFramePath();
@@ -261,6 +266,13 @@ export class WebDisplayServer implements WebAudioBridgeServer {
     }
     if (data?.type === "play_complete") {
       webAudioBridge.handlePlayComplete(data.playId);
+      return;
+    }
+    if (data?.type === "text_input") {
+      const text = typeof data.text === "string" ? data.text.trim() : "";
+      if (text) {
+        this.onTextInput(text);
+      }
       return;
     }
     if (data?.type === "ping") {
