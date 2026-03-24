@@ -3,6 +3,7 @@ import { cloneDeep } from "lodash";
 import { transformToGeminiType } from "../utils";
 import { addImageGenerationTools } from "./image-generation";
 import { addVisionTools } from "./vision";
+import { addWebSearchTools } from "./web-search";
 import { pluginRegistry } from "../plugin";
 
 // ── Collect tools from all llm-tools plugins ────────────────
@@ -39,9 +40,10 @@ for (const { name, provider } of activated) {
   }
 }
 
-// ── Add image-generation & vision tools ─────────────────────
+// ── Add image-generation, vision & web search tools ──────────
 addImageGenerationTools(pluginTools);
 addVisionTools(pluginTools);
+addWebSearchTools(pluginTools);
 
 // ── Exported aggregated tool lists ──────────────────────────
 export const llmTools: LLMTool[] = [...pluginTools];

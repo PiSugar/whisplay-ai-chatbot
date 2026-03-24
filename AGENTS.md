@@ -377,6 +377,34 @@ bash upgrade-env.sh
 2. Implement handler function
 3. Or create `llm-tools` plugin for third-party tools
 
+### Web Search
+The chatbot supports web search functionality via multiple providers:
+
+**Supported Providers:**
+| Provider | API Key Required | Features |
+|----------|------------------|----------|
+| Tavily | `TAVILY_API_KEY` | AI-optimized search, recommended |
+| SerpAPI | `SERP_API_KEY` | Google Search results |
+| Bing | `BING_SEARCH_API_KEY` | Microsoft Bing Search |
+| Google | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` | Custom Search API |
+
+**Configuration:**
+```bash
+# Enable web search
+WEB_SEARCH_ENABLED=true
+
+# Select provider (default: tavily)
+WEB_SEARCH_PROVIDER=tavily
+
+# Optional: max results (default: 5)
+WEB_SEARCH_MAX_RESULTS=5
+
+# Optional: enable image search
+WEB_SEARCH_INCLUDE_IMAGES=false
+```
+
+**Usage:** Once enabled, LLM automatically uses `webSearch` tool when users ask about current events, news, or time-sensitive information.
+
 ### Modifying UI/Display
 1. Python rendering: `python/chatbot-ui.py` (RenderThread class)
 2. Status icons: `python/status-bar-icon/` directory
