@@ -37,7 +37,7 @@ import {
   resetCameraModeControl,
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
-import { getMusicPlaybackStatus } from "../../device/music-player";
+import { isMusicPlaying, getCurrentTrackTitle } from "../../device/music-player";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -111,15 +111,15 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonReleased(noop);
 
-    const playback = getMusicPlaybackStatus();
+    const trackTitle = getCurrentTrackTitle();
     display({
       status: "music",
       emoji: "🎹",
       RGB: "#0066aa",
       text:
         ctx.musicDisplayText ||
-        (playback.isPlaying
-          ? `Now playing: ${playback.title}`
+        (isMusicPlaying() && trackTitle
+          ? `Now playing: ${trackTitle}`
           : "Music mode. Press the button to talk."),
       rag_icon_visible: false,
     });

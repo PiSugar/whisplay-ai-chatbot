@@ -14,7 +14,7 @@ export function registerMusicToolsPlugins(): void {
     return;
   }
 
-  // Preload local music index at startup so play requests can use in-memory matching.
+  // Preload local music index at startup
   void getLocalMusicPlayer(process.env).preloadLibrary();
 
   pluginRegistry.register({
@@ -22,7 +22,7 @@ export function registerMusicToolsPlugins(): void {
     displayName: "Local Music Tools",
     version: "1.0.0",
     type: "llm-tools",
-    description: "Built-in local music search and playback tools",
+    description: "Local music playback with continuous random play support",
     activate: (ctx) => {
       const player = getLocalMusicPlayer(ctx.env);
 
@@ -33,13 +33,13 @@ export function registerMusicToolsPlugins(): void {
             function: {
               name: "playMusic",
               description:
-                "Play local music from configured folders by fuzzy-matching the user query.",
+                "Play a specific song from the music library by name. When the song ends, it will automatically continue playing random songs until the user presses the button to stop.",
               parameters: {
                 type: "object",
                 properties: {
                   query: {
                     type: "string",
-                    description: "song name or keywords to search in local music library",
+                    description: "Song name or keywords to search in the music library",
                   },
                 },
                 required: ["query"],
@@ -51,12 +51,32 @@ export function registerMusicToolsPlugins(): void {
                 return `${ToolReturnTag.Error}Missing required parameter: query.`;
               }
 
-              const result = await player.playByQuery(query);
+              // playMusic: play single track only (continuous = false)
+              const result = await player.playByQuery(query, false);
               if (!result.ok) {
                 return `${ToolReturnTag.Error}${result.message}`;
               }
 
-              return `${ToolReturnTag.Success}${result.message} (${result.trackPath})`;
+              return `${ToolReturnTag.Success}${result.message}`;
+            },
+          },
+          {
+            type: "function",
+            function: {
+              name: "playMusicRandom",
+              description:
+                "Play a random song from the music library. When the song ends, it will automatically play another random song continuously until the user presses the button to stop.",
+              parameters: {
+                type: "object",
+                properties: {},
+              },
+            },
+            func: async () => {
+              const result = await player.playRandom();
+              if (!result.ok) {
+                return `${ToolReturnTag.Error}${result.message}`;
+              }
+              return `${ToolReturnTag.Success}${result.message}`;
             },
           },
         ],
