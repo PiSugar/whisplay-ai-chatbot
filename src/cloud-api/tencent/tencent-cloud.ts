@@ -1,7 +1,9 @@
+import mp3Duration from "mp3-duration";
 import fs from "fs";
 import crypto from "crypto";
 import axios from "axios";
 import dotenv from "dotenv";
+import { TTSResult } from "../../type";
 
 dotenv.config();
 
@@ -129,7 +131,7 @@ const recognizeAudio = async (
 
 const synthesizeSpeech = async (
   text: string,
-): Promise<{ data: Buffer; duration: number } | undefined> => {
+): Promise<TTSResult | undefined> => {
   if (!isTencentTTSConfigValid()) {
     console.error("Tencent Cloud TTS configuration is incorrect");
     return;
@@ -163,13 +165,18 @@ const synthesizeSpeech = async (
       headers,
     });
     console.log("Speech synthesis completed");
-    if (res.data.Response.Audio === undefined) {
+    const audio = res.data?.Response?.Audio;
+    if (!audio) {
       console.error("Speech synthesis error:", res.data);
       return;
     }
-    const buffer = Buffer.from(await res.data.Response.Audio.arrayBuffer());
-    const duration = 0; // Replace with actual duration calculation if needed
-    return { data: buffer, duration: duration * 1000 };
+    const buffer = Buffer.isBuffer(audio)
+      ? audio
+      : typeof audio === "string"
+        ? Buffer.from(audio, "base64")
+        : Buffer.from(audio);
+    const duration = await mp3Duration(buffer);
+    return { buffer, duration: duration * 1000 };
   } catch (err: any) {
     console.error(
       "Speech synthesis failed:",
