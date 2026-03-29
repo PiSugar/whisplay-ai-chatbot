@@ -250,6 +250,65 @@ body {
   margin-top: 6px;
 }
 
+/* ── Text Input Card ─────────────────────────────────────────────── */
+.text-input-wrap {
+  position: relative;
+}
+
+#textInput {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  padding: 10px 44px 10px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#textInput:focus {
+  border-color: var(--accent);
+}
+
+#textInput:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#textSendBtn {
+  position: absolute;
+  right: 10px;
+  bottom: 13px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--accent);
+  color: #000;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s;
+  padding: 0;
+  z-index: 1;
+}
+
+#textSendBtn:hover {
+  opacity: 0.85;
+}
+
+#textSendBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 @media (max-width: 860px) {
   .wrap {
     grid-template-columns: 1fr;

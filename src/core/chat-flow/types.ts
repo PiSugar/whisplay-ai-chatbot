@@ -3,6 +3,7 @@ import { StreamResponser } from "../StreamResponsor";
 export type FlowName =
   | "sleep"
   | "camera"
+  | "music"
   | "listening"
   | "wake_listening"
   | "asr"
@@ -35,6 +36,8 @@ export interface ChatFlowContext {
   pendingExternalImageUrl: string;
   currentExternalEmoji: string;
   isFromWakeListening: boolean;
+  enterMusicAfterAnswer: boolean;
+  musicDisplayText: string;
 
   transitionTo: (flowName: FlowName) => void;
   recognizeAudio: (path: string, isFromAutoListening?: boolean) => Promise<string>;

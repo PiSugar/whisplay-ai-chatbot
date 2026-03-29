@@ -54,6 +54,7 @@ export class WhisplayDisplay {
   private buttonReleasedCallback: () => void = () => {};
   private buttonDoubleClickCallback: (() => void) | null = null;
   private onCameraCaptureCallback: () => void = () => {};
+  private textInputCallback: (text: string) => void = () => {};
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
   private buttonPressTimeArray: number[] = [];
@@ -83,6 +84,7 @@ export class WhisplayDisplay {
         port,
         onButtonPress: () => this.handleButtonPressedEvent(),
         onButtonRelease: () => this.handleButtonReleasedEvent(),
+        onTextInput: (text: string) => this.handleTextInputEvent(text),
       });
       this.webDisplay.updateStatus(this.currentStatus);
     }
@@ -273,6 +275,10 @@ export class WhisplayDisplay {
     this.onCameraCaptureCallback = callback;
   }
 
+  onTextInput(callback: (text: string) => void): void {
+    this.textInputCallback = callback;
+  }
+
   private async sendToDisplay(data: string): Promise<void> {
     if (!this.deviceEnabled) {
       return;
@@ -434,6 +440,10 @@ export class WhisplayDisplay {
     this.onCameraCaptureCallback();
   }
 
+  private handleTextInputEvent(text: string): void {
+    this.textInputCallback(text);
+  }
+
   stopWebDisplay(): void {
     this.webDisplay?.close();
     this.webDisplay = null;
@@ -492,6 +502,8 @@ export const onButtonDoubleClick =
   displayInstance.onButtonDoubleClick.bind(displayInstance);
 export const onCameraCapture =
   displayInstance.onCameraCapture.bind(displayInstance);
+export const onTextInput =
+  displayInstance.onTextInput.bind(displayInstance);
 
 function cleanup() {
   console.log("Cleaning up display process before exit...");

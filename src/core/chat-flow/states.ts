@@ -7,6 +7,7 @@ import {
   display,
   getCurrentStatus,
   onCameraCapture,
+  onTextInput,
 } from "../../device/display";
 import {
   recordAudio,
@@ -36,6 +37,7 @@ import {
   resetCameraModeControl,
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
+import { isMusicPlaying, getCurrentTrackTitle } from "../../device/music-player";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -45,6 +47,13 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonReleased(noop);
     onCameraModeExit(null);
+    onTextInput((text: string) => {
+      if (ctx.currentFlowName !== "sleep") return;
+      ctx.answerId += 1;
+      ctx.asrText = text;
+      display({ status: "recognizing", text });
+      ctx.transitionTo("answer");
+    });
     if (ctx.enableCamera) {
       const captureImgPath = `${cameraDir}/capture-${moment().format(
         "YYYYMMDD-HHmmss",
@@ -95,7 +104,29 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       RGB: "#00ff88",
     });
   },
+  music: (ctx: ChatFlowContext) => {
+    onButtonDoubleClick(null);
+    onButtonPressed(() => {
+      ctx.transitionTo("listening");
+    });
+    onButtonReleased(noop);
+
+    const trackTitle = getCurrentTrackTitle();
+    display({
+      status: "music",
+      emoji: "🎹",
+      RGB: "#0066aa",
+      text:
+        ctx.musicDisplayText ||
+        (isMusicPlaying() && trackTitle
+          ? `Now playing: ${trackTitle}`
+          : "Music mode. Press the button to talk."),
+      rag_icon_visible: false,
+    });
+  },
   listening: (ctx: ChatFlowContext) => {
+    ctx.enterMusicAfterAnswer = false;
+    ctx.musicDisplayText = "";
     ctx.isFromWakeListening = false;
     ctx.answerId += 1;
     ctx.wakeSessionActive = false;
@@ -133,6 +164,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
   },
   wake_listening: (ctx: ChatFlowContext) => {
+    ctx.enterMusicAfterAnswer = false;
+    ctx.musicDisplayText = "";
     ctx.isFromWakeListening = true;
     ctx.answerId += 1;
     ctx.currentRecordFilePath = `${ctx.recordingsDir
@@ -210,6 +243,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
   },
   answer: (ctx: ChatFlowContext) => {
+    ctx.enterMusicAfterAnswer = false;
+    ctx.musicDisplayText = "";
     display({
       status: "answering...",
       RGB: "#00c8a3",
@@ -318,6 +353,13 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
                 display({ image: img });
               }
             }
+            if (
+              functionName === "playMusic" &&
+              result?.startsWith("[success]")
+            ) {
+              ctx.enterMusicAfterAnswer = true;
+              ctx.musicDisplayText = result.replace(/^\[success\]/, "").trim();
+            }
             if (result) {
               display({
                 text: `[${functionName}]${result}`,
@@ -341,6 +383,10 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           } else {
             ctx.transitionTo("wake_listening");
           }
+          return;
+        }
+        if (ctx.enterMusicAfterAnswer) {
+          ctx.transitionTo("music");
           return;
         }
         const img = getLatestDisplayImg();

@@ -133,6 +133,7 @@ function applyState(data) {
   statusText.textContent = data.status || "";
   emojiText.textContent = data.emoji || "";
   updateText(data.text || "", data.scroll_sync, data.scroll_speed);
+  updateTextInputState(data.status);
 
   const ledColor = normalizeColor(data.RGB);
   led.style.background = ledColor;
@@ -598,6 +599,37 @@ function updateCamIndicator(active) {
   if (el) el.style.display = active ? "block" : "none";
   refreshWebAudioCard();
 }
+
+// ── Text Input ───────────────────────────────────────────────────────────────
+// When the device is in "idle" (sleep) state, allow the user to type a message
+// and send it directly to the LLM, bypassing ASR.
+
+const textInput = document.getElementById("textInput");
+const textSendBtn = document.getElementById("textSendBtn");
+let currentDeviceStatus = "";
+
+function updateTextInputState(status) {
+  currentDeviceStatus = status || "";
+  const isIdle = currentDeviceStatus === "idle" || currentDeviceStatus === "starting";
+  textInput.disabled = !isIdle;
+  textSendBtn.disabled = !isIdle;
+}
+
+function sendTextInput() {
+  const text = (textInput.value || "").trim();
+  if (!text) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "text_input", text }));
+  textInput.value = "";
+}
+
+textSendBtn.addEventListener("click", sendTextInput);
+textInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) {
+    e.preventDefault();
+    sendTextInput();
+  }
+});
 
 // Unlock AudioContext on first user interaction (required by browsers).
 document.addEventListener("click", () => { try { ensureAudioContext(); } catch {} }, { once: true });
