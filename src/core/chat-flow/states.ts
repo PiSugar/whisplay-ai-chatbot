@@ -37,12 +37,14 @@ import {
   resetCameraModeControl,
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
-import { isMusicPlaying, getCurrentTrackTitle } from "../../device/music-player";
+import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback } from "../../device/music-player";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
     onButtonPressed(() => {
       resetCameraModeControl();
+      // Stop any playing music when waking up
+      stopMusicPlayback();
       ctx.transitionTo("listening");
     });
     onButtonReleased(noop);
@@ -107,6 +109,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
   music: (ctx: ChatFlowContext) => {
     onButtonDoubleClick(null);
     onButtonPressed(() => {
+      // Stop music immediately when button is pressed
+      stopMusicPlayback();
       ctx.transitionTo("listening");
     });
     onButtonReleased(noop);
