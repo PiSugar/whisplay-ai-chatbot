@@ -51,8 +51,8 @@ export function registerMusicToolsPlugins(): void {
                 return `${ToolReturnTag.Error}Missing required parameter: query.`;
               }
 
-              // playMusic: play single track only (continuous = false)
-              const result = await player.playByQuery(query, false);
+              // playMusic: find track only (playback deferred to music state)
+              const result = await player.findByQuery(query, false);
               if (!result.ok) {
                 return `${ToolReturnTag.Error}${result.message}`;
               }
@@ -72,7 +72,7 @@ export function registerMusicToolsPlugins(): void {
               },
             },
             func: async () => {
-              const result = await player.playRandom();
+              const result = await player.findRandom();
               if (!result.ok) {
                 return `${ToolReturnTag.Error}${result.message}`;
               }

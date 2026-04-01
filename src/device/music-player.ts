@@ -94,6 +94,8 @@ class LocalMusicPlayer {
   private preloadPromise: Promise<void> | null = null;
   private isPlaying: boolean = false;
   private continuousPlay: boolean = false; // Whether to auto-play next track
+  private pendingTrack: Track | null = null;
+  private pendingContinuous: boolean = false;
 
   constructor(
     private readonly libraryDirs: string[],
@@ -417,8 +419,79 @@ class LocalMusicPlayer {
     };
   }
 
+  async findByQuery(query: string, continuous: boolean = false): Promise<{
+    ok: boolean;
+    message: string;
+    trackPath?: string;
+    trackTitle?: string;
+  }> {
+    if (!this.isConfigured()) {
+      return { ok: false, message: "Music library not configured." };
+    }
+
+    await this.preloadLibrary();
+    if (this.tracks.length === 0) {
+      return { ok: false, message: "No music files found." };
+    }
+
+    const best = this.findBestMatch(query);
+    if (!best) {
+      return { ok: false, message: `No matching track found for "${query}"` };
+    }
+
+    this.pendingTrack = best.track;
+    this.pendingContinuous = continuous;
+
+    return {
+      ok: true,
+      message: `Playing: ${best.track.title}`,
+      trackPath: best.track.filePath,
+      trackTitle: best.track.title,
+    };
+  }
+
+  async findRandom(continuous: boolean = true): Promise<{
+    ok: boolean;
+    message: string;
+    trackPath?: string;
+    trackTitle?: string;
+  }> {
+    if (!this.isConfigured()) {
+      return { ok: false, message: "Music library not configured." };
+    }
+
+    await this.preloadLibrary();
+    if (this.tracks.length === 0) {
+      return { ok: false, message: "No music files found." };
+    }
+
+    const track = this.getRandomTrack();
+    if (!track) {
+      return { ok: false, message: "Could not select a random track." };
+    }
+
+    this.pendingTrack = track;
+    this.pendingContinuous = continuous;
+
+    return {
+      ok: true,
+      message: `Playing: ${track.title}`,
+      trackPath: track.filePath,
+      trackTitle: track.title,
+    };
+  }
+
+  startPendingPlayback(): void {
+    if (!this.pendingTrack) return;
+    const track = this.pendingTrack;
+    const continuous = this.pendingContinuous;
+    this.pendingTrack = null;
+    void this.startPlayback(track, continuous);
+  }
+
   stop(): void {
     this.isPlaying = false;
+    this.pendingTrack = null;
     this.stopCurrentProcess();
     console.log("[Music] Playback stopped");
   }
@@ -471,4 +544,8 @@ export const isMusicPlaying = (): boolean => {
 
 export const getCurrentTrackTitle = (): string => {
   return localMusicPlayerInstance?.getCurrentTrack()?.title || "";
+};
+
+export const startPendingMusicPlayback = (): void => {
+  localMusicPlayerInstance?.startPendingPlayback();
 };
