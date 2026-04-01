@@ -16,7 +16,7 @@ import { FlowStateMachine } from "./chat-flow/stateMachine";
 import { flowStates } from "./chat-flow/states";
 import { ChatFlowContext, FlowName } from "./chat-flow/types";
 import { playWakeupChime } from "../device/audio";
-import { stopMusicPlayback, isMusicPlaying } from "../device/music-player";
+import { stopMusicPlayback } from "../device/music-player";
 
 dotEnv.config();
 
@@ -199,7 +199,7 @@ class ChatFlow implements ChatFlowContext {
   };
 
   transitionTo = (flowName: FlowName): void => {
-    if (flowName !== "music" && isMusicPlaying()) {
+    if (this.currentFlowName === "music" && flowName !== "music") {
       stopMusicPlayback();
     }
     console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
