@@ -52,7 +52,7 @@ function startPlayerProcess() {
     return null;
   } else {
     // use mpg123 for mp3 files
-    return spawn("mpg123", [
+    const proc = spawn("mpg123", [
       "-",
       "--scale",
       "2",
@@ -61,6 +61,14 @@ function startPlayerProcess() {
       "-a",
       alsaOutputDevice,
     ]);
+    // Prevent EPIPE from becoming an uncaught exception when the process dies
+    proc.stdin?.on("error", (err) => {
+      console.error("Player stdin error:", err.message);
+    });
+    proc.on("error", (err) => {
+      console.error("Player process error:", err.message);
+    });
+    return proc;
   }
 }
 
@@ -339,6 +347,9 @@ const playAudioData = (params: TTSResult): Promise<void> => {
         "alsa",
         alsaOutputDevice,
       ]);
+      process.stdin?.on("error", (err) => {
+        console.error("Sox stdin error:", err.message);
+      });
       process.stdout?.on("data", (data) => console.log(data.toString()));
       process.stderr?.on("data", (data) => console.error(data.toString()));
       process.on("exit", (code) => {

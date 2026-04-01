@@ -248,9 +248,6 @@ class LocalMusicPlayer {
     if (!webAudioBridge.isAvailable()) return false;
 
     try {
-      webAudioBridge.stopPlayback();
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
       const ext = path.extname(filePath).toLowerCase();
       const format = ext === ".mp3" ? "mp3" : "wav";
       const buffer = fs.readFileSync(filePath);

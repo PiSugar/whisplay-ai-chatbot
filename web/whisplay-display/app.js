@@ -417,6 +417,8 @@ let audioQueue = [];
 let isProcessingAudio = false;
 let playbackFallbackTimer = null;
 let currentPlayId = null;
+let currentAudioResolver = null;
+let audioPlaybackGeneration = 0;
 
 function ensureAudioContext() {
   if (!audioCtx || audioCtx.state === "closed") {
@@ -443,6 +445,7 @@ function stopWebAudioSilent() {
     // Remove onended BEFORE stop() to prevent spurious play_complete.
     currentAudioSource.onended = null;
     try { currentAudioSource.stop(); } catch {}
+    try { currentAudioSource.disconnect(); } catch {}
     currentAudioSource = null;
   }
 }
@@ -466,7 +469,31 @@ async function processAudioQueue() {
 
 function playWebAudioItem(base64Data, _format, duration, playId) {
   return new Promise(async (resolve) => {
+    const generation = audioPlaybackGeneration;
     currentPlayId = playId;
+    let finished = false;
+    const finish = (notifyServer) => {
+      if (finished) return;
+      finished = true;
+      if (currentAudioResolver === cancelPlayback) {
+        currentAudioResolver = null;
+      }
+      if (playbackFallbackTimer) {
+        clearTimeout(playbackFallbackTimer);
+        playbackFallbackTimer = null;
+      }
+      if (currentAudioSource) {
+        try { currentAudioSource.onended = null; } catch {}
+        try { currentAudioSource.disconnect(); } catch {}
+        currentAudioSource = null;
+      }
+      if (notifyServer && generation === audioPlaybackGeneration) {
+        sendPlayComplete(playId);
+      }
+      resolve();
+    };
+    const cancelPlayback = () => finish(false);
+    currentAudioResolver = cancelPlayback;
     try {
       const ctx = ensureAudioContext();
       if (ctx.state === "suspended") {
@@ -477,22 +504,18 @@ function playWebAudioItem(base64Data, _format, duration, playId) {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
 
+      if (generation !== audioPlaybackGeneration) {
+        finish(false);
+        return;
+      }
+
       stopWebAudioSilent();
       currentAudioSource = ctx.createBufferSource();
       currentAudioSource.buffer = decoded;
       currentAudioSource.connect(ctx.destination);
 
-      let finished = false;
       const onFinished = () => {
-        if (finished) return;
-        finished = true;
-        if (playbackFallbackTimer) {
-          clearTimeout(playbackFallbackTimer);
-          playbackFallbackTimer = null;
-        }
-        currentAudioSource = null;
-        sendPlayComplete(playId);
-        resolve();
+        finish(true);
       };
 
       currentAudioSource.onended = onFinished;
@@ -506,24 +529,28 @@ function playWebAudioItem(base64Data, _format, duration, playId) {
         playbackFallbackTimer = null;
         if (!finished) {
           stopWebAudioSilent();
-          onFinished();
+          finish(true);
         }
       }, fallbackMs);
 
       currentAudioSource.start(0);
     } catch (e) {
       console.error("[WebAudio] Playback failed:", e);
-      sendPlayComplete(playId);
-      resolve();
+      finish(true);
     }
   });
 }
 
 // Stop playback, clear queue, and notify server (used by "stop_audio" command).
 function stopWebAudio() {
+  audioPlaybackGeneration += 1;
   audioQueue.length = 0;
-  isProcessingAudio = false;
   stopWebAudioSilent();
+  if (currentAudioResolver) {
+    const resolveCurrentAudio = currentAudioResolver;
+    currentAudioResolver = null;
+    resolveCurrentAudio();
+  }
 }
 
 // ── Web Camera Streaming ─────────────────────────────────────────────────────
