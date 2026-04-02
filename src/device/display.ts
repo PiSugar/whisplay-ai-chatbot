@@ -28,6 +28,8 @@ export interface Status {
   network_connected: boolean;
   rag_icon_visible: boolean;
   image_icon_visible: boolean;
+  music_progress: number | undefined;
+  music_duration_ms: number | undefined;
 }
 
 export class WhisplayDisplay {
@@ -47,6 +49,8 @@ export class WhisplayDisplay {
     network_connected: false,
     rag_icon_visible: false,
     image_icon_visible: false,
+    music_progress: undefined,
+    music_duration_ms: undefined,
   };
 
   private client = null as Socket | null;
@@ -363,6 +367,8 @@ export class WhisplayDisplay {
       network_connected,
       rag_icon_visible,
       image_icon_visible,
+      music_progress,
+      music_duration_ms,
     } = {
       ...this.currentStatus,
       ...normalizedStatus,
@@ -388,6 +394,8 @@ export class WhisplayDisplay {
     this.currentStatus.network_connected = network_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
     this.currentStatus.image_icon_visible = image_icon_visible;
+    this.currentStatus.music_progress = music_progress;
+    this.currentStatus.music_duration_ms = music_duration_ms;
     
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;
