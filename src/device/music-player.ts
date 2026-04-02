@@ -246,6 +246,17 @@ class LocalMusicPlayer {
     } catch {}
   }
 
+  private resetProgressTimer(): void {
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+    // Restart the timer from 0 with the same duration
+    if (this.currentTrackDurationMs > 0) {
+      this.startProgressTimer(this.currentTrackDurationMs);
+    }
+  }
+
   private startProgressTimer(durationMs: number): void {
     this.stopProgressTimer();
     this.currentTrackDurationMs = durationMs;
@@ -323,6 +334,7 @@ class LocalMusicPlayer {
       if (code && code !== 0) {
         console.error(`[Music] Playback exited with code=${code} signal=${signal}`);
         this.currentProcess = null;
+        this.resetProgressTimer();
         if (this.isPlaying && this.playbackRetries < LocalMusicPlayer.MAX_PLAYBACK_RETRIES) {
           this.playbackRetries++;
           console.log(`[Music] Retrying "${track.title}" (attempt ${this.playbackRetries}/${LocalMusicPlayer.MAX_PLAYBACK_RETRIES})...`);
