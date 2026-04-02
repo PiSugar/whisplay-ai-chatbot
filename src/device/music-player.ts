@@ -104,6 +104,11 @@ class LocalMusicPlayer {
   private pendingContinuous: boolean = false;
   private playbackGeneration: number = 0;
   private playbackRetries: number = 0;
+  private trackChangeCallback: ((title: string) => void) | null = null;
+
+  onTrackChange(callback: ((title: string) => void) | null): void {
+    this.trackChangeCallback = callback;
+  }
 
   constructor(
     private readonly libraryDirs: string[],
@@ -288,6 +293,7 @@ class LocalMusicPlayer {
     });
 
     console.log(`[Music] Playing: ${track.title}`);
+    this.trackChangeCallback?.(track.title);
   }
 
   private buildPlaybackCommand(filePath: string): { command: string; args: string[] } {
@@ -350,6 +356,7 @@ class LocalMusicPlayer {
     const playedViaWeb = await this.playViaWeb(track.filePath, onEnded);
     if (playedViaWeb) {
       console.log(`[Music] Playing: ${track.title}`);
+      this.trackChangeCallback?.(track.title);
       return;
     }
 
@@ -577,4 +584,8 @@ export const getCurrentTrackTitle = (): string => {
 
 export const startPendingMusicPlayback = (): void => {
   localMusicPlayerInstance?.startPendingPlayback();
+};
+
+export const onMusicTrackChange = (callback: ((title: string) => void) | null): void => {
+  localMusicPlayerInstance?.onTrackChange(callback);
 };
