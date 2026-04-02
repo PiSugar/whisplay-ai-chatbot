@@ -8,6 +8,7 @@ import {
   getCurrentStatus,
   onCameraCapture,
   onTextInput,
+  isButtonDown,
 } from "../../device/display";
 import {
   recordAudio,
@@ -161,9 +162,19 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       }/user-${Date.now()}.${recordFileFormat}`;
     onButtonPressed(noop);
     const listeningStartedAt = Date.now();
+    // If button was already released before we entered this state, go back to sleep
+    if (!isButtonDown()) {
+      console.log("[listening] Button already released, returning to sleep");
+      ctx.transitionTo("sleep");
+      return;
+    }
     const { result, stop } = recordAudioManually(ctx.currentRecordFilePath);
-    onButtonReleased(() => {
+    const handleRelease = () => {
       if (Date.now() - listeningStartedAt < 500) {
+        // Too short to be meaningful — stop recording and return to sleep
+        console.log("[listening] Button released too quickly, returning to sleep");
+        stop();
+        ctx.transitionTo("sleep");
         return;
       }
       stop();
@@ -171,7 +182,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         RGB: "#ff6800",
         image: "",
       });
-    });
+    };
+    onButtonReleased(handleRelease);
     result
       .then(() => {
         ctx.transitionTo("asr");

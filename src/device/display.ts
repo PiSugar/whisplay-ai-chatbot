@@ -57,6 +57,7 @@ export class WhisplayDisplay {
   private buttonPressedCallback: () => void = () => {};
   private buttonReleasedCallback: () => void = () => {};
   private buttonDoubleClickCallback: (() => void) | null = null;
+  private buttonDown = false;
   private onCameraCaptureCallback: () => void = () => {};
   private textInputCallback: (text: string) => void = () => {};
   private isReady: Promise<void>;
@@ -428,6 +429,7 @@ export class WhisplayDisplay {
   }
 
   private handleButtonPressedEvent(): void {
+    this.buttonDown = true;
     this.buttonPressTimeArray.push(Date.now());
     this.startMonitoringDoubleClick();
     if (!this.buttonDetectInterval) {
@@ -437,11 +439,16 @@ export class WhisplayDisplay {
   }
 
   private handleButtonReleasedEvent(): void {
+    this.buttonDown = false;
     this.buttonReleaseTimeArray.push(Date.now());
     if (!this.buttonDetectInterval) {
       console.log("emit released");
       this.buttonReleasedCallback();
     }
+  }
+
+  isButtonDown(): boolean {
+    return this.buttonDown;
   }
 
   private handleCameraCaptureEvent(): void {
@@ -512,6 +519,8 @@ export const onCameraCapture =
   displayInstance.onCameraCapture.bind(displayInstance);
 export const onTextInput =
   displayInstance.onTextInput.bind(displayInstance);
+export const isButtonDown =
+  displayInstance.isButtonDown.bind(displayInstance);
 
 function cleanup() {
   console.log("Cleaning up display process before exit...");
