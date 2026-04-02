@@ -3,6 +3,9 @@ import path from "path";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import { webAudioBridge } from "./web-audio-bridge";
 
+// Lazy import to avoid circular dependency (audio.ts pulls in cloud-api/server + plugin at module level)
+const lazyAudio = () => require("./audio") as { releaseAudioPlayer: () => Promise<void>; restoreAudioPlayer: () => void };
+
 type Track = {
   filePath: string;
   title: string;
@@ -88,12 +91,19 @@ const parseDirectories = (value: string | undefined): string[] => {
 };
 
 class LocalMusicPlayer {
+  private static readonly MAX_PLAYBACK_RETRIES = 10;
+  private static readonly RETRY_DELAY_MS = 1000;
+
   private tracks: Track[] = [];
   private currentProcess: ChildProcessWithoutNullStreams | null = null;
   private currentTrack: Track | null = null;
   private preloadPromise: Promise<void> | null = null;
   private isPlaying: boolean = false;
   private continuousPlay: boolean = false; // Whether to auto-play next track
+  private pendingTrack: Track | null = null;
+  private pendingContinuous: boolean = false;
+  private playbackGeneration: number = 0;
+  private playbackRetries: number = 0;
 
   constructor(
     private readonly libraryDirs: string[],
@@ -211,6 +221,8 @@ class LocalMusicPlayer {
   }
 
   private stopCurrentProcess(): void {
+    this.playbackGeneration++;
+
     if (webAudioBridge.isAvailable()) {
       webAudioBridge.stopPlayback();
     }
@@ -230,17 +242,68 @@ class LocalMusicPlayer {
     this.currentTrack = null;
   }
 
+  /**
+   * Spawn mpg123/sox for a track. On abnormal exit (code != 0), retries
+   * the same track up to MAX_PLAYBACK_RETRIES times with a delay.
+   * On normal exit, calls onNormalEnd. Stale exits from previous
+   * generations are silently ignored.
+   */
+  private spawnAndPlay(track: Track, gen: number, onNormalEnd: () => void): void {
+    const { command, args } = this.buildPlaybackCommand(track.filePath);
+    const proc = spawn(command, args);
+    this.currentProcess = proc;
+
+    proc.on("error", (err) => {
+      console.error(`[Music] Playback spawn error: ${err.message}`);
+      if (gen === this.playbackGeneration) {
+        this.currentProcess = null;
+        this.currentTrack = null;
+      }
+    });
+
+    proc.on("exit", (code, signal) => {
+      if (gen !== this.playbackGeneration) return;
+
+      if (code && code !== 0) {
+        console.error(`[Music] Playback exited with code=${code} signal=${signal}`);
+        this.currentProcess = null;
+        if (this.isPlaying && this.playbackRetries < LocalMusicPlayer.MAX_PLAYBACK_RETRIES) {
+          this.playbackRetries++;
+          console.log(`[Music] Retrying "${track.title}" (attempt ${this.playbackRetries}/${LocalMusicPlayer.MAX_PLAYBACK_RETRIES})...`);
+          setTimeout(() => {
+            if (gen === this.playbackGeneration && this.isPlaying) {
+              this.spawnAndPlay(track, gen, onNormalEnd);
+            }
+          }, LocalMusicPlayer.RETRY_DELAY_MS);
+          return;
+        }
+      }
+
+      this.playbackRetries = 0;
+      this.currentProcess = null;
+      this.currentTrack = null;
+      if (this.isPlaying) {
+        onNormalEnd();
+      }
+    });
+
+    console.log(`[Music] Playing: ${track.title}`);
+  }
+
   private buildPlaybackCommand(filePath: string): { command: string; args: string[] } {
     const ext = path.extname(filePath).toLowerCase();
+    // Use the "dmixed" ALSA device (dmix software mixer) so music playback
+    // can coexist with the persistent TTS player without ALSA device conflicts.
+    const alsaDevice = "dmixed";
     if (ext === ".mp3") {
       return {
         command: "mpg123",
-        args: ["-o", "alsa", "-a", `hw:${this.soundCardIndex},0`, filePath],
+        args: ["-o", "alsa", "-a", alsaDevice, filePath],
       };
     }
     return {
       command: "sox",
-      args: [filePath, "-t", "alsa", `hw:${this.soundCardIndex},0`],
+      args: [filePath, "-t", "alsa", alsaDevice],
     };
   }
 
@@ -275,6 +338,7 @@ class LocalMusicPlayer {
 
     this.stopCurrentProcess();
     this.currentTrack = track;
+    this.playbackRetries = 0;
 
     // Callback when playback ends - continue with next random track
     const onEnded = () => {
@@ -289,30 +353,8 @@ class LocalMusicPlayer {
       return;
     }
 
-    // Local playback fallback
-    const { command, args } = this.buildPlaybackCommand(track.filePath);
-    const process = spawn(command, args);
-    this.currentProcess = process;
-
-    process.on("error", (err) => {
-      console.error(`[Music] Playback error: ${err.message}`);
-      if (this.currentProcess === process) {
-        this.currentProcess = null;
-        this.currentTrack = null;
-      }
-    });
-
-    process.on("exit", () => {
-      if (this.currentProcess === process) {
-        this.currentProcess = null;
-        this.currentTrack = null;
-        if (this.isPlaying) {
-          void this.playNextRandomTrack();
-        }
-      }
-    });
-
-    console.log(`[Music] Playing: ${track.title}`);
+    const gen = this.playbackGeneration;
+    this.spawnAndPlay(track, gen, onEnded);
   }
 
   private async startPlayback(track: Track, continuous: boolean = false): Promise<void> {
@@ -320,8 +362,9 @@ class LocalMusicPlayer {
     this.currentTrack = track;
     this.isPlaying = true;
     this.continuousPlay = continuous;
+    this.playbackRetries = 0;
 
-    // Callback when playback ends
+    // Callback when playback ends normally
     const onEnded = () => {
       if (this.isPlaying && this.continuousPlay) {
         void this.playNextRandomTrack();
@@ -333,28 +376,14 @@ class LocalMusicPlayer {
     const playedViaWeb = await this.playViaWeb(track.filePath, onEnded);
     if (playedViaWeb) return;
 
-    // Local playback fallback
-    const { command, args } = this.buildPlaybackCommand(track.filePath);
-    const process = spawn(command, args);
-    this.currentProcess = process;
+    // Release the persistent TTS player so ALSA is completely free.
+    // Music uses the "dmixed" device (dmix mixer) which can coexist, but
+    // releasing first avoids any contention on the underlying hardware.
+    await lazyAudio().releaseAudioPlayer();
+    if (!this.isPlaying) return;
 
-    process.on("error", (err) => {
-      console.error(`[Music] Playback error: ${err.message}`);
-      if (this.currentProcess === process) {
-        this.currentProcess = null;
-        this.currentTrack = null;
-      }
-    });
-
-    process.on("exit", () => {
-      if (this.currentProcess === process) {
-        this.currentProcess = null;
-        this.currentTrack = null;
-        if (this.isPlaying) {
-          void this.playNextRandomTrack();
-        }
-      }
-    });
+    const gen = this.playbackGeneration;
+    this.spawnAndPlay(track, gen, onEnded);
   }
 
   async playByQuery(query: string, continuous: boolean = false): Promise<{
@@ -417,9 +446,82 @@ class LocalMusicPlayer {
     };
   }
 
+  async findByQuery(query: string, continuous: boolean = false): Promise<{
+    ok: boolean;
+    message: string;
+    trackPath?: string;
+    trackTitle?: string;
+  }> {
+    if (!this.isConfigured()) {
+      return { ok: false, message: "Music library not configured." };
+    }
+
+    await this.preloadLibrary();
+    if (this.tracks.length === 0) {
+      return { ok: false, message: "No music files found." };
+    }
+
+    const best = this.findBestMatch(query);
+    if (!best) {
+      return { ok: false, message: `No matching track found for "${query}"` };
+    }
+
+    this.pendingTrack = best.track;
+    this.pendingContinuous = continuous;
+
+    return {
+      ok: true,
+      message: `Playing: ${best.track.title}`,
+      trackPath: best.track.filePath,
+      trackTitle: best.track.title,
+    };
+  }
+
+  async findRandom(continuous: boolean = true): Promise<{
+    ok: boolean;
+    message: string;
+    trackPath?: string;
+    trackTitle?: string;
+  }> {
+    if (!this.isConfigured()) {
+      return { ok: false, message: "Music library not configured." };
+    }
+
+    await this.preloadLibrary();
+    if (this.tracks.length === 0) {
+      return { ok: false, message: "No music files found." };
+    }
+
+    const track = this.getRandomTrack();
+    if (!track) {
+      return { ok: false, message: "Could not select a random track." };
+    }
+
+    this.pendingTrack = track;
+    this.pendingContinuous = continuous;
+
+    return {
+      ok: true,
+      message: `Playing: ${track.title}`,
+      trackPath: track.filePath,
+      trackTitle: track.title,
+    };
+  }
+
+  startPendingPlayback(): void {
+    if (!this.pendingTrack) return;
+    const track = this.pendingTrack;
+    const continuous = this.pendingContinuous;
+    this.pendingTrack = null;
+    void this.startPlayback(track, continuous);
+  }
+
   stop(): void {
     this.isPlaying = false;
+    this.pendingTrack = null;
     this.stopCurrentProcess();
+    // Restore the persistent TTS player after releasing
+    lazyAudio().restoreAudioPlayer();
     console.log("[Music] Playback stopped");
   }
 
@@ -471,4 +573,8 @@ export const isMusicPlaying = (): boolean => {
 
 export const getCurrentTrackTitle = (): string => {
   return localMusicPlayerInstance?.getCurrentTrack()?.title || "";
+};
+
+export const startPendingMusicPlayback = (): void => {
+  localMusicPlayerInstance?.startPendingPlayback();
 };

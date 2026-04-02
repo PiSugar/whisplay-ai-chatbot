@@ -37,7 +37,7 @@ import {
   resetCameraModeControl,
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
-import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback } from "../../device/music-player";
+import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback } from "../../device/music-player";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -107,6 +107,9 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
   },
   music: (ctx: ChatFlowContext) => {
+    // Start deferred music playback when entering music state
+    startPendingMusicPlayback();
+
     onButtonDoubleClick(null);
     onButtonPressed(() => {
       // Stop music immediately when button is pressed
@@ -358,7 +361,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
               }
             }
             if (
-              functionName === "playMusic" &&
+              functionName.startsWith("playMusic") &&
               result?.startsWith("[success]")
             ) {
               ctx.enterMusicAfterAnswer = true;
