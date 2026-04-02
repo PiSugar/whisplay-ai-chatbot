@@ -12,7 +12,9 @@ export { getDynamicVoiceDetectLevel } from "./voice-detect";
 dotenv.config();
 
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
-const alsaOutputDevice = `hw:${soundCardIndex},0`;
+// Use the dmix software mixer so TTS and music playback can coexist.
+// Raw "hw:X,0" is exclusive — only one process can open it at a time.
+const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || "dmixed";
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
   const normalized = (value || "").toLowerCase();
   return normalized === "wav" || normalized === "mp3" ? normalized : fallback;
@@ -423,10 +425,59 @@ process.on("SIGINT", () => {
   process.exit();
 });
 
+/**
+ * Kill the persistent TTS player process to free the ALSA device.
+ * Resolves once the process has fully exited AND a post-exit settling
+ * delay has elapsed so that ALSA fully releases the hardware.
+ * Must be paired with restoreAudioPlayer() when done.
+ */
+const releaseAudioPlayer = (): Promise<void> => {
+  const proc = player.process;
+  player.process = null;
+  player.isPlaying = false;
+
+  if (!proc) {
+    return Promise.resolve();
+  }
+
+  const waitForExit = new Promise<void>((resolve) => {
+    if (proc.exitCode !== null || proc.signalCode !== null) {
+      resolve();
+      return;
+    }
+
+    const timeout = setTimeout(resolve, 3000);
+
+    proc.once("exit", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+
+    try {
+      proc.stdin?.end();
+      proc.kill();
+    } catch {}
+  });
+
+  // After process exit, wait for ALSA device to fully release
+  return waitForExit.then(() => new Promise((r) => setTimeout(r, 500)));
+};
+
+/**
+ * Recreate the persistent TTS player process after releaseAudioPlayer().
+ */
+const restoreAudioPlayer = (): void => {
+  if (!player.process) {
+    player.process = startPlayerProcess();
+  }
+};
+
 export {
   recordAudio,
   recordAudioManually,
   stopRecording,
   playAudioData,
   stopPlaying,
+  releaseAudioPlayer,
+  restoreAudioPlayer,
 };
