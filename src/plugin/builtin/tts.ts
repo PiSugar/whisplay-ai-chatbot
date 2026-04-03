@@ -149,4 +149,17 @@ export function registerTTSPlugins(): void {
       return { ttsProcessor };
     },
   } as TTSPlugin);
+
+  pluginRegistry.register({
+    name: "aws",
+    displayName: "Amazon Polly TTS",
+    version: "1.0.0",
+    type: "tts",
+    audioFormat: "mp3",
+    description: "Amazon Polly text-to-speech",
+    activate: () => {
+      const ttsProcessor = require("../../cloud-api/aws/aws-tts").default;
+      return { ttsProcessor };
+    },
+  } as TTSPlugin);
 }

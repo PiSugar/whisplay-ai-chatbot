@@ -248,4 +248,20 @@ export function registerLLMPlugins(): void {
       };
     },
   } as LLMPlugin);
+
+  pluginRegistry.register({
+    name: "aws",
+    displayName: "AWS Bedrock LLM",
+    version: "1.0.0",
+    type: "llm",
+    description: "Amazon Bedrock language model",
+    activate: () => {
+      const mod = require("../../cloud-api/aws/aws-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+        summaryTextWithLLM: mod.summaryTextWithLLM,
+      };
+    },
+  } as LLMPlugin);
 }

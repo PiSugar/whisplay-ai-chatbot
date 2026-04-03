@@ -162,4 +162,17 @@ export function registerASRPlugins(): void {
       return { recognizeAudio };
     },
   } as ASRPlugin);
+
+  pluginRegistry.register({
+    name: "aws",
+    displayName: "Amazon Transcribe ASR",
+    version: "1.0.0",
+    type: "asr",
+    audioFormat: "wav",
+    description: "Amazon Transcribe speech recognition",
+    activate: () => {
+      const { recognizeAudio } = require("../../cloud-api/aws/aws-asr");
+      return { recognizeAudio };
+    },
+  } as ASRPlugin);
 }
