@@ -31,7 +31,7 @@ battery_font_size=13
 # Global variables
 current_status = "Hello"
 current_emoji = "😄"
-current_text = "Waiting for message..."
+current_text = "Hi, I am Nirmata. \n Waiting for message..."
 current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
