@@ -6,6 +6,10 @@ const batteryText = document.getElementById("batteryText");
 const netIcon = document.getElementById("netIcon");
 const imageIcon = document.getElementById("imageIcon");
 const ragIcon = document.getElementById("ragIcon");
+const musicProgress = document.getElementById("musicProgress");
+const musicFill = document.getElementById("musicFill");
+const musicElapsed = document.getElementById("musicElapsed");
+const musicTotal = document.getElementById("musicTotal");
 const led = document.getElementById("led");
 const ledText = document.getElementById("ledText");
 const btn = document.getElementById("btn");
@@ -127,6 +131,13 @@ let ws = null;
 let reconnectTimer = null;
 let cameraTimer = null;
 
+function formatMs(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return min + ":" + (sec < 10 ? "0" : "") + sec;
+}
+
 function applyState(data) {
   if (!data || !data.ready) return;
 
@@ -153,6 +164,18 @@ function applyState(data) {
   setIconVisible(netIcon, Boolean(data.network_connected));
   setIconVisible(imageIcon, Boolean(data.image_icon_visible));
   setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
+
+  const progress = typeof data.music_progress === "number" ? data.music_progress : -1;
+  const durationMs = typeof data.music_duration_ms === "number" ? data.music_duration_ms : 0;
+  if (progress >= 0) {
+    musicProgress.classList.add("visible");
+    musicFill.style.width = (Math.min(1, Math.max(0, progress)) * 100).toFixed(1) + "%";
+    musicElapsed.textContent = formatMs(durationMs * Math.min(1, Math.max(0, progress)));
+    musicTotal.textContent = formatMs(durationMs);
+  } else {
+    musicProgress.classList.remove("visible");
+    musicFill.style.width = "0%";
+  }
 
   const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));
   dim.style.opacity = dimOpacity.toFixed(2);

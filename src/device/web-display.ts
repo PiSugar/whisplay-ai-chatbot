@@ -205,6 +205,8 @@ export class WebDisplayServer implements WebAudioBridgeServer {
       rag_icon_visible: this.currentStatus.rag_icon_visible,
       image_icon_visible: this.currentStatus.image_icon_visible,
       image_revision: this.imageRevision,
+      music_progress: this.currentStatus.music_progress,
+      music_duration_ms: this.currentStatus.music_duration_ms,
     };
   }
 

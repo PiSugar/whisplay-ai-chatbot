@@ -28,6 +28,8 @@ export interface Status {
   network_connected: boolean;
   rag_icon_visible: boolean;
   image_icon_visible: boolean;
+  music_progress: number | undefined;
+  music_duration_ms: number | undefined;
 }
 
 export class WhisplayDisplay {
@@ -47,12 +49,15 @@ export class WhisplayDisplay {
     network_connected: false,
     rag_icon_visible: false,
     image_icon_visible: false,
+    music_progress: undefined,
+    music_duration_ms: undefined,
   };
 
   private client = null as Socket | null;
   private buttonPressedCallback: () => void = () => {};
   private buttonReleasedCallback: () => void = () => {};
   private buttonDoubleClickCallback: (() => void) | null = null;
+  private buttonDown = false;
   private onCameraCaptureCallback: () => void = () => {};
   private textInputCallback: (text: string) => void = () => {};
   private isReady: Promise<void>;
@@ -363,6 +368,8 @@ export class WhisplayDisplay {
       network_connected,
       rag_icon_visible,
       image_icon_visible,
+      music_progress,
+      music_duration_ms,
     } = {
       ...this.currentStatus,
       ...normalizedStatus,
@@ -388,6 +395,8 @@ export class WhisplayDisplay {
     this.currentStatus.network_connected = network_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
     this.currentStatus.image_icon_visible = image_icon_visible;
+    this.currentStatus.music_progress = music_progress;
+    this.currentStatus.music_duration_ms = music_duration_ms;
     
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;
@@ -420,6 +429,7 @@ export class WhisplayDisplay {
   }
 
   private handleButtonPressedEvent(): void {
+    this.buttonDown = true;
     this.buttonPressTimeArray.push(Date.now());
     this.startMonitoringDoubleClick();
     if (!this.buttonDetectInterval) {
@@ -429,11 +439,16 @@ export class WhisplayDisplay {
   }
 
   private handleButtonReleasedEvent(): void {
+    this.buttonDown = false;
     this.buttonReleaseTimeArray.push(Date.now());
     if (!this.buttonDetectInterval) {
       console.log("emit released");
       this.buttonReleasedCallback();
     }
+  }
+
+  isButtonDown(): boolean {
+    return this.buttonDown;
   }
 
   private handleCameraCaptureEvent(): void {
@@ -504,6 +519,8 @@ export const onCameraCapture =
   displayInstance.onCameraCapture.bind(displayInstance);
 export const onTextInput =
   displayInstance.onTextInput.bind(displayInstance);
+export const isButtonDown =
+  displayInstance.isButtonDown.bind(displayInstance);
 
 function cleanup() {
   console.log("Cleaning up display process before exit...");

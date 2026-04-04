@@ -49,6 +49,8 @@ current_image = None
 current_network_connected = None
 current_rag_icon_visible = False
 current_image_icon_visible = False
+current_music_progress = None
+current_music_duration_ms = None
 camera_mode = False
 camera_capture_image_path = ""
 camera_thread = None
@@ -133,12 +135,41 @@ class RenderThread(threading.Thread):
             self.render_header(image, draw, status, emoji, battery_level, battery_color)
             self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, header_height, ImageUtils.image_to_rgb565(image, self.whisplay.LCD_WIDTH, header_height))
 
+            # render music progress bar if active
+            progress_bar_height = 0
+            if current_music_progress is not None:
+                progress_bar_height = 22
+                pb_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, progress_bar_height), (0, 0, 0, 255))
+                pb_draw = ImageDraw.Draw(pb_image)
+                margin = 10
+                bar_w = self.whisplay.LCD_WIDTH - 2 * margin
+                bar_h = 4
+                # time labels above the bar
+                time_font = ImageFont.truetype(self.font_path, 10)
+                elapsed_ms = int((current_music_duration_ms or 0) * min(1.0, max(0.0, current_music_progress)))
+                total_ms = current_music_duration_ms or 0
+                elapsed_str = "%d:%02d" % (elapsed_ms // 60000, (elapsed_ms % 60000) // 1000)
+                total_str = "%d:%02d" % (total_ms // 60000, (total_ms % 60000) // 1000)
+                pb_draw.text((margin, 0), elapsed_str, font=time_font, fill=(180, 180, 180, 255))
+                total_bbox = time_font.getbbox(total_str)
+                total_w = total_bbox[2] - total_bbox[0]
+                pb_draw.text((margin + bar_w - total_w, 0), total_str, font=time_font, fill=(180, 180, 180, 255))
+                # progress bar below time labels
+                bar_y = progress_bar_height - bar_h - 2
+                # background track
+                pb_draw.rounded_rectangle([margin, bar_y, margin + bar_w, bar_y + bar_h], radius=2, fill=(60, 60, 60, 255))
+                # filled portion
+                fill_w = max(0, int(bar_w * min(1.0, max(0.0, current_music_progress))))
+                if fill_w > 0:
+                    pb_draw.rounded_rectangle([margin, bar_y, margin + fill_w, bar_y + bar_h], radius=2, fill=(0, 102, 170, 255))
+                self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, progress_bar_height, ImageUtils.image_to_rgb565(pb_image, self.whisplay.LCD_WIDTH, progress_bar_height))
+
             # render main text area
-            text_area_height = self.whisplay.LCD_HEIGHT - header_height
+            text_area_height = self.whisplay.LCD_HEIGHT - header_height - progress_bar_height
             text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
             text_draw = ImageDraw.Draw(text_bg_image)
             self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
-            self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
+            self.whisplay.draw_image(0, header_height + progress_bar_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
 
         
 
@@ -318,13 +349,15 @@ class RenderThread(threading.Thread):
 
 def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
-                  network_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None):
+                  network_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None,
+                  music_progress=None, music_duration_ms=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
     global current_scroll_sync_target_top, current_scroll_sync_speed
     global current_scroll_sync_hold_until
     global current_network_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
+    global current_music_progress, current_music_duration_ms
 
     next_text = text
     if text is not None:
@@ -395,6 +428,10 @@ def update_display_data(status=None, emoji=None, text=None,
     current_battery_level = battery_level if battery_level is not None else current_battery_level
     current_battery_color = battery_color if battery_color is not None else current_battery_color
     current_image_path = image_path if image_path is not None else current_image_path
+    if music_progress is not None:
+        current_music_progress = music_progress if music_progress >= 0 else None
+    if music_duration_ms is not None:
+        current_music_duration_ms = music_duration_ms if music_duration_ms > 0 else None
 
 
 def send_to_all_clients(message):
@@ -469,6 +506,8 @@ def handle_client(client_socket, addr, whisplay):
                     network_connected = content.get("network_connected", None)
                     rag_icon_visible = content.get("rag_icon_visible", None)
                     image_icon_visible = content.get("image_icon_visible", None)
+                    music_progress = content.get("music_progress", None)
+                    music_duration_ms = content.get("music_duration_ms", None)
                     capture_image_path = content.get("capture_image_path", None)
                     trigger_camera_capture = content.get("camera_capture", None)
                     # boolean to enable camera mode
@@ -512,14 +551,17 @@ def handle_client(client_socket, addr, whisplay):
                     if (text is not None) or (status is not None) or (emoji is not None) or \
                        (battery_level is not None) or (battery_color is not None) or \
                               (image_path is not None) or (network_connected is not None) or \
-                            (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None):
+                            (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None) or \
+                            (music_progress is not None) or (music_duration_ms is not None):
                         update_display_data(status=status, emoji=emoji,
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
                                                  rag_icon_visible=rag_icon_visible,
                                          image_icon_visible=image_icon_visible,
-                                                 transaction_id=transaction_id)
+                                                 transaction_id=transaction_id,
+                                                 music_progress=music_progress,
+                                                 music_duration_ms=music_duration_ms)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:

@@ -8,6 +8,7 @@ import {
   getCurrentStatus,
   onCameraCapture,
   onTextInput,
+  isButtonDown,
 } from "../../device/display";
 import {
   recordAudio,
@@ -37,7 +38,7 @@ import {
   resetCameraModeControl,
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
-import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback } from "../../device/music-player";
+import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback, onMusicTrackChange, onMusicPlaybackEnd } from "../../device/music-player";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -110,9 +111,27 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     // Start deferred music playback when entering music state
     startPendingMusicPlayback();
 
+    // Update display when track changes during continuous playback
+    onMusicTrackChange((title) => {
+      if (ctx.currentFlowName === "music") {
+        display({ text: `Now playing: ${title}` });
+      }
+    });
+
+    // Return to sleep when non-continuous playback finishes
+    onMusicPlaybackEnd(() => {
+      if (ctx.currentFlowName === "music") {
+        onMusicTrackChange(null);
+        onMusicPlaybackEnd(null);
+        ctx.transitionTo("sleep");
+      }
+    });
+
     onButtonDoubleClick(null);
     onButtonPressed(() => {
       // Stop music immediately when button is pressed
+      onMusicTrackChange(null);
+      onMusicPlaybackEnd(null);
       stopMusicPlayback();
       ctx.transitionTo("listening");
     });
@@ -143,9 +162,19 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       }/user-${Date.now()}.${recordFileFormat}`;
     onButtonPressed(noop);
     const listeningStartedAt = Date.now();
+    // If button was already released before we entered this state, go back to sleep
+    if (!isButtonDown()) {
+      console.log("[listening] Button already released, returning to sleep");
+      ctx.transitionTo("sleep");
+      return;
+    }
     const { result, stop } = recordAudioManually(ctx.currentRecordFilePath);
-    onButtonReleased(() => {
+    const handleRelease = () => {
       if (Date.now() - listeningStartedAt < 500) {
+        // Too short to be meaningful — stop recording and return to sleep
+        console.log("[listening] Button released too quickly, returning to sleep");
+        stop();
+        ctx.transitionTo("sleep");
         return;
       }
       stop();
@@ -153,7 +182,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         RGB: "#ff6800",
         image: "",
       });
-    });
+    };
+    onButtonReleased(handleRelease);
     result
       .then(() => {
         ctx.transitionTo("asr");

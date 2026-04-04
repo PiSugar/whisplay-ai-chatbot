@@ -149,6 +149,46 @@ body {
   z-index: 1;
 }
 
+.music-progress {
+  display: none;
+  padding: 0 10px 2px;
+  background: #000;
+  position: relative;
+  z-index: 1;
+}
+
+.music-progress.visible {
+  display: block;
+}
+
+.music-progress.visible + .body {
+  height: calc(280px - 98px - 18px);
+}
+
+.music-progress-track {
+  height: 4px;
+  background: #3c3c3c;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.music-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #0066aa;
+  border-radius: 2px;
+  transition: width 0.5s linear;
+}
+
+.music-progress-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #b4b4b4;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
 .text-viewport {
   position: relative;
   height: 100%;

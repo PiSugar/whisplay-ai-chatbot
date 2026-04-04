@@ -1,10 +1,12 @@
 import fs from "fs";
 import path from "path";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { getAudioDurationInSeconds } from "get-audio-duration";
 import { webAudioBridge } from "./web-audio-bridge";
 
-// Lazy import to avoid circular dependency (audio.ts pulls in cloud-api/server + plugin at module level)
+// Lazy imports to avoid circular dependencies
 const lazyAudio = () => require("./audio") as { releaseAudioPlayer: () => Promise<void>; restoreAudioPlayer: () => void };
+const lazyDisplay = () => require("./display") as { display: (s: Record<string, any>) => void };
 
 type Track = {
   filePath: string;
@@ -104,6 +106,19 @@ class LocalMusicPlayer {
   private pendingContinuous: boolean = false;
   private playbackGeneration: number = 0;
   private playbackRetries: number = 0;
+  private trackChangeCallback: ((title: string) => void) | null = null;
+  private playbackEndCallback: (() => void) | null = null;
+  private progressTimer: ReturnType<typeof setInterval> | null = null;
+  private playbackStartTime: number = 0;
+  private currentTrackDurationMs: number = 0;
+
+  onTrackChange(callback: ((title: string) => void) | null): void {
+    this.trackChangeCallback = callback;
+  }
+
+  onPlaybackEnd(callback: (() => void) | null): void {
+    this.playbackEndCallback = callback;
+  }
 
   constructor(
     private readonly libraryDirs: string[],
@@ -220,6 +235,58 @@ class LocalMusicPlayer {
     return this.tracks[index];
   }
 
+  private stopProgressTimer(): void {
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+    // Clear progress bar from display
+    try {
+      lazyDisplay().display({ music_progress: -1, music_duration_ms: 0 });
+    } catch {}
+  }
+
+  private resetProgressTimer(): void {
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+    // Restart the timer from 0 with the same duration
+    if (this.currentTrackDurationMs > 0) {
+      this.startProgressTimer(this.currentTrackDurationMs);
+    }
+  }
+
+  private startProgressTimer(durationMs: number): void {
+    this.stopProgressTimer();
+    this.currentTrackDurationMs = durationMs;
+    this.playbackStartTime = Date.now();
+    // Send initial progress
+    try {
+      lazyDisplay().display({ music_progress: 0, music_duration_ms: durationMs });
+    } catch {}
+    this.progressTimer = setInterval(() => {
+      if (!this.isPlaying || this.currentTrackDurationMs <= 0) {
+        this.stopProgressTimer();
+        return;
+      }
+      const elapsed = Date.now() - this.playbackStartTime;
+      const progress = Math.min(1, elapsed / this.currentTrackDurationMs);
+      try {
+        lazyDisplay().display({ music_progress: progress, music_duration_ms: this.currentTrackDurationMs });
+      } catch {}
+    }, 1000);
+  }
+
+  private async getTrackDurationMs(filePath: string): Promise<number> {
+    try {
+      const sec = await getAudioDurationInSeconds(filePath);
+      return Math.round(sec * 1000);
+    } catch {
+      return 0;
+    }
+  }
+
   private stopCurrentProcess(): void {
     this.playbackGeneration++;
 
@@ -267,6 +334,7 @@ class LocalMusicPlayer {
       if (code && code !== 0) {
         console.error(`[Music] Playback exited with code=${code} signal=${signal}`);
         this.currentProcess = null;
+        this.resetProgressTimer();
         if (this.isPlaying && this.playbackRetries < LocalMusicPlayer.MAX_PLAYBACK_RETRIES) {
           this.playbackRetries++;
           console.log(`[Music] Retrying "${track.title}" (attempt ${this.playbackRetries}/${LocalMusicPlayer.MAX_PLAYBACK_RETRIES})...`);
@@ -288,6 +356,7 @@ class LocalMusicPlayer {
     });
 
     console.log(`[Music] Playing: ${track.title}`);
+    this.trackChangeCallback?.(track.title);
   }
 
   private buildPlaybackCommand(filePath: string): { command: string; args: string[] } {
@@ -337,11 +406,16 @@ class LocalMusicPlayer {
     if (!track) return;
 
     this.stopCurrentProcess();
+    this.stopProgressTimer();
     this.currentTrack = track;
     this.playbackRetries = 0;
 
+    const durationMs = await this.getTrackDurationMs(track.filePath);
+    if (!this.isPlaying) return;
+
     // Callback when playback ends - continue with next random track
     const onEnded = () => {
+      this.stopProgressTimer();
       if (this.isPlaying) {
         void this.playNextRandomTrack();
       }
@@ -350,31 +424,43 @@ class LocalMusicPlayer {
     const playedViaWeb = await this.playViaWeb(track.filePath, onEnded);
     if (playedViaWeb) {
       console.log(`[Music] Playing: ${track.title}`);
+      this.trackChangeCallback?.(track.title);
+      if (durationMs > 0) this.startProgressTimer(durationMs);
       return;
     }
 
     const gen = this.playbackGeneration;
     this.spawnAndPlay(track, gen, onEnded);
+    if (durationMs > 0) this.startProgressTimer(durationMs);
   }
 
   private async startPlayback(track: Track, continuous: boolean = false): Promise<void> {
     this.stopCurrentProcess();
+    this.stopProgressTimer();
     this.currentTrack = track;
     this.isPlaying = true;
     this.continuousPlay = continuous;
     this.playbackRetries = 0;
 
+    const durationMs = await this.getTrackDurationMs(track.filePath);
+    if (!this.isPlaying) return;
+
     // Callback when playback ends normally
     const onEnded = () => {
+      this.stopProgressTimer();
       if (this.isPlaying && this.continuousPlay) {
         void this.playNextRandomTrack();
       } else {
         this.isPlaying = false;
+        this.playbackEndCallback?.();
       }
     };
 
     const playedViaWeb = await this.playViaWeb(track.filePath, onEnded);
-    if (playedViaWeb) return;
+    if (playedViaWeb) {
+      if (durationMs > 0) this.startProgressTimer(durationMs);
+      return;
+    }
 
     // Release the persistent TTS player so ALSA is completely free.
     // Music uses the "dmixed" device (dmix mixer) which can coexist, but
@@ -384,6 +470,7 @@ class LocalMusicPlayer {
 
     const gen = this.playbackGeneration;
     this.spawnAndPlay(track, gen, onEnded);
+    if (durationMs > 0) this.startProgressTimer(durationMs);
   }
 
   async playByQuery(query: string, continuous: boolean = false): Promise<{
@@ -519,6 +606,7 @@ class LocalMusicPlayer {
   stop(): void {
     this.isPlaying = false;
     this.pendingTrack = null;
+    this.stopProgressTimer();
     this.stopCurrentProcess();
     // Restore the persistent TTS player after releasing
     lazyAudio().restoreAudioPlayer();
@@ -577,4 +665,12 @@ export const getCurrentTrackTitle = (): string => {
 
 export const startPendingMusicPlayback = (): void => {
   localMusicPlayerInstance?.startPendingPlayback();
+};
+
+export const onMusicTrackChange = (callback: ((title: string) => void) | null): void => {
+  localMusicPlayerInstance?.onTrackChange(callback);
+};
+
+export const onMusicPlaybackEnd = (callback: (() => void) | null): void => {
+  localMusicPlayerInstance?.onPlaybackEnd(callback);
 };
