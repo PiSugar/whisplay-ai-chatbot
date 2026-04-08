@@ -9,6 +9,7 @@ import {
   Tool,
   ToolConfiguration
 } from "@aws-sdk/client-bedrock-runtime";
+import type { ConverseStreamCommandInput, SystemContentBlock } from "@aws-sdk/client-bedrock-runtime";
 import { shouldResetChatHistory, systemPrompt, updateLastMessageTime } from "../../config/llm-config";
 import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import { FunctionCall, Message, ToolReturnTag } from "../../type";
@@ -127,13 +128,16 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   });
 
   try {
-    const systemMsg = messages.find(m => m.role === "system")?.content || systemPrompt;
+    const systemMsgs: SystemContentBlock[] = messages.reduce((acc, m) => m.role === "system" ? [...acc, { text: m.content }] : acc, [] as SystemContentBlock[]);
+    if (systemMsgs.length === 0) {
+      systemMsgs.push({ text: systemPrompt });
+    }
     const bedrockMessages = toBedrockMessages(messages);
     const toolConfig = toBedrockTools();
 
-    let commandParam: any = {
+    let commandParam: ConverseStreamCommandInput = {
       modelId: awsBedrockModel,
-      system: [{ text: systemMsg }],
+      system: systemMsgs,
       messages: bedrockMessages,
     };
 
