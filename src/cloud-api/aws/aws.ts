@@ -13,6 +13,7 @@ export const awsPollyVoice = process.env.AWS_POLLY_VOICE || "Joanna";
 export const awsPollyEngine = (process.env.AWS_POLLY_ENGINE as any) || "neural";
 export const awsPollyLanguageCode = process.env.AWS_POLLY_LANGUAGE_CODE || "en-US";
 export const awsTranscribeLanguageCode = process.env.AWS_TRANSCRIBE_LANGUAGE || "en-US";
+export const awsFacesCollectionId = process.env.AWS_FACES_COLLECTION_ID || "";
 
 export const getAwsCredentials = () => {
   if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
