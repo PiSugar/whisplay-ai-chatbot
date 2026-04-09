@@ -40,6 +40,7 @@ export enum LLMServer {
   whisplayim = "whisplay-im",
   imagetooldirect = "image-tool-direct",
   perplexity = "perplexity",
+  openrouter = "openrouter",
 }
 
 export enum TTSServer {
