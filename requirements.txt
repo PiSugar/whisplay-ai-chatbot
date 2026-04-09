@@ -1,0 +1,18 @@
+# Python dependencies for running start.py on a generic Raspberry Pi.
+#
+# Install with:
+#     pip install -r requirements.txt --break-system-packages
+#
+# System packages that are assumed to already be present on Pi OS:
+#     sudo apt install alsa-utils          # provides arecord / aplay
+#     sudo apt install python3-libgpiod    # optional, improves gpiozero on Pi 5
+#
+# On Pi 5 / Bookworm, lgpio is the preferred backend for gpiozero.
+# On older Pi OS releases gpiozero will fall back to RPi.GPIO automatically.
+
+faster-whisper>=1.0.0
+flask>=3.0.0
+werkzeug>=3.0.0
+requests>=2.31.0
+gpiozero>=2.0
+lgpio>=0.2.2.0; sys_platform == "linux"

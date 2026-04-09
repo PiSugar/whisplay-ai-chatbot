@@ -27,6 +27,45 @@ Tutorial (offline version build on RPi 5):
 - PiSugar Whisplay HAT (including LCD screen, on-board speaker and microphone)
 - PiSugar 3 1200mAh (Plus version 5000mAh for RPi 5)
 
+## Python-only variant (`start.py`) — generic Raspberry Pi, no Whisplay HAT
+
+This repository also ships a self-contained Python implementation for
+a plain Raspberry Pi with a USB microphone, speaker and a single push
+button wired to a GPIO pin. It uses `faster-whisper` for STT, an
+OpenAI-compatible LLM/TTS API, and a browser-based HTML display in
+place of the Whisplay LCD.
+
+### Wiring
+
+Connect one leg of a momentary push button to a GPIO pin (default BCM
+17) and the other leg to ground (`GND`). No external resistor is
+required — the internal pull-up is enabled by default. Change
+`button.pin` in `config.json` to pick a different GPIO.
+
+### Install and run
+
+```bash
+# System packages used for audio I/O
+sudo apt install alsa-utils python3-pip
+
+# Python dependencies
+pip install -r requirements.txt --break-system-packages
+
+# Create your config from the example and fill in the API keys
+cp config.example.json config.json
+nano config.json
+
+# Start ChatWin
+python3 start.py
+```
+
+Open `http://<raspberry-pi-ip>:8080/` in a browser on the same network
+to watch the HTML display — it shows the current state, the
+transcription of what you said, and the assistant's streaming reply.
+
+Hold the GPIO button while speaking and release it to send the
+utterance to the LLM.
+
 ## Pre-build Image
 
 - Please find the pre-build images in project wiki: https://github.com/PiSugar/whisplay-ai-chatbot/wiki

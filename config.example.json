@@ -1,0 +1,50 @@
+{
+    "button": {
+        "pin": 17,
+        "pull_up": true,
+        "active_low": true,
+        "bounce_time_ms": 50,
+        "hold_to_talk": true
+    },
+    "web_display": {
+        "host": "0.0.0.0",
+        "port": 8080,
+        "title": "ChatWin",
+        "show_conversation": true
+    },
+    "audio": {
+        "sample_rate": 16000,
+        "channels": 1,
+        "record_device": "default",
+        "playback_device": "default",
+        "record_format": "S16_LE",
+        "max_record_seconds": 60
+    },
+    "stt": {
+        "model_size_or_path": "tiny",
+        "device": "cpu",
+        "compute_type": "int8",
+        "cpu_threads": 3,
+        "language": "en",
+        "vad_filter": true
+    },
+    "llm": {
+        "enabled": true,
+        "api_key": "YOUR_OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+        "system_prompt": "You are ChatWin, a friendly voice assistant running on a Raspberry Pi. Answer briefly and conversationally in at most three sentences.",
+        "max_history": 10,
+        "request_timeout": 60,
+        "stream": true
+    },
+    "tts": {
+        "enabled": true,
+        "api_key": "YOUR_OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1",
+        "model": "tts-1",
+        "voice": "alloy",
+        "response_format": "wav",
+        "request_timeout": 60
+    }
+}

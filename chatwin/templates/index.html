@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="state-starting">
+    <div class="app">
+        <header class="header">
+            <div class="identity">
+                <span class="brand">{{ title }}</span>
+                <span class="hint">Hold the button. Ask something. Release to get an answer.</span>
+            </div>
+            <div class="connection">
+                <span id="connection-dot" class="dot"></span>
+                <span id="connection-label">connecting…</span>
+            </div>
+        </header>
+
+        <main class="main">
+            <section class="stage">
+                <div class="badge">
+                    <span id="emoji" class="emoji">●</span>
+                    <span id="status" class="status-label">starting</span>
+                </div>
+                <div id="current-text" class="current-text">Loading…</div>
+                <div id="user-text" class="user-text" hidden></div>
+            </section>
+
+            <section id="conversation-section" class="conversation">
+                <h2>Conversation</h2>
+                <ul id="conversation" class="conversation-list"></ul>
+                <p id="conversation-empty" class="conversation-empty">
+                    No messages yet. Hold the button and speak to get started.
+                </p>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <small>ChatWin — running on a Raspberry Pi with a GPIO push button and faster-whisper STT.</small>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -18,3 +18,5 @@ package-lock.json
 docker/volume
 .DS_Store
 __pycache__
+# Runtime config for start.py (contains API keys); use config.example.json as the template
+/config.json
