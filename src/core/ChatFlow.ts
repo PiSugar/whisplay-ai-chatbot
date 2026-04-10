@@ -17,6 +17,7 @@ import { flowStates } from "./chat-flow/states";
 import { ChatFlowContext, FlowName } from "./chat-flow/types";
 import { playWakeupChime } from "../device/audio";
 import { stopMusicPlayback, isMusicPlaying } from "../device/music-player";
+import type { Status } from "../device/display";
 
 dotEnv.config();
 
@@ -131,13 +132,16 @@ class ChatFlow implements ChatFlowContext {
           const statusText = payload.tool
             ? `[${payload.tool}] ${payload.text || ""}`
             : payload.text || "";
-          const statusMap: Record<string, Partial<{ status: string; emoji: string; text: string; RGB: string; scroll_speed: number }>> = {
+          const textInputEnabled =
+            payload.status === "idle" && this.currentFlowName === "sleep";
+          const statusMap: Record<string, Partial<Status>> = {
             thinking: {
               status: "Thinking",
               emoji: payload.emoji || "🤔",
               text: statusText,
               RGB: "#ff6800",
               scroll_speed: 6,
+              text_input_enabled: false,
             },
             tool_calling: {
               status: "Tool calling",
@@ -145,16 +149,19 @@ class ChatFlow implements ChatFlowContext {
               text: statusText,
               RGB: "#ff6800",
               scroll_speed: 4,
+              text_input_enabled: false,
             },
             answering: {
               status: "answering...",
               emoji: payload.emoji || "💬",
               RGB: "#00c8a3",
+              text_input_enabled: false,
             },
             idle: {
               status: "idle",
               emoji: payload.emoji || "😊",
               RGB: "#000055",
+              text_input_enabled: textInputEnabled,
             },
           };
           const displayPayload = statusMap[payload.status] || {
@@ -162,6 +169,7 @@ class ChatFlow implements ChatFlowContext {
             emoji: payload.emoji || "🤖",
             text: statusText,
             RGB: "#ff6800",
+            text_input_enabled: false,
           };
           display(displayPayload);
         },
@@ -204,6 +212,7 @@ class ChatFlow implements ChatFlowContext {
     }
     console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
     this.stateMachine.transitionTo(flowName);
+    display({ text_input_enabled: flowName === "sleep" });
   };
 
   isAnswerFlow = (): boolean => {

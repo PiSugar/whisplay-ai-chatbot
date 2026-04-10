@@ -146,7 +146,7 @@ function applyState(data) {
   statusText.textContent = status;
   emojiText.textContent = data.emoji || "";
   updateText(data.text || "", data.scroll_sync, data.scroll_speed);
-  updateTextInputState(status);
+  updateTextInputState(data.text_input_enabled, status);
 
   const ledColor = normalizeColor(data.RGB);
   led.style.background = ledColor;
@@ -664,11 +664,14 @@ const textInput = document.getElementById("textInput");
 const textSendBtn = document.getElementById("textSendBtn");
 let currentDeviceStatus = "";
 
-function updateTextInputState(status) {
+function updateTextInputState(enabled, status) {
   currentDeviceStatus = status || "";
-  const isIdle = currentDeviceStatus === "idle" || currentDeviceStatus === "starting";
-  textInput.disabled = !isIdle;
-  textSendBtn.disabled = !isIdle;
+  const isEnabled =
+    typeof enabled === "boolean"
+      ? enabled
+      : currentDeviceStatus === "idle" || currentDeviceStatus === "starting";
+  textInput.disabled = !isEnabled;
+  textSendBtn.disabled = !isEnabled;
 }
 
 function sendTextInput() {
@@ -686,6 +689,8 @@ textInput.addEventListener("keydown", (e) => {
     sendTextInput();
   }
 });
+
+updateTextInputState(false, "");
 
 // Unlock AudioContext on first user interaction (required by browsers).
 document.addEventListener("click", () => { try { ensureAudioContext(); } catch {} }, { once: true });

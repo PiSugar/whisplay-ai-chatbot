@@ -192,6 +192,7 @@ export class WebDisplayServer implements WebAudioBridgeServer {
       status: this.currentStatus.status,
       emoji: this.currentStatus.emoji,
       text: this.currentStatus.text,
+      text_input_enabled: this.currentStatus.text_input_enabled,
       scroll_speed: this.currentStatus.scroll_speed,
       scroll_sync: this.currentStatus.scroll_sync,
       brightness: this.currentStatus.brightness,

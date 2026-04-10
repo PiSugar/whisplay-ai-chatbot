@@ -54,7 +54,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       if (ctx.currentFlowName !== "sleep") return;
       ctx.answerId += 1;
       ctx.asrText = text;
-      display({ status: "recognizing", text });
+      display({ status: "recognizing", text, text_input_enabled: false });
       ctx.transitionTo("answer");
     });
     if (ctx.enableCamera) {
