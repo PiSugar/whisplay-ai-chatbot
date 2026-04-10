@@ -142,10 +142,11 @@ function formatMs(ms) {
 function applyState(data) {
   if (!data || !data.ready) return;
 
-  statusText.textContent = data.status || "";
+  const status = data.status || "";
+  statusText.textContent = status;
   emojiText.textContent = data.emoji || "";
   updateText(data.text || "", data.scroll_sync, data.scroll_speed);
-  updateTextInputState(data.status);
+  updateTextInputState(status);
 
   const ledColor = normalizeColor(data.RGB);
   led.style.background = ledColor;
@@ -169,7 +170,8 @@ function applyState(data) {
 
   const progress = typeof data.music_progress === "number" ? data.music_progress : -1;
   const durationMs = typeof data.music_duration_ms === "number" ? data.music_duration_ms : 0;
-  if (progress >= 0) {
+  const showMusicProgress = status === "music" && progress >= 0 && durationMs > 0;
+  if (showMusicProgress) {
     musicProgress.classList.add("visible");
     musicFill.style.width = (Math.min(1, Math.max(0, progress)) * 100).toFixed(1) + "%";
     musicElapsed.textContent = formatMs(durationMs * Math.min(1, Math.max(0, progress)));
@@ -177,6 +179,8 @@ function applyState(data) {
   } else {
     musicProgress.classList.remove("visible");
     musicFill.style.width = "0%";
+    musicElapsed.textContent = "0:00";
+    musicTotal.textContent = "0:00";
   }
 
   const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));

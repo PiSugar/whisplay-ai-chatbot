@@ -18,6 +18,7 @@ body {
   font-family: "Space Grotesk", sans-serif;
   background: radial-gradient(circle at 20% 0%, #1c2a3d, #0b1016 60%);
   color: var(--text);
+  color-scheme: dark;
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -296,19 +297,27 @@ body {
 }
 
 #textInput {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
   min-height: 110px;
   resize: vertical;
   padding: 10px 44px 10px 10px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: none;
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
   line-height: 1.45;
   outline: none;
+  box-shadow: none;
   transition: border-color 0.15s;
+}
+
+#textInput::placeholder {
+  color: rgba(228, 236, 244, 0.55);
 }
 
 #textInput:focus {
@@ -321,6 +330,8 @@ body {
 }
 
 #textSendBtn {
+  appearance: none;
+  -webkit-appearance: none;
   position: absolute;
   right: 10px;
   bottom: 13px;
@@ -328,7 +339,8 @@ body {
   height: 36px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--accent);
+  background-color: var(--accent);
+  background-image: none;
   color: #000;
   font-size: 16px;
   cursor: pointer;
@@ -337,6 +349,7 @@ body {
   justify-content: center;
   transition: opacity 0.15s;
   padding: 0;
+  box-shadow: none;
   z-index: 1;
 }
 
