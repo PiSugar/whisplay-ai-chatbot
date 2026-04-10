@@ -6,6 +6,7 @@
     "whisplay": "./bin/whisplay"
   },
   "scripts": {
+    "dev": "yarn build && yarn start",
     "build": "rm -rf dist && tsc && node scripts/register-whisplay-daemon-app.js",
     "start": "node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/index.js",
     "index-knowledge": "node -r ts-node/register -r tsconfig-paths/register dist/index-knowledge.js",
@@ -22,6 +23,7 @@
     "@aws-sdk/client-bedrock-runtime": "^3.714.0",
     "@aws-sdk/client-polly": "^3.758.0",
     "@aws-sdk/client-rekognition": "^3.758.0",
+    "@aws-sdk/client-s3vectors": "^3.758.0",
     "@aws-sdk/client-transcribe-streaming": "^3.758.0",
     "@google-cloud/text-to-speech": "^6.3.1",
     "@google/genai": "1.25.0",
@@ -29,7 +31,7 @@
     "@picovoice/leopard-node": "^2.0.2",
     "@picovoice/orca-node": "^2.0.1",
     "@qdrant/js-client-rest": "^1.16.2",
-    "axios": "^1.13.5",
+    "axios": "1.13.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.5.0",
     "get-audio-duration": "^4.0.1",
