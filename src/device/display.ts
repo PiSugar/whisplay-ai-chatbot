@@ -12,6 +12,7 @@ export interface Status {
   status: string;
   emoji: string;
   text: string;
+  text_input_enabled?: boolean;
   scroll_speed: number;
   scroll_sync?: {
     char_end: number;
@@ -26,6 +27,7 @@ export interface Status {
   camera_capture?: boolean;
   capture_image_path: string;
   network_connected: boolean;
+  vpn_connected: boolean;
   rag_icon_visible: boolean;
   image_icon_visible: boolean;
   music_progress: number | undefined;
@@ -37,6 +39,7 @@ export class WhisplayDisplay {
     status: "starting",
     emoji: "😊",
     text: "",
+    text_input_enabled: false,
     scroll_speed: 3,
     scroll_sync: undefined,
     brightness: 100,
@@ -47,6 +50,7 @@ export class WhisplayDisplay {
     camera_mode: false,
     capture_image_path: "",
     network_connected: false,
+    vpn_connected: false,
     rag_icon_visible: false,
     image_icon_visible: false,
     music_progress: undefined,
@@ -356,6 +360,7 @@ export class WhisplayDisplay {
       status,
       emoji,
       text,
+      text_input_enabled,
       RGB,
       brightness,
       scroll_sync,
@@ -366,6 +371,7 @@ export class WhisplayDisplay {
       camera_capture,
       capture_image_path,
       network_connected,
+      vpn_connected,
       rag_icon_visible,
       image_icon_visible,
       music_progress,
@@ -384,6 +390,7 @@ export class WhisplayDisplay {
     this.currentStatus.status = status;
     this.currentStatus.emoji = emoji;
     this.currentStatus.text = text;
+    this.currentStatus.text_input_enabled = text_input_enabled;
     this.currentStatus.RGB = RGB;
     this.currentStatus.brightness = brightness;
     this.currentStatus.scroll_sync = scroll_sync;
@@ -393,6 +400,7 @@ export class WhisplayDisplay {
     this.currentStatus.camera_mode = camera_mode;
     this.currentStatus.capture_image_path = capture_image_path;
     this.currentStatus.network_connected = network_connected;
+    this.currentStatus.vpn_connected = vpn_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
     this.currentStatus.image_icon_visible = image_icon_visible;
     this.currentStatus.music_progress = music_progress;

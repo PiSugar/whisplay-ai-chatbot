@@ -4,6 +4,7 @@ const textContent = document.getElementById("textContent");
 const batteryFill = document.getElementById("batteryFill");
 const batteryText = document.getElementById("batteryText");
 const netIcon = document.getElementById("netIcon");
+const vpnIcon = document.getElementById("vpnIcon");
 const imageIcon = document.getElementById("imageIcon");
 const ragIcon = document.getElementById("ragIcon");
 const musicProgress = document.getElementById("musicProgress");
@@ -141,10 +142,11 @@ function formatMs(ms) {
 function applyState(data) {
   if (!data || !data.ready) return;
 
-  statusText.textContent = data.status || "";
+  const status = data.status || "";
+  statusText.textContent = status;
   emojiText.textContent = data.emoji || "";
   updateText(data.text || "", data.scroll_sync, data.scroll_speed);
-  updateTextInputState(data.status);
+  updateTextInputState(data.text_input_enabled, status);
 
   const ledColor = normalizeColor(data.RGB);
   led.style.background = ledColor;
@@ -162,12 +164,14 @@ function applyState(data) {
   batteryFill.style.background = normalizeColor(data.battery_color);
 
   setIconVisible(netIcon, Boolean(data.network_connected));
+  setIconVisible(vpnIcon, Boolean(data.vpn_connected));
   setIconVisible(imageIcon, Boolean(data.image_icon_visible));
   setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
 
   const progress = typeof data.music_progress === "number" ? data.music_progress : -1;
   const durationMs = typeof data.music_duration_ms === "number" ? data.music_duration_ms : 0;
-  if (progress >= 0) {
+  const showMusicProgress = status === "music" && progress >= 0 && durationMs > 0;
+  if (showMusicProgress) {
     musicProgress.classList.add("visible");
     musicFill.style.width = (Math.min(1, Math.max(0, progress)) * 100).toFixed(1) + "%";
     musicElapsed.textContent = formatMs(durationMs * Math.min(1, Math.max(0, progress)));
@@ -175,6 +179,8 @@ function applyState(data) {
   } else {
     musicProgress.classList.remove("visible");
     musicFill.style.width = "0%";
+    musicElapsed.textContent = "0:00";
+    musicTotal.textContent = "0:00";
   }
 
   const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));
@@ -658,11 +664,14 @@ const textInput = document.getElementById("textInput");
 const textSendBtn = document.getElementById("textSendBtn");
 let currentDeviceStatus = "";
 
-function updateTextInputState(status) {
+function updateTextInputState(enabled, status) {
   currentDeviceStatus = status || "";
-  const isIdle = currentDeviceStatus === "idle" || currentDeviceStatus === "starting";
-  textInput.disabled = !isIdle;
-  textSendBtn.disabled = !isIdle;
+  const isEnabled =
+    typeof enabled === "boolean"
+      ? enabled
+      : currentDeviceStatus === "idle" || currentDeviceStatus === "starting";
+  textInput.disabled = !isEnabled;
+  textSendBtn.disabled = !isEnabled;
 }
 
 function sendTextInput() {
@@ -680,6 +689,8 @@ textInput.addEventListener("keydown", (e) => {
     sendTextInput();
   }
 });
+
+updateTextInputState(false, "");
 
 // Unlock AudioContext on first user interaction (required by browsers).
 document.addEventListener("click", () => { try { ensureAudioContext(); } catch {} }, { once: true });
