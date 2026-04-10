@@ -26,6 +26,7 @@ export interface Status {
   camera_capture?: boolean;
   capture_image_path: string;
   network_connected: boolean;
+  wireguard_connected: boolean;
   rag_icon_visible: boolean;
   image_icon_visible: boolean;
   music_progress: number | undefined;
@@ -47,6 +48,7 @@ export class WhisplayDisplay {
     camera_mode: false,
     capture_image_path: "",
     network_connected: false,
+    wireguard_connected: false,
     rag_icon_visible: false,
     image_icon_visible: false,
     music_progress: undefined,
@@ -366,6 +368,7 @@ export class WhisplayDisplay {
       camera_capture,
       capture_image_path,
       network_connected,
+      wireguard_connected,
       rag_icon_visible,
       image_icon_visible,
       music_progress,
@@ -393,6 +396,7 @@ export class WhisplayDisplay {
     this.currentStatus.camera_mode = camera_mode;
     this.currentStatus.capture_image_path = capture_image_path;
     this.currentStatus.network_connected = network_connected;
+    this.currentStatus.wireguard_connected = wireguard_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
     this.currentStatus.image_icon_visible = image_icon_visible;
     this.currentStatus.music_progress = music_progress;

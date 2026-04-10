@@ -4,6 +4,7 @@ import ChatFlow from "./core/ChatFlow";
 import dotenv from "dotenv";
 import { connect } from "net";
 import dns from "dns";
+import { exec } from "child_process";
 
 dotenv.config();
 
@@ -46,6 +47,26 @@ const intervalCheckNetwork = () => {
   }, 10000);
 };
 intervalCheckNetwork();
+
+const wireguardInterface = process.env.WIREGUARD_INTERFACE || "wg0";
+
+const isWireguardConnected = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    exec(`ip link show ${wireguardInterface}`, (err) => {
+      resolve(!err);
+    });
+  });
+};
+
+const intervalCheckWireguard = () => {
+  setInterval(async () => {
+    const connected = await isWireguardConnected();
+    display({
+      wireguard_connected: connected,
+    });
+  }, 10000);
+};
+intervalCheckWireguard();
 
 new ChatFlow({
   enableCamera: process.env.ENABLE_CAMERA === "true",

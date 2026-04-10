@@ -4,6 +4,7 @@ const textContent = document.getElementById("textContent");
 const batteryFill = document.getElementById("batteryFill");
 const batteryText = document.getElementById("batteryText");
 const netIcon = document.getElementById("netIcon");
+const vpnIcon = document.getElementById("vpnIcon");
 const imageIcon = document.getElementById("imageIcon");
 const ragIcon = document.getElementById("ragIcon");
 const musicProgress = document.getElementById("musicProgress");
@@ -162,6 +163,7 @@ function applyState(data) {
   batteryFill.style.background = normalizeColor(data.battery_color);
 
   setIconVisible(netIcon, Boolean(data.network_connected));
+  setIconVisible(vpnIcon, Boolean(data.wireguard_connected));
   setIconVisible(imageIcon, Boolean(data.image_icon_visible));
   setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
 
