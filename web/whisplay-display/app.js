@@ -163,7 +163,7 @@ function applyState(data) {
   batteryFill.style.background = normalizeColor(data.battery_color);
 
   setIconVisible(netIcon, Boolean(data.network_connected));
-  setIconVisible(vpnIcon, Boolean(data.wireguard_connected));
+  setIconVisible(vpnIcon, Boolean(data.vpn_connected));
   setIconVisible(imageIcon, Boolean(data.image_icon_visible));
   setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
 

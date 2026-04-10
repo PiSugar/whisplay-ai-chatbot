@@ -48,6 +48,11 @@ const intervalCheckNetwork = () => {
 };
 intervalCheckNetwork();
 
+type VpnProvider = "none" | "wireguard" | "tailscale";
+
+const vpnProvider = (
+  process.env.VPN_PROVIDER || "none"
+).toLowerCase() as VpnProvider;
 const wireguardInterface = process.env.WIREGUARD_INTERFACE || "wg0";
 
 const isWireguardConnected = (): Promise<boolean> => {
@@ -62,11 +67,50 @@ const intervalCheckWireguard = () => {
   setInterval(async () => {
     const connected = await isWireguardConnected();
     display({
-      wireguard_connected: connected,
+      vpn_connected: connected,
     });
   }, 10000);
 };
-intervalCheckWireguard();
+
+const isTailscaleConnected = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    exec("tailscale status --json", (err, stdout) => {
+      if (err || !stdout) {
+        resolve(false);
+        return;
+      }
+
+      try {
+        const status = JSON.parse(stdout) as {
+          BackendState?: string;
+          TailscaleIPs?: string[];
+          Self?: { Online?: boolean };
+        };
+        const hasAddress = Array.isArray(status.TailscaleIPs) && status.TailscaleIPs.length > 0;
+        resolve(status.BackendState === "Running" && hasAddress && Boolean(status.Self?.Online));
+      } catch {
+        resolve(false);
+      }
+    });
+  });
+};
+
+const intervalCheckTailscale = () => {
+  setInterval(async () => {
+    const connected = await isTailscaleConnected();
+    display({
+      vpn_connected: connected,
+    });
+  }, 10000);
+};
+
+if (vpnProvider === "wireguard") {
+  intervalCheckWireguard();
+} else if (vpnProvider === "tailscale") {
+  intervalCheckTailscale();
+} else {
+  display({ vpn_connected: false });
+}
 
 new ChatFlow({
   enableCamera: process.env.ENABLE_CAMERA === "true",
