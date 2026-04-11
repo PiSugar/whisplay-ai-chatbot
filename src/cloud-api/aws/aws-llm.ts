@@ -153,20 +153,6 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
     if (response.stream) {
       for await (const chunk of response.stream) {
-        if (chunk.contentBlockDelta) {
-          const d = chunk.contentBlockDelta;
-          if (d.delta?.text) {
-            partialAnswer += d.delta.text;
-            partialCallback(d.delta.text);
-          }
-          if (d.delta?.toolUse) {
-            const toolUseId = d.contentBlockIndex?.toString() || "sys_" + Date.now();
-            const existingTool = toolCalls.find((t) => t.id === toolUseId);
-            if (existingTool) {
-              existingTool.function.arguments += d.delta.toolUse.input || "";
-            }
-          }
-        }
         if (chunk.contentBlockStart) {
           const scbs = chunk.contentBlockStart;
           if (scbs.start?.toolUse) {
@@ -180,7 +166,17 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
               }
             });
           }
+        } else if (chunk.contentBlockDelta) {
+          const d = chunk.contentBlockDelta;
+          if (d.delta?.text) {
+            partialAnswer += d.delta.text;
+            partialCallback(d.delta.text);
+          }
+          if (d.delta?.toolUse) {
+            toolCalls[toolCalls.length - 1].function.arguments += d.delta.toolUse.input || "";
+          }
         }
+
       }
     }
 
@@ -194,6 +190,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       const results = await Promise.all(
         toolCalls.map(async (call: FunctionCall) => {
           const { function: { arguments: argString, name }, id } = call;
+          console.log('func call', JSON.stringify(call, null, 2))
+
           let args: Record<string, any> = {};
           try { args = JSON.parse(argString || "{}"); } catch { }
           const func = llmFuncMap[name! as string];
