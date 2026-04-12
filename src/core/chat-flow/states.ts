@@ -39,6 +39,7 @@ import {
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
 import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback, onMusicTrackChange, onMusicPlaybackEnd } from "../../device/music-player";
+import { autoSaveExchange } from "../../config/mempalace";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -331,6 +332,11 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       getPlayEndPromise,
       stop: stopPlaying,
     } = ctx.streamResponser;
+    let llmResponseText = "";
+    const trackingPartial = (text: string): void => {
+      llmResponseText += text;
+      if (currentAnswerId === ctx.answerId) partial(text);
+    };
     ctx.partialThinking = "";
     ctx.thinkingSentences = [];
     [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
@@ -369,7 +375,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         ]);
         chatWithLLMStream(
           prompt,
-          (text) => currentAnswerId === ctx.answerId && partial(text),
+          (text) => { if (currentAnswerId === ctx.answerId) trackingPartial(text); },
           () => currentAnswerId === ctx.answerId && endPartial(),
           (partialThinking) =>
             currentAnswerId === ctx.answerId &&
@@ -411,6 +417,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       });
     getPlayEndPromise().then(() => {
       if (ctx.currentFlowName === "answer") {
+        autoSaveExchange(ctx.asrText, llmResponseText);
         clearPendingCapturedImgForChat();
         display({ image_icon_visible: false });
         if (ctx.wakeSessionActive || ctx.endAfterAnswer) {
