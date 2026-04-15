@@ -1,7 +1,31 @@
 import { pluginRegistry } from "../registry";
 import { LLMPlugin } from "../types";
 
+const NOT_CONFIGURED_MSG = "LLM service is not configured. Please set LLM_SERVER in your .env file.";
+
 export function registerLLMPlugins(): void {
+  pluginRegistry.register({
+    name: "test",
+    displayName: "Test LLM (Not Configured)",
+    version: "1.0.0",
+    type: "llm",
+    description: "Placeholder LLM plugin that reminds users to configure LLM_SERVER",
+    activate: () => {
+      return {
+        chatWithLLMStream: async (
+          _inputMessages: any[],
+          partialCallback: (partialAnswer: string) => void,
+          endCallBack: () => void,
+        ) => {
+          console.warn(NOT_CONFIGURED_MSG);
+          partialCallback(NOT_CONFIGURED_MSG);
+          endCallBack();
+        },
+        resetChatHistory: () => {},
+      };
+    },
+  } as LLMPlugin);
+
   pluginRegistry.register({
     name: "volcengine",
     displayName: "Volcengine LLM",

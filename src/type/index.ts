@@ -13,6 +13,7 @@ export interface OllamaMessage {
 }
 
 export enum ASRServer {
+  test = "test",
   volcengine = "volcengine",
   tencent = "tencent",
   openai = "openai",
@@ -27,6 +28,7 @@ export enum ASRServer {
 }
 
 export enum LLMServer {
+  test = "test",
   volcengine = "volcengine",
   openai = "openai",
   ollama = "ollama",
@@ -44,6 +46,7 @@ export enum LLMServer {
 }
 
 export enum TTSServer {
+  test = "test",
   volcengine = "volcengine",
   openai = "openai",
   tencent = "tencent",
