@@ -83,6 +83,7 @@ get_env_value() {
 # check if .env file exists
 initial_volume_percent=""
 default_initial_volume_percent=80
+es8388_mic_pga_level=8
 serve_ollama=false
 if [ -f ".env" ]; then
   # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
@@ -98,6 +99,9 @@ if [ -f ".env" ]; then
   if [ -n "$INITIAL_VOLUME_LEVEL" ]; then
     echo "[Volume] INITIAL_VOLUME_LEVEL is deprecated and ignored. Please use INITIAL_VOLUME_PERCENT (0-100) instead."
   fi
+
+  ES8388_MIC_PGA_LEVEL=$(get_env_value "ES8388_MIC_PGA_LEVEL")
+  [ -n "$ES8388_MIC_PGA_LEVEL" ] && export ES8388_MIC_PGA_LEVEL
 
   WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
   [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
@@ -121,6 +125,10 @@ if [ -f ".env" ]; then
   if [ -n "$INITIAL_VOLUME_PERCENT" ] && [ "$INITIAL_VOLUME_PERCENT" != "auto" ]; then
     initial_volume_percent=$INITIAL_VOLUME_PERCENT
   fi
+
+  if [ -n "$ES8388_MIC_PGA_LEVEL" ]; then
+    es8388_mic_pga_level=$ES8388_MIC_PGA_LEVEL
+  fi
 else
   echo ".env file not found, please create one based on .env.template."
   exit 1
@@ -140,10 +148,16 @@ if [ "$audio_supported" = true ]; then
     amixer -c "$card_index" set "$card_control" "${initial_volume_percent}%" >/dev/null 2>&1 || true
   fi
 
-  # ES8388: reduce mic PGA gain to avoid ADC clipping.
+  # ES8388: apply a deterministic capture route and input gain.
   if [ "$card_control" = "Output 1" ]; then
-    amixer -c "$card_index" cset numid=12 4,4 >/dev/null 2>&1 || true
-    echo "ES8388 Mic PGA set to 12dB"
+    # Route ADC from Line 1 path, select stereo input, maximize digital capture,
+    # and apply the configured analogue PGA gain.
+    amixer -c "$card_index" cset numid=15 0 >/dev/null 2>&1 || true
+    amixer -c "$card_index" cset numid=16 0 >/dev/null 2>&1 || true
+    amixer -c "$card_index" cset numid=14 0 >/dev/null 2>&1 || true
+    amixer -c "$card_index" cset numid=1 192,192 >/dev/null 2>&1 || true
+    amixer -c "$card_index" cset numid=12 "$es8388_mic_pga_level,$es8388_mic_pga_level" >/dev/null 2>&1 || true
+    echo "ES8388 capture route initialized (PGA=$es8388_mic_pga_level)"
   fi
 fi
 

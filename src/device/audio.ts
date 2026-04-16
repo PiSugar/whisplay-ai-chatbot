@@ -13,6 +13,10 @@ export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
 dotenv.config();
 
+const soundCardType = detectSoundCardType();
+const defaultRecordGainDb = soundCardType === "es8388" ? 18 : 0;
+const parsedRecordGainDb = parseFloat(process.env.RECORD_GAIN_DB || `${defaultRecordGainDb}`);
+const recordGainDb = Number.isFinite(parsedRecordGainDb) ? parsedRecordGainDb : defaultRecordGainDb;
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
   const normalized = (value || "").toLowerCase();
   return normalized === "wav" || normalized === "mp3" ? normalized : fallback;
@@ -186,6 +190,7 @@ const recordAudio = async (
       "-r",
       "16000",
       outputPath,
+      ...(recordGainDb !== 0 ? ["gain", `${recordGainDb}`] : []),
       "silence",
       "1",
       "0.1",
@@ -247,8 +252,11 @@ const recordAudioManually = (
     let warmupProcess: ChildProcess | null = null;
     let recordingProcess: ChildProcess | null = null;
     let stopped = false;
+    let warmupFinished = false;
 
     const startRecording = () => {
+      if (warmupFinished) return;
+      warmupFinished = true;
       warmupProcess = null;
       if (stopped) return;
       const process = spawn("sox", [
@@ -256,6 +264,7 @@ const recordAudioManually = (
         "-t", recordFileFormat,
         "-c", "1", "-r", "16000",
         outputPath,
+        ...(recordGainDb !== 0 ? ["gain", `${recordGainDb}`] : []),
       ]);
       recordingProcess = process;
       process.on("error", (err) => {
