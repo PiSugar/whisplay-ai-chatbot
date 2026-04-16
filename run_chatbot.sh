@@ -168,6 +168,17 @@ if [ "$serve_ollama" = true ]; then
   OLLAMA_HOST=0.0.0.0:11434 ollama serve &
 fi
 
+# Auto-launch Hat Plus UI browser when ES8388 sound card is detected (Hat Plus model)
+is_hat_plus=false
+if [ "$audio_supported" = true ] && echo "$card_control" | grep -qi 'Output 1'; then
+  is_hat_plus=true
+fi
+if [ "$is_hat_plus" = true ] && [ -f "scripts/start-hat-plus-ui.sh" ]; then
+  echo "Hat Plus detected, launching Hat Plus UI in background..."
+  bash scripts/start-hat-plus-ui.sh &
+  hat_plus_ui_pid=$!
+fi
+
 # if file use_npm exists and is true, use npm
 if [ -f "use_npm" ]; then
   use_npm=true
@@ -200,6 +211,14 @@ fi
 
 # After the service ends, perform cleanup
 echo "Cleaning up after service..."
+
+# Stop Hat Plus UI browser if we launched it
+if [ -n "$hat_plus_ui_pid" ]; then
+  echo "Stopping Hat Plus UI browser..."
+  kill $hat_plus_ui_pid 2>/dev/null
+  pkill -f "firefox.*17881" 2>/dev/null || true
+  pkill -f "chromium.*17881" 2>/dev/null || true
+fi
 
 if [ "$serve_ollama" = true ]; then
   echo "Stopping Ollama server..."

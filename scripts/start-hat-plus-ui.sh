@@ -38,16 +38,16 @@ pkill -f "chromium.*${HAT_PLUS_PORT}" 2>/dev/null || true
 pkill -f "firefox.*${HAT_PLUS_PORT}" 2>/dev/null || true
 sleep 1
 
-# Prefer Chromium, fall back to Firefox
+# Prefer Firefox, fall back to Chromium
 BROWSER_BIN=""
-if command -v chromium &>/dev/null; then
+if command -v firefox &>/dev/null; then
+  BROWSER_BIN="firefox"
+elif command -v chromium &>/dev/null; then
   BROWSER_BIN="chromium"
 elif command -v chromium-browser &>/dev/null; then
   BROWSER_BIN="chromium-browser"
-elif command -v firefox &>/dev/null; then
-  BROWSER_BIN="firefox"
 else
-  echo "[hat-plus-ui] Error: no browser found. Install chromium or firefox"
+  echo "[hat-plus-ui] Error: no browser found. Install firefox or chromium"
   exit 1
 fi
 
