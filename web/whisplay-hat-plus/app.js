@@ -5,6 +5,7 @@ const textContent = document.getElementById("textContent");
 const batteryFill = document.getElementById("batteryFill");
 const batteryText = document.getElementById("batteryText");
 const netIcon = document.getElementById("netIcon");
+const vpnIcon = document.getElementById("vpnIcon");
 const imageIcon = document.getElementById("imageIcon");
 const ragIcon = document.getElementById("ragIcon");
 const ledDot = document.getElementById("ledDot");
@@ -17,6 +18,10 @@ const menuOverlay = document.getElementById("menuOverlay");
 const menuClose = document.getElementById("menuClose");
 const volumeSlider = document.getElementById("volumeSlider");
 const volumeValue = document.getElementById("volumeValue");
+const musicBar = document.getElementById("musicBar");
+const musicElapsed = document.getElementById("musicElapsed");
+const musicTotal = document.getElementById("musicTotal");
+const musicFill = document.getElementById("musicFill");
 
 // ── Scroll state ────────────────────────────────────────────────────────────
 let scrollTop = 0;
@@ -206,6 +211,24 @@ let reconnectTimer = null;
 let cameraTimer = null;
 let volumeFetchPending = false;
 
+function formatMusicTime(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return min + ":" + (sec < 10 ? "0" : "") + sec;
+}
+
+function updateMusicBar(progress, durationMs) {
+  const hasMusic = typeof progress === "number" && progress >= 0;
+  musicBar.classList.toggle("visible", hasMusic);
+  if (!hasMusic) return;
+  const p = Math.min(1, Math.max(0, progress));
+  const dur = durationMs || 0;
+  musicFill.style.width = (p * 100).toFixed(1) + "%";
+  musicElapsed.textContent = formatMusicTime(dur * p);
+  musicTotal.textContent = formatMusicTime(dur);
+}
+
 function applyState(data) {
   if (!data || !data.ready) return;
 
@@ -231,8 +254,12 @@ function applyState(data) {
 
   // Icons
   setIconVisible(netIcon, Boolean(data.network_connected));
+  setIconVisible(vpnIcon, Boolean(data.vpn_connected));
   setIconVisible(imageIcon, Boolean(data.image_icon_visible));
   setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
+
+  // Music progress bar
+  updateMusicBar(data.music_progress, data.music_duration_ms);
 
   // Brightness dim
   const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));

@@ -25,7 +25,7 @@ body {
   width: 480px;
   height: 640px;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto auto;
   position: relative;
   background: var(--bg);
 }
@@ -167,6 +167,46 @@ body {
   box-shadow: 0 0 6px rgba(68,242,138,.3);
   pointer-events: none;
   flex-shrink: 0;
+}
+
+/* ── Music progress bar ─────────────────────────────────────────────────── */
+.music-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px 6px;
+  z-index: 2;
+}
+
+.music-bar.visible {
+  display: flex;
+}
+
+.music-time {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 32px;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-time:last-of-type {
+  text-align: right;
+}
+
+.music-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.music-fill {
+  height: 100%;
+  width: 0%;
+  background: #0066aa;
+  border-radius: 2px;
+  transition: width .3s linear;
 }
 
 /* ── Record button area ─────────────────────────────────────────────────── */

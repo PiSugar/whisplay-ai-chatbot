@@ -210,8 +210,11 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       camera_mode: this.currentStatus.camera_mode,
       capture_image_path: this.currentStatus.capture_image_path,
       network_connected: this.currentStatus.wifi_signal_level > 0,
+      vpn_connected: this.currentStatus.vpn_connected,
       rag_icon_visible: this.currentStatus.rag_icon_visible,
       image_icon_visible: this.currentStatus.image_icon_visible,
+      music_progress: this.currentStatus.music_progress,
+      music_duration_ms: this.currentStatus.music_duration_ms,
       image_revision: this.imageRevision,
     };
   }
