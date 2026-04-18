@@ -17,6 +17,14 @@ import { ChatWithLLMStreamFunction, SummaryTextWithLLMFunction } from "../interf
 import { chatHistoryDir } from "../../utils/dir";
 import { extractToolResponse, stimulateStreamResponse } from "../../config/common";
 import { AWS_REGION, getAwsCredentials, hasAwsCredentials, awsBedrockModel } from "./aws";
+import {
+  consumePendingCapturedImgForChat,
+  hasPendingCapturedImgForChat,
+  getImageMimeType,
+} from "../../utils/image";
+
+const useCapturedImageInChat =
+  (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() === "true";
 
 const client = hasAwsCredentials()
   ? new BedrockRuntimeClient({ region: AWS_REGION, credentials: getAwsCredentials() })
@@ -33,8 +41,31 @@ const resetChatHistory = (): void => {
   messages.push({ role: "system", content: systemPrompt });
 };
 
-const toBedrockMessages = (msgs: Message[]): BedrockMessage[] => {
+const toBedrockMessages = (
+  msgs: Message[],
+  capturedImagePath?: string,
+  lastUserMsgIdx?: number
+): BedrockMessage[] => {
   const result: BedrockMessage[] = [];
+
+  let imageBlock: any = null;
+  if (capturedImagePath) {
+    try {
+      const mimeType = getImageMimeType(capturedImagePath);
+      const formatStr = mimeType?.split("/")[1] || "jpeg";
+      const format = formatStr === "jpg" ? "jpeg" : formatStr;
+      const imageBytes = fs.readFileSync(capturedImagePath);
+      imageBlock = {
+        image: {
+          format,
+          source: { bytes: new Uint8Array(imageBytes) },
+        }
+      };
+    } catch (err) {
+      console.error("Error reading captured image:", err);
+    }
+  }
+
   for (let i = 0; i < msgs.length; i++) {
     const msg = msgs[i];
     if (msg.role === "system") continue;
@@ -80,9 +111,14 @@ const toBedrockMessages = (msgs: Message[]): BedrockMessage[] => {
       continue;
     }
 
+    const contentBlocks: any[] = [{ text: msg.content }];
+    if (imageBlock && msg.role === "user" && i === lastUserMsgIdx) {
+      contentBlocks.push(imageBlock);
+    }
+
     result.push({
       role: msg.role as "user" | "assistant",
-      content: [{ text: msg.content }]
+      content: contentBlocks
     });
   }
   return result;
@@ -136,7 +172,19 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     if (systemMsgs.length === 0) {
       systemMsgs.push({ text: systemPrompt });
     }
-    const bedrockMessages = toBedrockMessages(messages);
+
+    const lastUserMessageIndex = messages
+      .map((msg, index) => ({ msg, index }))
+      .filter(({ msg }) => msg.role === "user")
+      .map(({ index }) => index)
+      .pop();
+
+    const capturedImagePath =
+      useCapturedImageInChat && lastUserMessageIndex !== undefined && hasPendingCapturedImgForChat()
+        ? consumePendingCapturedImgForChat()
+        : "";
+
+    const bedrockMessages = toBedrockMessages(messages, capturedImagePath, lastUserMessageIndex);
     const toolConfig = toBedrockTools();
 
     let commandParam: ConverseStreamCommandInput = {
