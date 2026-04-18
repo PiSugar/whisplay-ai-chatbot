@@ -76,6 +76,10 @@ const toBedrockMessages = (msgs: Message[]): BedrockMessage[] => {
       continue;
     }
 
+    if (!msg.content) {
+      continue;
+    }
+
     result.push({
       role: msg.role as "user" | "assistant",
       content: [{ text: msg.content }]
