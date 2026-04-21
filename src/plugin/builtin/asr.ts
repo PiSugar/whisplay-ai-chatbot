@@ -1,7 +1,25 @@
 import { pluginRegistry } from "../registry";
 import { ASRPlugin } from "../types";
 
+const NOT_CONFIGURED_MSG = "ASR service is not configured. Please set ASR_SERVER in your .env file.";
+
 export function registerASRPlugins(): void {
+  pluginRegistry.register({
+    name: "test",
+    displayName: "Test ASR (Not Configured)",
+    version: "1.0.0",
+    type: "asr",
+    description: "Placeholder ASR plugin that reminds users to configure ASR_SERVER",
+    activate: () => {
+      return {
+        recognizeAudio: async (_audioPath: string) => {
+          console.warn(NOT_CONFIGURED_MSG);
+          return NOT_CONFIGURED_MSG;
+        },
+      };
+    },
+  } as ASRPlugin);
+
   pluginRegistry.register({
     name: "volcengine",
     displayName: "Volcengine ASR",

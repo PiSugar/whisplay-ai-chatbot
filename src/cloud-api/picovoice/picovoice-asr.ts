@@ -7,6 +7,22 @@ const picovoiceAccessKey = process.env.PICOVOICE_ACCESS_KEY || "";
 // Optional: path to a custom Leopard model file (.pv)
 const leopardModelPath = process.env.PICOVOICE_LEOPARD_MODEL_PATH || undefined;
 
+// Lazy singleton — initialised on first use, then reused across calls
+let leopardInstance: any = null;
+
+function getLeopard(): any {
+  if (!leopardInstance) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Leopard } = require("@picovoice/leopard-node");
+    leopardInstance = new Leopard(
+      picovoiceAccessKey,
+      leopardModelPath ? { modelPath: leopardModelPath } : {},
+    );
+    console.log("[Picovoice ASR] Leopard instance initialized.");
+  }
+  return leopardInstance;
+}
+
 export const recognizeAudio = async (
   audioFilePath: string,
 ): Promise<string> => {
@@ -20,20 +36,15 @@ export const recognizeAudio = async (
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Leopard } = require("@picovoice/leopard-node");
-    const leopard = new Leopard(
-      picovoiceAccessKey,
-      leopardModelPath ? { modelPath: leopardModelPath } : {},
-    );
-
+    const leopard = getLeopard();
     const { transcript } = leopard.processFile(audioFilePath);
-    leopard.release();
 
     console.log("[Picovoice ASR] Transcript:", transcript);
     return transcript as string;
   } catch (error: any) {
     console.error("[Picovoice ASR] Recognition failed:", error.message);
+    // Reset instance on error so it can be re-initialized on next call
+    leopardInstance = null;
     return "";
   }
 };

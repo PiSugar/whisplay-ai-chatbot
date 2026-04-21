@@ -48,7 +48,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 };
 
 const llmServer: LLMServer = (
-  process.env.LLM_SERVER || LLMServer.volcengine
+  process.env.LLM_SERVER || LLMServer.test
 ).toLowerCase() as LLMServer;
 
 console.log(`Current LLM Server: ${llmServer}`);

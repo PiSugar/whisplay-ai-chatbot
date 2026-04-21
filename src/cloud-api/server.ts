@@ -24,13 +24,13 @@ let recognizeAudio: RecognizeAudioFunction = noop as any;
 let ttsProcessor: TTSProcessorFunction = noop as any;
 
 export const asrServer: ASRServer = (
-  process.env.ASR_SERVER || ASRServer.tencent
+  process.env.ASR_SERVER || ASRServer.test
 ).toLowerCase() as ASRServer;
 export const llmServer: LLMServer = (
-  process.env.LLM_SERVER || LLMServer.volcengine
+  process.env.LLM_SERVER || LLMServer.test
 ).toLowerCase() as LLMServer;
 export const ttsServer: TTSServer = (
-  process.env.TTS_SERVER || TTSServer.volcengine
+  process.env.TTS_SERVER || TTSServer.test
 ).toLowerCase() as TTSServer;
 export const imageGenerationServer: ImageGenerationServer = (
   process.env.IMAGE_GENERATION_SERVER || ""

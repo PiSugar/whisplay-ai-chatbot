@@ -2,6 +2,13 @@ import spidev
 import time
 import os
 import threading
+import gpiod
+
+# Detect gpiod API version: v1 has LINE_REQ_DIR_OUT; v2 has LineSettings
+_GPIOD_V2 = hasattr(gpiod, 'LineSettings')
+
+if _GPIOD_V2:
+    from gpiod.line import Direction, Value, Bias
 
 
 # ==================== Platform Detection ====================
@@ -32,32 +39,27 @@ def _detect_platform():
 
 PLATFORM, PLATFORM_MODEL = _detect_platform()
 
-# Import GPIO library based on platform
-if PLATFORM == "rpi":
-    import RPi.GPIO as GPIO
-elif PLATFORM == "radxa":
-    import gpiod
-else:
-    # Try auto-detection via available libraries
-    try:
-        import RPi.GPIO as GPIO
-        PLATFORM = "rpi"
-        PLATFORM_MODEL = "Unknown Raspberry Pi"
-    except ImportError:
-        try:
-            import gpiod
-            PLATFORM = "radxa"
-            PLATFORM_MODEL = "Unknown Radxa"
-        except ImportError:
-            raise RuntimeError(
-                "No supported GPIO library found.\n"
-                "Raspberry Pi: pip install RPi.GPIO\n"
-                "Radxa: sudo apt install python3-libgpiod"
-            )
 
-
-# ==================== Radxa Pin Mappings ====================
+# ==================== Pin Mappings ====================
 # Physical 40-pin header pin number -> (gpiochip number, line offset)
+
+# Raspberry Pi: BOARD pin -> BCM GPIO number
+_RPI_BOARD_TO_BCM = {
+    3: 2,    5: 3,    7: 4,    8: 14,
+    10: 15,  11: 17,  12: 18,  13: 27,
+    15: 22,  16: 23,  18: 24,  19: 10,
+    21: 9,   22: 25,  23: 11,  24: 8,
+    26: 7,   27: 0,   28: 1,   29: 5,
+    31: 6,   32: 12,  33: 13,  35: 19,
+    36: 16,  37: 26,  38: 20,  40: 21,
+}
+
+
+def _build_rpi_pin_map():
+    """Build RPi BOARD-pin -> (gpiochip, line_offset) mapping.
+    RPi 5 uses gpiochip4 (RP1), earlier models use gpiochip0."""
+    chip_num = 4 if "Raspberry Pi 5" in PLATFORM_MODEL else 0
+    return {pin: (chip_num, bcm) for pin, bcm in _RPI_BOARD_TO_BCM.items()}
 
 # Based on RK3566 Radxa ZERO 3W
 RADXA_ZERO3_PIN_MAP = {
@@ -99,6 +101,77 @@ def _detect_radxa_board():
         pass
     # Default to zero3w for backward compatibility
     return "zero3w"
+
+
+# ==================== gpiod v1/v2 Compatibility ====================
+class _LineHandle:
+    """Unified thin wrapper that exposes set_value(int) / get_value()->int
+    regardless of whether the underlying library is gpiod v1 or v2."""
+
+    def __init__(self, v2_request=None, v2_offset=None, v1_line=None):
+        self._v2_req = v2_request
+        self._v2_off = v2_offset
+        self._v1 = v1_line
+
+    def set_value(self, val):
+        if self._v2_req is not None:
+            self._v2_req.set_value(
+                self._v2_off, Value.ACTIVE if val else Value.INACTIVE
+            )
+        else:
+            self._v1.set_value(val)
+
+    def get_value(self):
+        if self._v2_req is not None:
+            return 1 if self._v2_req.get_value(self._v2_off) == Value.ACTIVE else 0
+        return self._v1.get_value()
+
+    def release(self):
+        try:
+            if self._v2_req is not None:
+                self._v2_req.release()
+            else:
+                self._v1.release()
+        except Exception:
+            pass
+
+
+def _request_output(chip, line_offset, consumer='whisplay'):
+    """Request a single GPIO line as output (LOW initial)."""
+    if _GPIOD_V2:
+        settings = gpiod.LineSettings(
+            direction=Direction.OUTPUT, output_value=Value.INACTIVE
+        )
+        req = chip.request_lines(consumer=consumer, config={line_offset: settings})
+        return _LineHandle(v2_request=req, v2_offset=line_offset)
+    else:
+        line = chip.get_line(line_offset)
+        line.request(consumer=consumer, type=gpiod.LINE_REQ_DIR_OUT, default_val=0)
+        return _LineHandle(v1_line=line)
+
+
+def _request_input(chip, line_offset, consumer='whisplay-btn'):
+    """Request a single GPIO line as input with bias disabled."""
+    if _GPIOD_V2:
+        try:
+            settings = gpiod.LineSettings(
+                direction=Direction.INPUT, bias=Bias.DISABLED
+            )
+        except Exception:
+            settings = gpiod.LineSettings(direction=Direction.INPUT)
+        req = chip.request_lines(consumer=consumer, config={line_offset: settings})
+        return _LineHandle(v2_request=req, v2_offset=line_offset)
+    else:
+        line = chip.get_line(line_offset)
+        try:
+            line.request(
+                consumer=consumer,
+                type=gpiod.LINE_REQ_DIR_IN,
+                flags=gpiod.LINE_REQ_FLAG_BIAS_DISABLE
+            )
+        except Exception:
+            line.request(consumer=consumer, type=gpiod.LINE_REQ_DIR_IN)
+        return _LineHandle(v1_line=line)
 
 
 # ==================== Software PWM ====================
@@ -178,12 +251,32 @@ class WhisplayBoard:
         self.button_press_callback = None
         self.button_release_callback = None
 
+        # Select pin map and SPI config based on platform
         if self.platform == "rpi":
-            self._init_rpi()
+            self._pin_map = _build_rpi_pin_map()
+            self._spi_bus = 0
+            self._spi_cs = 0
+            self._spi_speed = 100_000_000
         elif self.platform == "radxa":
-            self._init_radxa()
+            self._radxa_board = _detect_radxa_board()
+            if self._radxa_board == "cubie-a7z":
+                self._pin_map = RADXA_CUBIE_A7Z_PIN_MAP
+                self._spi_bus = 1   # SPI1, CS0 (Allwinner A733)
+                self._spi_cs = 0
+                self._spi_speed = 48_000_000
+            else:
+                self._pin_map = RADXA_ZERO3_PIN_MAP
+                self._spi_bus = 3   # SPI3, CS0 (RK3566 Radxa Zero 3W)
+                self._spi_cs = 0
+                self._spi_speed = 48_000_000
         else:
-            raise RuntimeError(f"Unsupported platform: {self.platform}")
+            raise RuntimeError(
+                f"Unsupported platform: {self.platform}\n"
+                "Install python3-libgpiod: sudo apt install python3-libgpiod"
+            )
+
+        self._init_gpio()
+        self._init_spi()
 
         self.previous_frame = None
         # Detect hardware version and set backlight mode
@@ -194,109 +287,9 @@ class WhisplayBoard:
         self._init_display()
         self.fill_screen(0)
 
-    # ==================== Raspberry Pi Initialization ====================
-    def _init_rpi(self):
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setwarnings(False)
-
-        # Initialize LCD pins
-        GPIO.setup([self.DC_PIN, self.RST_PIN, self.LED_PIN], GPIO.OUT)
-        GPIO.output(self.LED_PIN, GPIO.LOW)  # Enable backlight
-
-        # Initialize RGB LED pins
-        GPIO.setup([self.RED_PIN, self.GREEN_PIN, self.BLUE_PIN], GPIO.OUT, initial=GPIO.HIGH)
-        self.red_pwm = self._create_rpi_rgb_pwm(self.RED_PIN, "red")
-        self.green_pwm = self._create_rpi_rgb_pwm(self.GREEN_PIN, "green")
-        self.blue_pwm = self._create_rpi_rgb_pwm(self.BLUE_PIN, "blue")
-        self.red_pwm.start(0)
-        self.green_pwm.start(0)
-        self.blue_pwm.start(0)
-
-        # Initialize button
-        # The WhisPlay HAT has an external pull-down resistor on the button line.
-        # Button pressed = HIGH, released = LOW. No internal pull needed.
-        GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_OFF)
-        GPIO.add_event_detect(
-            self.BUTTON_PIN, GPIO.BOTH, callback=self._button_event_rpi, bouncetime=50
-        )
-
-        # Initialize SPI
-        self.spi = spidev.SpiDev()
-        self.spi.open(0, 0)
-        self.spi.max_speed_hz = 100_000_000
-        self.spi.mode = 0b00
-
-    def _rpi_pin_can_drive_low(self, pin):
-        """Check whether a Raspberry Pi GPIO can actually sink current when driven low."""
-        GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
-        time.sleep(0.02)
-        GPIO.output(pin, GPIO.LOW)
-        time.sleep(0.02)
-        can_drive_low = GPIO.input(pin) == GPIO.LOW
-        GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
-        return can_drive_low
-
-    def _rpi_set_rgb_sink_state(self, pin, value):
-        """Drive active-low RGB LED pins using either strong-high or input-pulldown-low.
-        NOTICE: rpi-lgpio 0.2/0.6 on RPi5 RP1 has issues switching between
-        IN/OUT modes in concurrent SoftPWM threads (GPIO busy / not allocated).
-        A lock serializes access and try/except prevents thread death."""
-        if not hasattr(self, '_rgb_lock'):
-            import threading
-            self._rgb_lock = threading.Lock()
-        with self._rgb_lock:
-            try:
-                if value:
-                    GPIO.setup(pin, GPIO.OUT)
-                    GPIO.output(pin, GPIO.HIGH)
-                else:
-                    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-            except Exception:
-                try:
-                    GPIO.output(pin, GPIO.HIGH if value else GPIO.LOW)
-                except Exception:
-                    pass
-
-    def _rpi_set_rgb_output_state(self, pin, value):
-        """Drive active-low RGB LED pins using normal push-pull output mode."""
-        GPIO.setup(pin, GPIO.OUT)
-        GPIO.output(pin, GPIO.HIGH if value else GPIO.LOW)
-
-    def _rpi_set_backlight_state(self, value):
-        """Drive active-low LCD backlight pin using plain GPIO state changes."""
-        GPIO.setup(self.LED_PIN, GPIO.OUT)
-        GPIO.output(self.LED_PIN, GPIO.HIGH if value else GPIO.LOW)
-
-    def _create_rpi_rgb_pwm(self, pin, color_name):
-        """Create RGB PWM on Raspberry Pi, with a weak sink fallback for damaged GPIO pins."""
-        if self._rpi_pin_can_drive_low(pin):
-            return SoftPWM(
-                lambda value, gpio_pin=pin: self._rpi_set_rgb_output_state(gpio_pin, value),
-                100,
-                stop_value=1,
-            )
-
-        print(
-            f"Warning: GPIO pin {pin} for {color_name} LED cannot drive LOW reliably; "
-            "using input-pulldown RGB workaround."
-        )
-        self._rpi_set_rgb_sink_state(pin, 1)
-        return SoftPWM(
-            lambda value, gpio_pin=pin: self._rpi_set_rgb_sink_state(gpio_pin, value),
-            100,
-            stop_value=1,
-        )
-
-    # ==================== Radxa Initialization ====================
-    def _init_radxa(self):
-        self._radxa_board = _detect_radxa_board()
-
-        if self._radxa_board == "cubie-a7z":
-            pin_map = RADXA_CUBIE_A7Z_PIN_MAP
-        else:
-            pin_map = RADXA_ZERO3_PIN_MAP
-
-        # Open required GPIO chips
+    # ==================== GPIO Initialization (gpiod, unified) ====================
+    def _init_gpio(self):
+        """Initialize all GPIO lines via gpiod (works on both RPi and Radxa)."""
         self._gpio_chips = {}
         self._gpio_lines = {}
 
@@ -305,21 +298,19 @@ class WhisplayBoard:
                      self.BUTTON_PIN]
 
         for pin in pins_used:
-            if pin not in pin_map:
-                raise RuntimeError(f"Physical pin {pin} is not defined in Radxa Zero 3W pin map")
-            chip_num, _ = pin_map[pin]
+            if pin not in self._pin_map:
+                raise RuntimeError(f"Physical pin {pin} is not defined in pin map")
+            chip_num, _ = self._pin_map[pin]
             if chip_num not in self._gpio_chips:
-                self._gpio_chips[chip_num] = gpiod.Chip(f'gpiochip{chip_num}')
+                self._gpio_chips[chip_num] = gpiod.Chip(f'/dev/gpiochip{chip_num}')
 
         # Request output pins
         output_pins = [self.DC_PIN, self.RST_PIN, self.LED_PIN,
                        self.RED_PIN, self.GREEN_PIN, self.BLUE_PIN]
         for pin in output_pins:
-            chip_num, line_offset = pin_map[pin]
+            chip_num, line_offset = self._pin_map[pin]
             chip = self._gpio_chips[chip_num]
-            line = chip.get_line(line_offset)
-            line.request(consumer='whisplay', type=gpiod.LINE_REQ_DIR_OUT, default_val=0)
-            self._gpio_lines[pin] = line
+            self._gpio_lines[pin] = _request_output(chip, line_offset)
 
         # Enable backlight (LOW = on)
         self._gpio_lines[self.LED_PIN].set_value(0)
@@ -337,43 +328,26 @@ class WhisplayBoard:
 
         # Initialize button (input, polled for state changes)
         # The WhisPlay HAT has an external pull-down resistor on the button line.
-        # Button pressed = HIGH, released = LOW. No internal pull needed.
-        chip_num, line_offset = pin_map[self.BUTTON_PIN]
+        # Button pressed = HIGH, released = LOW.  No internal pull needed.
+        chip_num, line_offset = self._pin_map[self.BUTTON_PIN]
         chip = self._gpio_chips[chip_num]
-        btn_line = chip.get_line(line_offset)
-        try:
-            btn_line.request(
-                consumer='whisplay-btn',
-                type=gpiod.LINE_REQ_DIR_IN,
-                flags=gpiod.LINE_REQ_FLAG_BIAS_DISABLE
-            )
-        except Exception:
-            # Fallback: no bias flag (older libgpiod or unsupported)
-            btn_line.request(
-                consumer='whisplay-btn',
-                type=gpiod.LINE_REQ_DIR_IN
-            )
-        self._gpio_lines[self.BUTTON_PIN] = btn_line
+        self._gpio_lines[self.BUTTON_PIN] = _request_input(chip, line_offset)
 
-        # Start button event listener thread
+        # Start button event listener thread (polling)
         self._btn_thread_running = True
-        self._btn_thread = threading.Thread(target=self._button_monitor_radxa, daemon=True)
+        self._btn_thread = threading.Thread(target=self._button_monitor, daemon=True)
         self._btn_thread.start()
 
-        # Initialize SPI (board-specific SPI bus)
+    def _init_spi(self):
+        """Initialize SPI bus."""
         self.spi = spidev.SpiDev()
-        if self._radxa_board == "cubie-a7z":
-            self.spi.open(1, 0)  # SPI1, CS0 (Allwinner A733)
-            self.spi.max_speed_hz = 48_000_000
-        else:
-            self.spi.open(3, 0)  # SPI3, CS0 (RK3566 Radxa Zero 3W)
-            self.spi.max_speed_hz = 48_000_000  # RK3566 SPI max 50MHz
+        self.spi.open(self._spi_bus, self._spi_cs)
+        self.spi.max_speed_hz = self._spi_speed
         self.spi.mode = 0b00
 
-    def _button_monitor_radxa(self):
-        """Button state polling thread for Radxa platform.
-        Reads GPIO value directly (like RPi's GPIO.input), avoiding edge event ambiguity.
-        HIGH (1) = pressed, LOW (0) = released (matching RPi behavior).
+    def _button_monitor(self):
+        """Button state polling thread.
+        HIGH (1) = pressed, LOW (0) = released.
         10ms poll interval provides natural debounce.
         """
         btn_line = self._gpio_lines[self.BUTTON_PIN]
@@ -384,32 +358,24 @@ class WhisplayBoard:
                 if state != last_state:
                     last_state = state
                     if state == 1:
-                        # Button pressed (HIGH)
                         if self.button_press_callback:
                             self.button_press_callback()
                     else:
-                        # Button released (LOW)
                         if self.button_release_callback:
                             self.button_release_callback()
             except Exception:
                 if self._btn_thread_running:
                     pass
-            time.sleep(0.01)  # 10ms poll interval
+            time.sleep(0.01)
 
-    # ==================== Cross-platform GPIO Helpers ====================
+    # ==================== GPIO Helpers ====================
     def _gpio_output(self, pin, value):
         """Set GPIO pin output value"""
-        if self.platform == "rpi":
-            GPIO.output(pin, GPIO.HIGH if value else GPIO.LOW)
-        elif self.platform == "radxa":
-            self._gpio_lines[pin].set_value(1 if value else 0)
+        self._gpio_lines[pin].set_value(1 if value else 0)
 
     def _gpio_input(self, pin):
         """Read GPIO pin input value"""
-        if self.platform == "rpi":
-            return GPIO.input(pin)
-        elif self.platform == "radxa":
-            return self._gpio_lines[pin].get_value()
+        return self._gpio_lines[pin].get_value()
 
     # ==================== Hardware Detection ====================
     def _detect_hardware_version(self):
@@ -453,15 +419,8 @@ class WhisplayBoard:
     def set_backlight(self, brightness):
         if self.backlight_mode:  # PWM mode
             if self.backlight_pwm is None:
-                if self.platform == "rpi":
-                    self.backlight_pwm = SoftPWM(
-                        self._rpi_set_backlight_state,
-                        1000,
-                        stop_value=1,
-                    )
-                elif self.platform == "radxa":
-                    led_line = self._gpio_lines[self.LED_PIN]
-                    self.backlight_pwm = SoftPWM(led_line.set_value, 1000, stop_value=1)
+                led_line = self._gpio_lines[self.LED_PIN]
+                self.backlight_pwm = SoftPWM(led_line.set_value, 1000, stop_value=1)
                 self.backlight_pwm.start(100)
             if 0 <= brightness <= 100:
                 duty_cycle = 100 - brightness
@@ -481,15 +440,8 @@ class WhisplayBoard:
             return  # Mode unchanged, no action needed
 
         if mode:  # Switch to PWM mode
-            if self.platform == "rpi":
-                self.backlight_pwm = SoftPWM(
-                    self._rpi_set_backlight_state,
-                    1000,
-                    stop_value=1,
-                )
-            elif self.platform == "radxa":
-                led_line = self._gpio_lines[self.LED_PIN]
-                self.backlight_pwm = SoftPWM(led_line.set_value, 1000, stop_value=1)
+            led_line = self._gpio_lines[self.LED_PIN]
+            self.backlight_pwm = SoftPWM(led_line.set_value, 1000, stop_value=1)
             self.backlight_pwm.start(100)
         else:  # Switch to simple on/off mode
             if self.backlight_pwm is not None:
@@ -668,24 +620,6 @@ class WhisplayBoard:
     def on_button_release(self, callback):
         self.button_release_callback = callback
 
-    def _button_release_event(self, channel):
-        if self.button_release_callback:
-            self.button_release_callback()
-
-    def _button_press_event(self, channel):
-        if self.button_press_callback:
-            self.button_press_callback()
-
-    def _button_event_rpi(self, channel):
-        """Raspberry Pi button interrupt callback"""
-        # Pressed = 5V, released = 0V
-        if GPIO.input(channel):
-            # Button pressed
-            self._button_press_event(channel)
-        else:
-            # Button released
-            self._button_release_event(channel)
-
     # ========== Cleanup ==========
     def cleanup(self):
         # Stop backlight PWM
@@ -698,21 +632,18 @@ class WhisplayBoard:
         self.green_pwm.stop()
         self.blue_pwm.stop()
 
-        if self.platform == "rpi":
-            GPIO.cleanup()
-        elif self.platform == "radxa":
-            # Stop button listener thread
-            self._btn_thread_running = False
-            if hasattr(self, '_btn_thread') and self._btn_thread:
-                self._btn_thread.join(timeout=2)
-            # Release GPIO resources
-            for line in self._gpio_lines.values():
-                try:
-                    line.release()
-                except Exception:
-                    pass
-            for chip in self._gpio_chips.values():
-                try:
-                    chip.close()
-                except Exception:
-                    pass
+        # Stop button listener thread
+        self._btn_thread_running = False
+        if hasattr(self, '_btn_thread') and self._btn_thread:
+            self._btn_thread.join(timeout=2)
+        # Release GPIO resources
+        for line in self._gpio_lines.values():
+            try:
+                line.release()
+            except Exception:
+                pass
+        for chip in self._gpio_chips.values():
+            try:
+                chip.close()
+            except Exception:
+                pass

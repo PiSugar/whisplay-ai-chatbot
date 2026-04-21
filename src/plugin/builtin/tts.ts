@@ -1,7 +1,25 @@
 import { pluginRegistry } from "../registry";
 import { TTSPlugin } from "../types";
 
+const NOT_CONFIGURED_MSG = "TTS service is not configured. Please set TTS_SERVER in your .env file.";
+
 export function registerTTSPlugins(): void {
+  pluginRegistry.register({
+    name: "test",
+    displayName: "Test TTS (Not Configured)",
+    version: "1.0.0",
+    type: "tts",
+    description: "Placeholder TTS plugin that reminds users to configure TTS_SERVER",
+    activate: () => {
+      return {
+        ttsProcessor: async (_text: string) => {
+          console.warn(NOT_CONFIGURED_MSG);
+          return { duration: 0 };
+        },
+      };
+    },
+  } as TTSPlugin);
+
   pluginRegistry.register({
     name: "volcengine",
     displayName: "Volcengine TTS",
