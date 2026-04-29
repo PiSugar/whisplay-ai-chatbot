@@ -53,10 +53,10 @@ const intervalCheckNetwork = () => {
 };
 intervalCheckNetwork();
 
-type VpnProvider = "none" | "wireguard" | "tailscale";
+type VpnProvider = "auto" | "none" | "wireguard" | "tailscale";
 
 const vpnProvider = (
-  process.env.VPN_PROVIDER || "none"
+  process.env.VPN_PROVIDER || "auto"
 ).toLowerCase() as VpnProvider;
 const wireguardInterface = process.env.WIREGUARD_INTERFACE || "wg0";
 const tailscaleCommand = process.env.TAILSCALE_COMMAND || "tailscale";
@@ -153,12 +153,35 @@ const intervalCheckTailscale = () => {
   }, 10000);
 };
 
+const intervalCheckAutoVpn = () => {
+  const updateAutoVpnStatus = async () => {
+    if (await isTailscaleConnected()) {
+      display({
+        vpn_connected: true,
+      });
+      return;
+    }
+
+    const connected = await isWireguardConnected();
+    display({
+      vpn_connected: connected,
+    });
+  };
+
+  void updateAutoVpnStatus();
+  setInterval(() => {
+    void updateAutoVpnStatus();
+  }, 10000);
+};
+
 if (vpnProvider === "wireguard") {
   intervalCheckWireguard();
 } else if (vpnProvider === "tailscale") {
   intervalCheckTailscale();
-} else {
+} else if (vpnProvider === "none") {
   display({ vpn_connected: false });
+} else {
+  intervalCheckAutoVpn();
 }
 
 new ChatFlow({
