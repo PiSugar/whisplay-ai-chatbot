@@ -28,6 +28,7 @@ scroll_stop_event = threading.Event()
 status_font_size=20
 emoji_font_size=40
 battery_font_size=13
+IDLE_RENDER_INTERVAL = 0.5
 
 # Global variables
 current_status = "Hello"
@@ -56,6 +57,7 @@ current_music_duration_ms = None
 camera_mode = False
 camera_capture_image_path = ""
 camera_thread = None
+render_thread = None
 clients = {}
 status_icon_factories = []
 
@@ -73,10 +75,16 @@ class RenderThread(threading.Thread):
         # Clear logo after 1 second and start running loop
         time.sleep(1)
         self.running = True
+        self.status_font = ImageFont.truetype(self.font_path, status_font_size)
+        self.emoji_font = ImageFont.truetype(self.font_path, emoji_font_size)
+        self.battery_font = ImageFont.truetype(self.font_path, battery_font_size)
         self.main_text_font = ImageFont.truetype(self.font_path, 20)
+        self.music_time_font = ImageFont.truetype(self.font_path, 10)
         self.main_text_line_height = self.main_text_font.getmetrics()[0] + self.main_text_font.getmetrics()[1]
         self.text_cache_image = None
         self.current_render_text = ""
+        self.pending_auto_scroll_after_hold = False
+        self.render_event = threading.Event()
 
     def render_init_screen(self):
         # Display logo on startup
@@ -90,8 +98,9 @@ class RenderThread(threading.Thread):
 
     def render_frame(self, status, emoji, text, scroll_top, battery_level, battery_color):
         global current_scroll_speed, current_image_path, current_image, camera_mode
+        self.pending_auto_scroll_after_hold = False
         if camera_mode:
-            return  # Skip rendering if in camera mode
+            return False  # Skip rendering if in camera mode
         if current_image_path not in [None, ""]:
             # Try to load image from path
             if current_image is not None:
@@ -120,6 +129,7 @@ class RenderThread(threading.Thread):
                     self.whisplay.draw_image(0, 0, self.whisplay.LCD_WIDTH, self.whisplay.LCD_HEIGHT, rgb565_data)
                 except Exception as e:
                     print(f"[Render] Failed to load image {current_image_path}: {e}")
+            return False
         else:
             current_image = None
             header_height = 88 + 10  # header + margin
@@ -147,15 +157,14 @@ class RenderThread(threading.Thread):
                 bar_w = self.whisplay.LCD_WIDTH - 2 * margin
                 bar_h = 4
                 # time labels above the bar
-                time_font = ImageFont.truetype(self.font_path, 10)
                 elapsed_ms = int((current_music_duration_ms or 0) * min(1.0, max(0.0, current_music_progress)))
                 total_ms = current_music_duration_ms or 0
                 elapsed_str = "%d:%02d" % (elapsed_ms // 60000, (elapsed_ms % 60000) // 1000)
                 total_str = "%d:%02d" % (total_ms // 60000, (total_ms % 60000) // 1000)
-                pb_draw.text((margin, 0), elapsed_str, font=time_font, fill=(180, 180, 180, 255))
-                total_bbox = time_font.getbbox(total_str)
+                pb_draw.text((margin, 0), elapsed_str, font=self.music_time_font, fill=(180, 180, 180, 255))
+                total_bbox = self.music_time_font.getbbox(total_str)
                 total_w = total_bbox[2] - total_bbox[0]
-                pb_draw.text((margin + bar_w - total_w, 0), total_str, font=time_font, fill=(180, 180, 180, 255))
+                pb_draw.text((margin + bar_w - total_w, 0), total_str, font=self.music_time_font, fill=(180, 180, 180, 255))
                 # progress bar below time labels
                 bar_y = progress_bar_height - bar_h - 2
                 # background track
@@ -170,8 +179,10 @@ class RenderThread(threading.Thread):
             text_area_height = self.whisplay.LCD_HEIGHT - header_height - progress_bar_height
             text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
             text_draw = ImageDraw.Draw(text_bg_image)
-            self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
+            animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
             self.whisplay.draw_image(0, header_height + progress_bar_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
+
+            return animation_active
 
         
 
@@ -196,9 +207,10 @@ class RenderThread(threading.Thread):
         global current_scroll_sync_speed, current_scroll_sync_hold_until
         """Render main text content, wrap lines according to screen width, only display currently visible part"""
         if not text:
-            return
+            self.pending_auto_scroll_after_hold = False
+            return False
         # Use main text font
-        font = ImageFont.truetype(self.font_path, 20)
+        font = self.main_text_font
         lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
 
         # Line height
@@ -263,15 +275,34 @@ class RenderThread(threading.Thread):
             current_scroll_top += scroll_speed
         if current_scroll_top > max_scroll_top:
             current_scroll_top = max_scroll_top
+        self.pending_auto_scroll_after_hold = (
+            scroll_speed > 0
+            and current_scroll_top < max_scroll_top
+            and time.time() < current_scroll_sync_hold_until
+        )
+        return (
+            (
+                current_scroll_sync_speed is not None
+                and current_scroll_sync_target_top is not None
+            )
+            or (
+                scroll_speed > 0
+                and current_scroll_top < max_scroll_top
+                and time.time() >= current_scroll_sync_hold_until
+            )
+        )
+
+    def request_render(self):
+        self.render_event.set()
                 
 
     def render_header(self, image, draw, status, emoji, battery_level, battery_color):
         global current_status, current_emoji, current_battery_level, current_battery_color
         global status_font_size, emoji_font_size, battery_font_size
         
-        status_font = ImageFont.truetype(self.font_path, status_font_size)
-        emoji_font = ImageFont.truetype(self.font_path, emoji_font_size)
-        battery_font = ImageFont.truetype(self.font_path, battery_font_size)
+        status_font = self.status_font
+        emoji_font = self.emoji_font
+        battery_font = self.battery_font
 
         image_width = self.whisplay.LCD_WIDTH
 
@@ -346,11 +377,20 @@ class RenderThread(threading.Thread):
     def run(self):
         frame_interval = 1 / self.fps
         while self.running:
-            self.render_frame(current_status, current_emoji, current_text, current_scroll_top, current_battery_level, current_battery_color)
-            time.sleep(frame_interval)
+            animation_active = self.render_frame(current_status, current_emoji, current_text, current_scroll_top, current_battery_level, current_battery_color)
+            if animation_active:
+                time.sleep(frame_interval)
+                continue
+
+            wait_timeout = None
+            if self.pending_auto_scroll_after_hold:
+                wait_timeout = max(0.0, current_scroll_sync_hold_until - time.time())
+            self.render_event.wait(wait_timeout)
+            self.render_event.clear()
             
     def stop(self):
         self.running = False
+        self.render_event.set()
 
 def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
@@ -363,6 +403,7 @@ def update_display_data(status=None, emoji=None, text=None,
     global current_scroll_sync_hold_until
     global current_network_connected, current_vpn_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
     global current_music_progress, current_music_duration_ms
+    global render_thread
 
     next_text = text
     if text is not None:
@@ -439,6 +480,8 @@ def update_display_data(status=None, emoji=None, text=None,
         current_music_progress = music_progress if music_progress >= 0 else None
     if music_duration_ms is not None:
         current_music_duration_ms = music_duration_ms if music_duration_ms > 0 else None
+    if render_thread is not None:
+        render_thread.request_render()
 
 
 def send_to_all_clients(message):
@@ -457,7 +500,7 @@ def send_to_all_clients(message):
             print(f"[Server] Failed to send notification to client {addr}: {e}")
 
 def exit_camera_mode():
-    global camera_mode, camera_thread
+    global camera_mode, camera_thread, render_thread
     print("[Camera] Exiting camera mode...")
     if camera_thread is not None:
         camera_thread.stop()
@@ -465,6 +508,8 @@ def exit_camera_mode():
     notification = {"event": "exit_camera_mode"}
     send_to_all_clients(notification)
     camera_mode = False
+    if render_thread is not None:
+        render_thread.request_render()
 
 def on_button_pressed():
     """Function executed when button is pressed"""
@@ -479,7 +524,7 @@ def on_button_release():
     send_to_all_clients(notification)
 
 def handle_client(client_socket, addr, whisplay):
-    global camera_capture_image_path, camera_mode, camera_thread
+    global camera_capture_image_path, camera_mode, camera_thread, render_thread
     print(f"[Socket] Client {addr} connected")
     clients[addr] = client_socket
     try:
@@ -548,6 +593,8 @@ def handle_client(client_socket, addr, whisplay):
                                 camera_thread.stop()
                                 camera_thread = None
                             camera_mode = False
+                        if render_thread is not None:
+                            render_thread.request_render()
 
                     if trigger_camera_capture:
                         print("[Camera] Capturing image by command...")
