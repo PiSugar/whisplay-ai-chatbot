@@ -4,7 +4,7 @@ import ChatFlow from "./core/ChatFlow";
 import dotenv from "dotenv";
 import { connect } from "net";
 import dns from "dns";
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 
 dotenv.config();
 
@@ -39,11 +39,16 @@ const isNetworkConnected: () => Promise<boolean> = () => {
 };
 
 const intervalCheckNetwork = () => {
-  setInterval(async () => {
+  const updateNetworkStatus = async () => {
     const connected = await isNetworkConnected();
     display({
       network_connected: connected,
     });
+  };
+
+  void updateNetworkStatus();
+  setInterval(() => {
+    void updateNetworkStatus();
   }, 10000);
 };
 intervalCheckNetwork();
@@ -54,6 +59,7 @@ const vpnProvider = (
   process.env.VPN_PROVIDER || "none"
 ).toLowerCase() as VpnProvider;
 const wireguardInterface = process.env.WIREGUARD_INTERFACE || "wg0";
+const tailscaleCommand = process.env.TAILSCALE_COMMAND || "tailscale";
 
 const isWireguardConnected = (): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -64,43 +70,86 @@ const isWireguardConnected = (): Promise<boolean> => {
 };
 
 const intervalCheckWireguard = () => {
-  setInterval(async () => {
+  const updateWireguardStatus = async () => {
     const connected = await isWireguardConnected();
     display({
       vpn_connected: connected,
     });
+  };
+
+  void updateWireguardStatus();
+  setInterval(() => {
+    void updateWireguardStatus();
   }, 10000);
 };
 
-const isTailscaleConnected = (): Promise<boolean> => {
+const runTailscaleCommand = (
+  args: string[],
+): Promise<{ ok: boolean; stdout: string }> => {
   return new Promise((resolve) => {
-    exec("tailscale status --json", (err, stdout) => {
-      if (err || !stdout) {
-        resolve(false);
-        return;
-      }
-
-      try {
-        const status = JSON.parse(stdout) as {
-          BackendState?: string;
-          TailscaleIPs?: string[];
-          Self?: { Online?: boolean };
-        };
-        const hasAddress = Array.isArray(status.TailscaleIPs) && status.TailscaleIPs.length > 0;
-        resolve(status.BackendState === "Running" && hasAddress && Boolean(status.Self?.Online));
-      } catch {
-        resolve(false);
-      }
+    execFile(tailscaleCommand, args, (err, stdout) => {
+      resolve({
+        ok: !err,
+        stdout: typeof stdout === "string" ? stdout.trim() : "",
+      });
     });
   });
 };
 
+const isTailscaleConnected = (): Promise<boolean> => {
+  return new Promise(async (resolve) => {
+    const statusResult = await runTailscaleCommand(["status", "--json"]);
+
+    if (statusResult.ok && statusResult.stdout) {
+      try {
+        const status = JSON.parse(statusResult.stdout) as {
+          BackendState?: string;
+          TailscaleIPs?: string[];
+          Self?: {
+            Online?: boolean;
+            TailscaleIPs?: string[];
+          };
+        };
+        const topLevelAddresses = Array.isArray(status.TailscaleIPs)
+          ? status.TailscaleIPs
+          : [];
+        const selfAddresses = Array.isArray(status.Self?.TailscaleIPs)
+          ? status.Self.TailscaleIPs
+          : [];
+        const hasAddress = [...topLevelAddresses, ...selfAddresses].some(
+          (address) => Boolean(address),
+        );
+        if (status.BackendState === "Running" && hasAddress) {
+          resolve(true);
+          return;
+        }
+      } catch {
+        // Fall back to `tailscale ip` when JSON output is unavailable or unexpected.
+      }
+    }
+
+    const ipv4Result = await runTailscaleCommand(["ip", "-4"]);
+    if (ipv4Result.ok && ipv4Result.stdout) {
+      resolve(true);
+      return;
+    }
+
+    const ipv6Result = await runTailscaleCommand(["ip", "-6"]);
+    resolve(ipv6Result.ok && Boolean(ipv6Result.stdout));
+  });
+};
+
 const intervalCheckTailscale = () => {
-  setInterval(async () => {
+  const updateTailscaleStatus = async () => {
     const connected = await isTailscaleConnected();
     display({
       vpn_connected: connected,
     });
+  };
+
+  void updateTailscaleStatus();
+  setInterval(() => {
+    void updateTailscaleStatus();
   }, 10000);
 };
 
