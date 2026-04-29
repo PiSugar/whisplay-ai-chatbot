@@ -1,5 +1,6 @@
 import mp3Duration from "mp3-duration";
 import fs from "fs";
+import path from "path";
 import crypto from "crypto";
 import axios from "axios";
 import dotenv from "dotenv";
@@ -82,6 +83,15 @@ const getAuthorization = (
   };
 };
 
+const getVoiceFormat = (audioPath: string): string => {
+  const ext = path.extname(audioPath).toLowerCase().replace(/^\./, "");
+  if (ext === "wav" || ext === "mp3" || ext === "m4a" || ext === "flac" || ext === "aac") {
+    return ext;
+  }
+  // Fallback to mp3 to preserve previous behaviour for unknown extensions
+  return "mp3";
+};
+
 const recognizeAudio = async (
   audioPath: string,
 ): Promise<string | undefined> => {
@@ -89,19 +99,24 @@ const recognizeAudio = async (
     console.error("Tencent Cloud ASR configuration is incorrect");
     return "";
   }
-  console.time("Audio recognition");
   if (!fs.existsSync(audioPath)) {
     console.error("Audio file does not exist");
     return "";
   }
-  const audioData = fs.readFileSync(audioPath).toString("base64");
+  const timeLabel = `Audio recognition ${Date.now()}`;
+  console.time(timeLabel);
+  const audioBuffer = fs.readFileSync(audioPath);
+  const audioData = audioBuffer.toString("base64");
+  const voiceFormat = getVoiceFormat(audioPath);
 
   const payload = JSON.stringify({
     EngSerViceType: "16k_zh",
     SourceType: 1,
     Data: audioData,
-    DataLen: Buffer.byteLength(audioData),
-    VoiceFormat: "mp3",
+    // Tencent expects DataLen to be the size of the original audio (in bytes),
+    // NOT the length of the base64-encoded string.
+    DataLen: audioBuffer.length,
+    VoiceFormat: voiceFormat,
   });
 
   const { authorization, timestamp } = getAuthorization(payload, "asr");
@@ -119,13 +134,24 @@ const recognizeAudio = async (
     const res = await axios.post(`https://${ASR_ENDPOINT}`, payload, {
       headers,
     });
-    console.log("Audio recognized result:", res.data.Response.Result);
-    return res.data.Response.Result;
+    const response = res.data?.Response;
+    if (response?.Error) {
+      console.error(
+        "Tencent ASR returned an error:",
+        `${response.Error.Code} - ${response.Error.Message}`,
+        `(RequestId: ${response.RequestId})`,
+      );
+      return "";
+    }
+    console.log("Audio recognized result:", response?.Result);
+    return response?.Result;
   } catch (err: any) {
     console.error(
       "Audio recognition failed:",
       err.response?.data || err.message,
     );
+  } finally {
+    console.timeEnd(timeLabel);
   }
 };
 
