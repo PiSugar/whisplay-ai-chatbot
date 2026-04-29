@@ -1,5 +1,10 @@
 import fs from "fs";
+import dotenv from "dotenv";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
+
+dotenv.config();
+
+const OpenAiAsrModel = process.env.OPENAI_ASR_MODEL || "whisper-1"; //default to whisper-1 - changeable if openai compatible provider like NanoGPT is used
 
 export const recognizeAudio = async (
   audioFilePath: string
@@ -16,7 +21,7 @@ export const recognizeAudio = async (
   try {
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(audioFilePath),
-      model: "whisper-1",
+      model: OpenAiAsrModel,
     });
     console.log("Transcription result:", transcription.text);
     return transcription.text;
