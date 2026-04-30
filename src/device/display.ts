@@ -26,7 +26,7 @@ export interface Status {
   camera_mode: boolean;
   camera_capture?: boolean;
   capture_image_path: string;
-  network_connected: boolean;
+  wifi_signal_level: number;
   vpn_connected: boolean;
   rag_icon_visible: boolean;
   image_icon_visible: boolean;
@@ -49,7 +49,7 @@ export class WhisplayDisplay {
     image: "",
     camera_mode: false,
     capture_image_path: "",
-    network_connected: false,
+    wifi_signal_level: 0,
     vpn_connected: false,
     rag_icon_visible: false,
     image_icon_visible: false,
@@ -370,7 +370,7 @@ export class WhisplayDisplay {
       camera_mode,
       camera_capture,
       capture_image_path,
-      network_connected,
+      wifi_signal_level,
       vpn_connected,
       rag_icon_visible,
       image_icon_visible,
@@ -399,7 +399,7 @@ export class WhisplayDisplay {
     this.currentStatus.image = image;
     this.currentStatus.camera_mode = camera_mode;
     this.currentStatus.capture_image_path = capture_image_path;
-    this.currentStatus.network_connected = network_connected;
+    this.currentStatus.wifi_signal_level = wifi_signal_level;
     this.currentStatus.vpn_connected = vpn_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
     this.currentStatus.image_icon_visible = image_icon_visible;

@@ -202,7 +202,7 @@ export class WebDisplayServer implements WebAudioBridgeServer {
       image: this.currentStatus.image,
       camera_mode: this.currentStatus.camera_mode,
       capture_image_path: this.currentStatus.capture_image_path,
-      network_connected: this.currentStatus.network_connected,
+      wifi_signal_level: this.currentStatus.wifi_signal_level,
       vpn_connected: this.currentStatus.vpn_connected,
       rag_icon_visible: this.currentStatus.rag_icon_visible,
       image_icon_visible: this.currentStatus.image_icon_visible,

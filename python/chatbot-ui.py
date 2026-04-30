@@ -17,7 +17,7 @@ if STATUS_ICON_DIR not in sys.path:
     sys.path.append(STATUS_ICON_DIR)
 
 from battery_icon import BatteryStatusIcon
-from network_icon import NetworkStatusIcon
+from wifi_icon import WifiStatusIcon
 from rag_icon import RagStatusIcon
 from image_icon import ImageStatusIcon
 from wireguard_icon import WireguardStatusIcon
@@ -49,6 +49,7 @@ current_transaction_id = None
 current_image_path = ""
 current_image = None
 current_network_connected = None
+current_wifi_signal_level = 0
 current_vpn_connected = False
 current_rag_icon_visible = False
 current_image_icon_visible = False
@@ -328,6 +329,7 @@ class RenderThread(threading.Thread):
             "battery_font": battery_font,
             "status_font_size": status_font_size,
             "network_connected": current_network_connected,
+            "wifi_signal_level": current_wifi_signal_level,
             "vpn_connected": current_vpn_connected,
             "rag_icon_visible": current_rag_icon_visible,
             "image_icon_visible": current_image_icon_visible,
@@ -346,8 +348,8 @@ class RenderThread(threading.Thread):
 
         if battery_level is not None:
             icons.append(BatteryStatusIcon(battery_level, battery_color, battery_font, status_font_size))
-        if context.get("network_connected"):
-            icons.append(NetworkStatusIcon(status_font_size))
+        if context.get("wifi_signal_level"):
+            icons.append(WifiStatusIcon(status_font_size, context.get("wifi_signal_level")))
         if context.get("vpn_connected"):
             icons.append(WireguardStatusIcon(status_font_size))
         if context.get("image_icon_visible"):
@@ -395,6 +397,7 @@ class RenderThread(threading.Thread):
 def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
                   network_connected=None, vpn_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None,
+                  wifi_signal_level=None,
                   music_progress=None, music_duration_ms=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
@@ -402,6 +405,7 @@ def update_display_data(status=None, emoji=None, text=None,
     global current_scroll_sync_target_top, current_scroll_sync_speed
     global current_scroll_sync_hold_until
     global current_network_connected, current_vpn_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
+    global current_wifi_signal_level
     global current_music_progress, current_music_duration_ms
     global render_thread
 
@@ -462,6 +466,11 @@ def update_display_data(status=None, emoji=None, text=None,
             print(f"[Display] Invalid scroll_speed payload: {scroll_speed}")
     if network_connected is not None:
         current_network_connected = network_connected
+    if wifi_signal_level is not None:
+        try:
+            current_wifi_signal_level = max(0, min(3, int(wifi_signal_level)))
+        except (TypeError, ValueError):
+            print(f"[Display] Invalid wifi_signal_level payload: {wifi_signal_level}")
     if vpn_connected is not None:
         current_vpn_connected = vpn_connected
     if rag_icon_visible is not None:
@@ -556,6 +565,7 @@ def handle_client(client_socket, addr, whisplay):
                     battery_color = content.get("battery_color", None)
                     image_path = content.get("image", None)
                     network_connected = content.get("network_connected", None)
+                    wifi_signal_level = content.get("wifi_signal_level", None)
                     vpn_connected = content.get("vpn_connected", None)
                     rag_icon_visible = content.get("rag_icon_visible", None)
                     image_icon_visible = content.get("image_icon_visible", None)
@@ -606,6 +616,7 @@ def handle_client(client_socket, addr, whisplay):
                     if (text is not None) or (status is not None) or (emoji is not None) or \
                        (battery_level is not None) or (battery_color is not None) or \
                               (image_path is not None) or (network_connected is not None) or \
+                            (wifi_signal_level is not None) or \
                             (vpn_connected is not None) or \
                             (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None) or \
                             (music_progress is not None) or (music_duration_ms is not None):
@@ -613,6 +624,7 @@ def handle_client(client_socket, addr, whisplay):
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
+                                                 wifi_signal_level=wifi_signal_level,
                                      vpn_connected=vpn_connected,
                                                  rag_icon_visible=rag_icon_visible,
                                          image_icon_visible=image_icon_visible,
