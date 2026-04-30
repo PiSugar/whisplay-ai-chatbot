@@ -3,7 +3,7 @@ const emojiText = document.getElementById("emojiText");
 const textContent = document.getElementById("textContent");
 const batteryFill = document.getElementById("batteryFill");
 const batteryText = document.getElementById("batteryText");
-const netIcon = document.getElementById("netIcon");
+const wifiIcon = document.getElementById("wifiIcon");
 const vpnIcon = document.getElementById("vpnIcon");
 const imageIcon = document.getElementById("imageIcon");
 const ragIcon = document.getElementById("ragIcon");
@@ -34,6 +34,25 @@ let activePointerId = null;
 
 function setIconVisible(iconEl, visible) {
   iconEl.style.display = visible ? "block" : "none";
+}
+
+const WIFI_LEVEL_SRC = {
+  1: "/img/wifi-weak.png",
+  2: "/img/wifi-medium.png",
+  3: "/img/wifi-strong.png",
+};
+
+function updateWifiIcon(level) {
+  const numeric = typeof level === "number" ? level : parseInt(level, 10);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return false;
+  }
+  const clamped = Math.min(3, Math.max(1, Math.round(numeric)));
+  const src = WIFI_LEVEL_SRC[clamped];
+  if (wifiIcon.getAttribute("src") !== src) {
+    wifiIcon.setAttribute("src", src);
+  }
+  return true;
 }
 
 function rgb565ToRgb(color) {
@@ -163,7 +182,7 @@ function applyState(data) {
   }
   batteryFill.style.background = normalizeColor(data.battery_color);
 
-  setIconVisible(netIcon, Boolean(data.network_connected));
+  setIconVisible(wifiIcon, updateWifiIcon(data.wifi_signal_level));
   setIconVisible(vpnIcon, Boolean(data.vpn_connected));
   setIconVisible(imageIcon, Boolean(data.image_icon_visible));
   setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
