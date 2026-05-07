@@ -9,6 +9,7 @@
     "build": "rm -rf dist && tsc",
     "start": "node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/index.js",
     "index-knowledge": "node -r ts-node/register -r tsconfig-paths/register dist/index-knowledge.js",
+    "configure-env": "node -r ts-node/register -r tsconfig-paths/register dist/configure-env.js",
     "upgrade-env": "node -r ts-node/register -r tsconfig-paths/register dist/upgrade-env.js",
     "postinstall": "patch-package",
     "test": "echo \"Error: no test specified\" && exit 1"

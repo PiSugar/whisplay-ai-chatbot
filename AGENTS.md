@@ -48,6 +48,7 @@ whisplay-ai-chatbot/
 ├── src/                          # Main TypeScript source code
 │   ├── index.ts                  # Application entry point
 │   ├── index-knowledge.ts        # Knowledge base indexing tool
+│   ├── configure-env.ts          # Interactive .env configuration tool
 │   ├── upgrade-env.ts            # Environment upgrade tool
 │   ├── cloud-api/                # AI service providers
 │   │   ├── interface.ts          # Common provider interfaces
@@ -164,6 +165,7 @@ whisplay service status                   # Check service status
 
 # Utilities
 whisplay update                           # Pull latest code, install deps, build
+whisplay configure                        # Interactively manage .env by category
 whisplay index-knowledge                  # Index knowledge base
 whisplay upgrade-env                      # Upgrade .env to latest template
 whisplay help                             # Show help
