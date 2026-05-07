@@ -56,7 +56,15 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    ```
    This also applies to `build.sh` and all `whisplay` CLI commands (`plugin install`, `plugin update`, `update`, etc.).
 
-3. Create a `.env` file based on the `.env.template` file and fill in the necessary environment variables.
+3. Configure environment variables:
+   ```bash
+   whisplay configure
+   ```
+   This command opens an interactive config wizard. If `.env` does not exist yet, it will be created automatically from `.env.template`.
+   You can still use the manual method if you prefer:
+   ```bash
+   cp .env.template .env
+   ```
 4. Build the project:
    ```bash
    bash build.sh
@@ -94,7 +102,15 @@ bash upgrade-env.sh
 
 ## Update Environment Variables
 
-If you need to update the environment variables, you can edit the `.env` file directly. After making changes, please restart the chatbot service with:
+The recommended way to update environment variables is:
+
+```bash
+whisplay configure
+```
+
+This lets you manage `.env` by category and will create the file automatically if it is missing.
+
+You can also edit `.env` directly if you prefer. After making changes, please restart the chatbot service with:
 
 ```bash
 sudo systemctl restart chatbot.service

@@ -34,6 +34,14 @@ type TopLevelGroup = {
   matches: (section: TemplateSection) => boolean;
 };
 
+type SectionMenuNode = {
+  title: string;
+  hint: string;
+  kind: "section" | "folder";
+  section?: TemplateSection;
+  sections?: TemplateSection[];
+};
+
 const envTemplatePath = path.resolve(__dirname, "..", ".env.template");
 const envPath = path.resolve(__dirname, "..", ".env");
 const envBackupDir = path.resolve(__dirname, "..", ".env.backups");
@@ -89,7 +97,6 @@ const topLevelGroups: TopLevelGroup[] = [
     matches: (section) =>
       [
         "Ollama",
-        "Ollama Embedding for RAG",
         "Piper TTS",
         "espeak-ng TTS",
         "Piper HTTP TTS",
@@ -111,14 +118,16 @@ const topLevelGroups: TopLevelGroup[] = [
         "Wake word",
         "Pi Camera",
         "RAG Settings",
+        "RAG Providers & Storage",
+        "Conversation & Runtime",
         "Web Search",
         "Tavily Search API",
         "SerpAPI (Google Search via SerpAPI)",
         "Bing Search API",
         "Google Custom Search API",
         "Local Music Tool (LLM function calling)",
-        "Qdrant for RAG Vector Database",
         "MemPalace (Long-term AI Memory)",
+        "AI Behavior",
       ].includes(section.title),
   },
   {
@@ -146,10 +155,18 @@ const topLevelGroups: TopLevelGroup[] = [
   {
     key: "advanced",
     title: "Advanced",
-    description: "System prompt and any uncategorized sections.",
+    description: "Less-common settings and any uncategorized sections.",
     matches: () => false,
   },
 ];
+
+const entryDisplayNameMap: Record<string, string> = {
+  SYSTEM_PROMPT: "Prompt",
+};
+
+function getEntryDisplayName(key: string): string {
+  return entryDisplayNameMap[key] || key;
+}
 
 function maskValue(key: string, value: string): string {
   if (!value) return "(empty)";
@@ -458,12 +475,73 @@ function summarizeComment(entry: TemplateEntry): string {
   return line || "No description available.";
 }
 
+function buildSectionMenuNodes(
+  groupTitle: string,
+  sections: TemplateSection[],
+  envMap: EnvMap,
+): SectionMenuNode[] {
+  if (groupTitle !== "AI Features") {
+    return sections.map((section) => {
+      const configuredCount = section.entries.filter((entry) => isConfigured(entry, envMap)).length;
+      return {
+        title: section.title,
+        hint: `${configuredCount}/${section.entries.length} configured`,
+        kind: "section",
+        section,
+      };
+    });
+  }
+
+  const isWebSearchProviderSection = (title: string): boolean =>
+    title.startsWith("Tavily Search API") ||
+    title.startsWith("SerpAPI") ||
+    title.startsWith("Bing Search API") ||
+    title.startsWith("Google Custom Search API");
+
+  const providerSections = sections.filter((section) => isWebSearchProviderSection(section.title));
+  const normalSections = sections.filter((section) => !isWebSearchProviderSection(section.title));
+
+  const nodes: SectionMenuNode[] = normalSections.map((section) => {
+    const configuredCount = section.entries.filter((entry) => isConfigured(entry, envMap)).length;
+    return {
+      title: section.title,
+      hint: `${configuredCount}/${section.entries.length} configured`,
+      kind: "section",
+      section,
+    };
+  });
+
+  if (providerSections.length > 0) {
+    const configuredCount = providerSections.reduce(
+      (sum, section) => sum + section.entries.filter((entry) => isConfigured(entry, envMap)).length,
+      0,
+    );
+    const totalCount = providerSections.reduce((sum, section) => sum + section.entries.length, 0);
+    const webSearchIndex = nodes.findIndex((node) => node.title === "Web Search");
+    const folderNode: SectionMenuNode = {
+      title: "Web Search Providers",
+      hint: `${configuredCount}/${totalCount} configured`,
+      kind: "folder",
+      sections: providerSections,
+    };
+
+    if (webSearchIndex >= 0) {
+      nodes.splice(webSearchIndex + 1, 0, folderNode);
+    } else {
+      nodes.push(folderNode);
+    }
+  }
+
+  return nodes;
+}
+
 function buildEntrySubtitle(entry: TemplateEntry, envMap: EnvMap): string {
   const currentValue = getEffectiveValue(entry, envMap);
   const currentDisplay =
     currentValue === undefined ? "(commented / unset)" : maskValue(entry.key, currentValue);
   const templateDisplay = entry.defaultValue || "(empty)";
   const lines = [
+    `Key: ${entry.key}`,
     `Description: ${summarizeComment(entry)}`,
     `Section: ${entry.sectionTitle}`,
     `Current: ${currentDisplay}`,
@@ -475,6 +553,14 @@ function buildEntrySubtitle(entry: TemplateEntry, envMap: EnvMap): string {
   }
 
   return lines.join("\n");
+}
+
+function formatPath(pathItems: string[]): string {
+  return pathItems.length > 0 ? pathItems.join(" > ") : "Home";
+}
+
+function withPath(pathItems: string[], details?: string): string {
+  return details ? `Path: ${formatPath(pathItems)}\n${details}` : `Path: ${formatPath(pathItems)}`;
 }
 
 async function promptForValue(
@@ -497,6 +583,7 @@ async function editEntry(
   entry: TemplateEntry,
   envMap: EnvMap,
   persistEnvMap: () => void,
+  pathItems: string[],
 ): Promise<"back" | "quit"> {
   while (true) {
     const currentValue = getEffectiveValue(entry, envMap);
@@ -520,8 +607,8 @@ async function editEntry(
           { label: "Quit", value: "quit" },
         ];
 
-    const choice = await selectWithArrows(entry.key, actions, {
-      subtitle: buildEntrySubtitle(entry, envMap),
+    const choice = await selectWithArrows(getEntryDisplayName(entry.key), actions, {
+      subtitle: withPath(pathItems, buildEntrySubtitle(entry, envMap)),
       escapeValue: "back",
     });
 
@@ -537,14 +624,17 @@ async function editEntry(
     } else if (choice === "custom" || choice === "edit") {
       if (entry.options.length > 0 && choice === "edit") {
         const optionChoice = await selectWithArrows(
-          `${entry.key} options`,
+          `${getEntryDisplayName(entry.key)} options`,
           [
             ...entry.options.map((option) => ({ label: option, value: option })),
             { label: "Custom value", value: "__custom__" },
             { label: "Back", value: "__back__" },
           ],
           {
-            subtitle: `${buildEntrySubtitle(entry, envMap)}\nChoose a suggested value or enter a custom one.`,
+            subtitle: withPath(
+              [...pathItems, "Options"],
+              `${buildEntrySubtitle(entry, envMap)}\nChoose a suggested value or enter a custom one.`,
+            ),
             escapeValue: "__back__",
           },
         );
@@ -589,6 +679,7 @@ async function manageSection(
   section: TemplateSection,
   envMap: EnvMap,
   persistEnvMap: () => void,
+  pathItems: string[],
 ): Promise<"back" | "quit"> {
   while (true) {
     const items: Array<MenuItem<string>> = section.entries.map((entry) => {
@@ -596,7 +687,7 @@ async function manageSection(
       const status = isConfigured(entry, envMap) ? "configured" : "template";
       const value = currentValue === undefined ? "(commented / unset)" : maskValue(entry.key, currentValue);
       return {
-        label: `${entry.key} = ${value}`,
+        label: `${getEntryDisplayName(entry.key)} = ${value}`,
         hint: status,
         value: entry.key,
       };
@@ -608,7 +699,10 @@ async function manageSection(
     const choice = await selectWithArrows(
       `${section.title} (${section.entries.length} vars)`,
       items,
-      { subtitle: "Select a variable to edit.", escapeValue: "__back__" },
+      {
+        subtitle: withPath(pathItems, "Select a variable to edit."),
+        escapeValue: "__back__",
+      },
     );
 
     if (choice === "__quit__") return "quit";
@@ -620,7 +714,12 @@ async function manageSection(
       continue;
     }
 
-    const result = await editEntry(entry, envMap, persistEnvMap);
+    const result = await editEntry(
+      entry,
+      envMap,
+      persistEnvMap,
+      [...pathItems, getEntryDisplayName(entry.key)],
+    );
     if (result === "quit") return "quit";
   }
 }
@@ -629,6 +728,7 @@ async function manageExtraKeys(
   envMap: EnvMap,
   knownKeys: Set<string>,
   persistEnvMap: () => void,
+  pathItems: string[],
 ): Promise<"back" | "quit"> {
   while (true) {
     const extraKeys = Object.keys(envMap).filter((key) => !knownKeys.has(key));
@@ -648,7 +748,7 @@ async function manageExtraKeys(
         { label: "Quit", value: "__quit__" },
       ],
       {
-        subtitle: "Manage keys that are not defined in .env.template.",
+        subtitle: withPath(pathItems, "Manage keys that are not defined in .env.template."),
         escapeValue: "__back__",
       },
     );
@@ -674,7 +774,10 @@ async function manageExtraKeys(
         { label: "Back", value: "back" },
         { label: "Quit", value: "quit" },
       ],
-      { escapeValue: "back" },
+      {
+        subtitle: withPath([...pathItems, key], `Current: ${maskValue(key, envMap[key])}`),
+        escapeValue: "back",
+      },
     );
 
     if (action === "quit") return "quit";
@@ -701,16 +804,15 @@ async function manageGroup(
   sections: TemplateSection[],
   envMap: EnvMap,
   persistEnvMap: () => void,
+  pathItems: string[],
 ): Promise<"back" | "quit"> {
   while (true) {
-    const items: Array<MenuItem<string>> = sections.map((section) => {
-      const configuredCount = section.entries.filter((entry) => isConfigured(entry, envMap)).length;
-      return {
-        label: section.title,
-        hint: `${configuredCount}/${section.entries.length} configured`,
-        value: section.title,
-      };
-    });
+    const nodes = buildSectionMenuNodes(groupTitle, sections, envMap);
+    const items: Array<MenuItem<string>> = nodes.map((node) => ({
+      label: node.title,
+      hint: node.hint,
+      value: node.title,
+    }));
 
     items.push({ label: "Back", value: "__back__" });
     items.push({ label: "Quit", value: "__quit__" });
@@ -718,19 +820,38 @@ async function manageGroup(
     const choice = await selectWithArrows(
       groupTitle,
       items,
-      { subtitle: "Select a section to configure.", escapeValue: "__back__" },
+      {
+        subtitle: withPath(pathItems, "Select a section to configure."),
+        escapeValue: "__back__",
+      },
     );
 
     if (choice === "__quit__") return "quit";
     if (choice === "__back__") return "back";
 
-    const section = sections.find((item) => item.title === choice);
-    if (!section) {
+    const node = nodes.find((item) => item.title === choice);
+    if (!node) {
       console.log(color.red("Invalid choice."));
       continue;
     }
 
-    const result = await manageSection(section, envMap, persistEnvMap);
+    const result =
+      node.kind === "folder" && node.sections
+        ? await manageGroup(
+            node.title,
+            node.sections,
+            envMap,
+            persistEnvMap,
+            [...pathItems, node.title],
+          )
+        : node.section
+          ? await manageSection(
+              node.section,
+              envMap,
+              persistEnvMap,
+              [...pathItems, node.section.title],
+            )
+          : "back";
     if (result === "quit") return "quit";
   }
 }
@@ -788,14 +909,17 @@ async function main(): Promise<void> {
         { label: "Quit", value: "__quit__" },
       ],
       {
-        subtitle: "Top-level groups are condensed from the full .env template.",
+        subtitle: withPath(["Home"], "Top-level groups are condensed from the full .env template."),
         escapeValue: "__quit__",
       },
     );
 
     if (groupChoice === "__quit__") break;
     if (groupChoice === "__extra__") {
-      const result = await manageExtraKeys(envMap, knownKeys, persistEnvMap);
+      const result = await manageExtraKeys(envMap, knownKeys, persistEnvMap, [
+        "Home",
+        "Extra keys",
+      ]);
       if (result === "quit") break;
       continue;
     }
@@ -809,12 +933,16 @@ async function main(): Promise<void> {
     const result =
       selectedGroup.sections.length === 1 &&
       selectedGroup.sections[0].title === selectedGroup.group.title
-        ? await manageSection(selectedGroup.sections[0], envMap, persistEnvMap)
+        ? await manageSection(selectedGroup.sections[0], envMap, persistEnvMap, [
+            "Home",
+            selectedGroup.group.title,
+          ])
         : await manageGroup(
             selectedGroup.group.title,
             selectedGroup.sections,
             envMap,
             persistEnvMap,
+            ["Home", selectedGroup.group.title],
           );
     if (result === "quit") break;
   }
