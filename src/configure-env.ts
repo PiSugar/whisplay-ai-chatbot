@@ -56,6 +56,7 @@ const color = {
   bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
   dim: (text: string) => `\x1b[2m${text}\x1b[0m`,
   cyan: (text: string) => `\x1b[0;36m${text}\x1b[0m`,
+  magenta: (text: string) => `\x1b[0;35m${text}\x1b[0m`,
 };
 
 const activeLinePattern = /^([A-Z0-9_]+)=(.*)$/;
@@ -538,7 +539,9 @@ function buildSectionMenuNodes(
 function buildEntrySubtitle(entry: TemplateEntry, envMap: EnvMap): string {
   const currentValue = getEffectiveValue(entry, envMap);
   const currentDisplay =
-    currentValue === undefined ? "(commented / unset)" : maskValue(entry.key, currentValue);
+    currentValue === undefined
+      ? color.dim("(commented / unset)")
+      : color.magenta(maskValue(entry.key, currentValue));
   const templateDisplay = entry.defaultValue || "(empty)";
   const lines = [
     `Key: ${entry.key}`,
