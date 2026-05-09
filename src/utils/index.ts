@@ -203,19 +203,49 @@ export const purifyTextForTTS = (text: string): string => {
 export const getRecordFileDurationMs = async (
   filePath: string
 ): Promise<number> => {
-  const format = filePath.endsWith(".mp3") ? "mp3" : "wav";
   if (!existsSync(filePath)) return 0;
+
+  // Check file size first - if non-empty, try to get duration
+  const data = readFileSync(filePath);
+  if (data.length === 0) return 0;
+
+  const format = filePath.endsWith(".mp3") ? "mp3" : filePath.endsWith(".wav") ? "wav" : "other";
+
   try {
-    const data = readFileSync(filePath);
     if (format === "wav") {
       return getWavFileDurationMs(data);
     } else if (format === "mp3") {
+      // Check if it's actually a WebM file (browser recordings)
+      const isWebM = data.length >= 4 && data.slice(0, 4).toString("hex") === "1a45dfa3";
+      if (isWebM) {
+        // Use ffprobe for WebM files
+        return await getMediaDurationWithFfprobe(filePath);
+      }
       return (await mp3Duration(data)) * 1000;
+    } else {
+      // For unknown formats, use ffprobe
+      return await getMediaDurationWithFfprobe(filePath);
     }
   } catch (error) {
-    return 0;
+    // If all else fails but file has content, assume it's valid (1 second minimum)
+    return data.length > 1000 ? 1000 : 0;
   }
-  return 0;
+};
+
+const getMediaDurationWithFfprobe = (filePath: string): Promise<number> => {
+  return new Promise((resolve) => {
+    exec(
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+      (error, stdout) => {
+        if (error) {
+          resolve(0);
+          return;
+        }
+        const duration = parseFloat(stdout.trim());
+        resolve(isNaN(duration) ? 0 : duration * 1000);
+      }
+    );
+  });
 };
 
 export function pcmToWav(
