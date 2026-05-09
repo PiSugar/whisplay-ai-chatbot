@@ -1,4 +1,5 @@
 import { exec } from "child_process";
+import { existsSync } from "fs";
 import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag } from "../utils";
@@ -76,9 +77,17 @@ export class WhisplayDisplay {
   private textCounterTimer: NodeJS.Timeout | null = null;
   private textCounterTemplate: string | null = null;
   private textCounterStartAt = 0;
+  private daemonSocketPath = "/tmp/whisplay-daemon.sock";
 
   constructor() {
-    this.deviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
+    const envDeviceEnabled = parseBoolEnv("WHISPLAY_DEVICE_ENABLED", true);
+    const daemonDetected = existsSync(this.daemonSocketPath);
+    this.deviceEnabled = envDeviceEnabled || daemonDetected;
+    if (!envDeviceEnabled && daemonDetected) {
+      console.log(
+        `[Display] Detected whisplay-daemon at ${this.daemonSocketPath}, enabling hardware path automatically.`,
+      );
+    }
     this.cameraEnabled = parseBoolEnv("ENABLE_CAMERA", false);
     const webCameraEnabled = parseBoolEnv("WEB_CAMERA_ENABLED", false);
     if (this.cameraEnabled && !webCameraEnabled) {
@@ -247,6 +256,11 @@ export class WhisplayDisplay {
             }
             if (json.event === "exit_camera_mode") {
               this.display({ camera_mode: false });
+            }
+            if (json.event === "app_exit_requested") {
+              console.log("[WhisplayApp] Exit requested by daemon");
+              cleanup();
+              process.exit(0);
             }
           } catch {
             // ignore invalid non-json lines
