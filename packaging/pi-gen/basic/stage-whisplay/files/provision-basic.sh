@@ -1,0 +1,141 @@
+#!/bin/bash
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export APT_LISTCHANGES_FRONTEND=none
+export UCF_FORCE_CONFOLD=1
+export NVM_DIR="/home/pi/.nvm"
+
+repo_dir="/home/pi/whisplay-ai-chatbot"
+repo_url="${WHISPLAY_CHATBOT_REPO:-https://github.com/PiSugar/whisplay-ai-chatbot.git}"
+repo_ref="${WHISPLAY_CHATBOT_REF:-master}"
+repo_version="${WHISPLAY_RELEASE_VERSION:-$repo_ref}"
+npm_registry="${NPM_REGISTRY:-https://registry.npmjs.org}"
+
+apt-get update
+apt-get install -y \
+  alsa-utils \
+  bluez \
+  curl \
+  dkms \
+  git \
+  i2c-tools \
+  jq \
+  libasound2-plugins \
+  libdbus-1-3 \
+  libsox-fmt-mp3 \
+  mpg123 \
+  python3-dev \
+  python3-lgpio \
+  python3-libgpiod \
+  python3-pip \
+  python3-spidev \
+  raspi-config \
+  rfkill \
+  sox \
+  sudo \
+  unzip \
+  xz-utils \
+  libcairo2 \
+  libcairo2-dev
+
+if command -v raspi-config >/dev/null 2>&1; then
+  raspi-config nonint do_spi 0
+fi
+
+if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q '^v20\.'; then
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+fi
+
+/usr/local/lib/whisplay-image/install-whisplay-driver.sh
+
+if [ ! -d "$repo_dir/.git" ]; then
+  git clone "$repo_url" "$repo_dir"
+fi
+
+cd "$repo_dir"
+git fetch --tags --force origin
+git checkout --force "$repo_ref"
+chown -R pi:pi "$repo_dir"
+
+if [ ! -f .env ]; then
+  cp .env.template .env
+  chown pi:pi .env
+fi
+
+sudo -u pi touch use_npm
+sudo -u pi env HOME=/home/pi npm config set registry "$npm_registry"
+sudo -u pi env HOME=/home/pi npm install
+sudo -u pi env HOME=/home/pi npm run build
+
+cd "$repo_dir/python"
+pip3 install -r requirements.txt --break-system-packages
+
+if [ ! -f NotoSansSC-Bold.ttf ]; then
+  curl -fL -o NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
+fi
+if [ ! -f emoji_svg.zip ]; then
+  curl -fL -o emoji_svg.zip https://storage.whisplay.ai/whisplay-ai-chatbot/emoji_svg.zip
+fi
+unzip -o emoji_svg.zip
+
+cd "$repo_dir"
+
+pisugar_installer="$(mktemp)"
+curl -fsSL https://cdn.pisugar.com/release/pisugar-power-manager.sh -o "$pisugar_installer"
+sed -i'' \
+  -e '/^local_host=/d' \
+  -e '/^local_ip=/d' \
+  -e '/Now navigate to .*8421/d' \
+  "$pisugar_installer"
+bash "$pisugar_installer" -c release
+rm -f "$pisugar_installer"
+
+for service_defaults in /etc/default/pisugar-server /etc/default/pisugar-poweroff; do
+  if [ -f "$service_defaults" ]; then
+    sed -i'' -E "s/--model '.*'/--model 'PiSugar 3'/g" "$service_defaults"
+  fi
+done
+
+/usr/local/lib/whisplay-image/install-sugar-wifi-conf.sh
+
+cat > /etc/systemd/system/chatbot.service <<'EOF'
+[Unit]
+Description=Chatbot Service
+After=network.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=pi
+Group=audio
+SupplementaryGroups=audio video gpio
+WorkingDirectory=/home/pi/whisplay-ai-chatbot
+ExecStart=/bin/bash /home/pi/whisplay-ai-chatbot/run_chatbot.sh
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+Environment=HOME=/home/pi
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=NODE_ENV=production
+PrivateDevices=no
+StandardOutput=append:/home/pi/whisplay-ai-chatbot/chatbot.log
+StandardError=append:/home/pi/whisplay-ai-chatbot/chatbot.log
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+touch /home/pi/whisplay-ai-chatbot/chatbot.log
+chown pi:pi /home/pi/whisplay-ai-chatbot/chatbot.log
+mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /etc/systemd/system/chatbot.service /etc/systemd/system/multi-user.target.wants/chatbot.service
+
+mkdir -p /etc/whisplay-image
+cat > /etc/whisplay-image/basic-release <<EOF
+WHISPLAY_RELEASE_VERSION=$repo_version
+WHISPLAY_CHATBOT_REF=$repo_ref
+WHISPLAY_CHATBOT_REPO=$repo_url
+EOF

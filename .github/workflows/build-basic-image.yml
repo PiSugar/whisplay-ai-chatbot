@@ -1,0 +1,292 @@
+name: Build Basic Image
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-image:
+    runs-on: ubuntu-22.04
+    outputs:
+      asset_name: ${{ steps.meta.outputs.asset_name }}
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_name: ${{ steps.meta.outputs.release_name }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      source_ref: ${{ steps.meta.outputs.source_ref }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate shell scripts
+        run: |
+          for script in \
+            packaging/pi-gen/basic/stage-whisplay/prerun.sh \
+            packaging/pi-gen/basic/stage-whisplay/01-whisplay/00-run.sh \
+            packaging/pi-gen/basic/stage-whisplay/01-whisplay/00-run-chroot.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/install-sugar-wifi-conf.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-driver.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/provision-basic.sh
+          do
+            bash -n "$script"
+          done
+
+      - name: Set release metadata
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            release_tag="${GITHUB_REF_NAME}"
+            release_name="${GITHUB_REF_NAME}"
+            asset_name="whisplay-basic-${GITHUB_REF_NAME}.img.xz"
+            prerelease="false"
+            source_ref="${GITHUB_REF_NAME}"
+          else
+            release_tag="master-latest"
+            release_name="master-latest"
+            asset_name="whisplay-basic-master-latest.img.xz"
+            prerelease="true"
+            source_ref="${GITHUB_SHA}"
+          fi
+
+          {
+            echo "release_tag=$release_tag"
+            echo "release_name=$release_name"
+            echo "asset_name=$asset_name"
+            echo "prerelease=$prerelease"
+            echo "source_ref=$source_ref"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            binfmt-support \
+            bmap-tools \
+            qemu-user-static \
+            xz-utils
+
+      - name: Register qemu-aarch64 for binfmt_misc
+        run: |
+          qemu_static="$(command -v qemu-aarch64-static)"
+          sudo ln -sf "$qemu_static" /usr/local/bin/qemu-aarch64
+          command -v qemu-aarch64
+          command -v qemu-aarch64-static
+          sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc || true
+          sudo update-binfmts --import qemu-aarch64 || true
+          sudo update-binfmts --enable qemu-aarch64 || true
+          test -f /proc/sys/fs/binfmt_misc/qemu-aarch64
+          cat /proc/sys/fs/binfmt_misc/qemu-aarch64
+
+      - name: Checkout pi-gen arm64
+        uses: actions/checkout@v4
+        with:
+          repository: RPi-Distro/pi-gen
+          ref: arm64
+          path: pi-gen
+
+      - name: Prepare pi-gen customization
+        env:
+          WHISPLAY_RELEASE_VERSION: ${{ steps.meta.outputs.release_name }}
+          WHISPLAY_SOURCE_REF: ${{ steps.meta.outputs.source_ref }}
+        run: |
+          cp -R packaging/pi-gen/basic/stage-whisplay pi-gen/stage-whisplay
+          chmod +x \
+            pi-gen/stage-whisplay/prerun.sh \
+            pi-gen/stage-whisplay/01-whisplay/00-run.sh \
+            pi-gen/stage-whisplay/01-whisplay/00-run-chroot.sh \
+            pi-gen/stage-whisplay/files/install-sugar-wifi-conf.sh \
+            pi-gen/stage-whisplay/files/install-whisplay-driver.sh \
+            pi-gen/stage-whisplay/files/provision-basic.sh
+          touch pi-gen/stage2/SKIP_IMAGES
+          touch pi-gen/stage3/SKIP_IMAGES
+          cat packaging/pi-gen/basic/pi-gen.env > pi-gen/config
+          {
+            echo "WHISPLAY_CHATBOT_REPO=https://github.com/${GITHUB_REPOSITORY}.git"
+            echo "WHISPLAY_CHATBOT_REF=${WHISPLAY_SOURCE_REF}"
+            echo "WHISPLAY_RELEASE_VERSION=${WHISPLAY_RELEASE_VERSION}"
+          } >> pi-gen/config
+
+      - name: Build image with pi-gen
+        working-directory: pi-gen
+        run: sudo ./build-docker.sh
+
+      - name: Prepare release assets
+        env:
+          ASSET_NAME: ${{ steps.meta.outputs.asset_name }}
+        run: |
+          set -euo pipefail
+          deploy_dir="pi-gen/deploy"
+          echo "Deploy directory contents:"
+          find "$deploy_dir" -maxdepth 1 -type f | sort
+          raw_img="$(find "$deploy_dir" -maxdepth 1 -type f -name '*.img' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2- || true)"
+          compressed_img="$(find "$deploy_dir" -maxdepth 1 -type f -name '*.img.xz' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2- || true)"
+
+          if [ -z "$compressed_img" ]; then
+            echo "No compressed image found in $deploy_dir" >&2
+            exit 1
+          fi
+
+          if [ -n "$raw_img" ] && [ ! -f "$raw_img" ]; then
+            echo "Ignoring invalid raw image path: $raw_img"
+            raw_img=""
+          fi
+
+          if [ -n "$raw_img" ] && command -v bmaptool >/dev/null 2>&1; then
+            bmaptool create -o "${raw_img}.bmap" "$raw_img"
+          fi
+
+          mkdir -p release-assets
+          cp "$compressed_img" "release-assets/${ASSET_NAME}"
+          (cd release-assets && sha256sum "${ASSET_NAME}" > "${ASSET_NAME}.sha256")
+
+          if [ -n "$raw_img" ] && [ -f "${raw_img}.bmap" ]; then
+            cp "${raw_img}.bmap" "release-assets/${ASSET_NAME%.xz}.bmap"
+          fi
+
+      - name: Inspect image contents
+        env:
+          ASSET_NAME: ${{ steps.meta.outputs.asset_name }}
+        run: |
+          set -euo pipefail
+          asset="release-assets/${ASSET_NAME}"
+          rm -f "${asset%.xz}"
+          xz -dk "$asset"
+          raw_img="${asset%.xz}"
+          loopdev="$(sudo losetup --find --show --partscan "$raw_img")"
+          cleanup() {
+            sudo umount /mnt/whisplay-root >/dev/null 2>&1 || true
+            sudo losetup -d "$loopdev" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          echo "Loop device: $loopdev"
+          sudo lsblk "$loopdev"
+          root_part="$(sudo lsblk -lnpo NAME,TYPE "$loopdev" | awk '$2 == "part" { print $1 }' | sed -n '2p')"
+          if [ -z "$root_part" ]; then
+            echo "Could not detect root partition on $loopdev" >&2
+            sudo fdisk -l "$raw_img" || true
+            exit 1
+          fi
+
+          sudo mkdir -p /mnt/whisplay-root
+          sudo mount -o ro "$root_part" /mnt/whisplay-root
+
+          check_file() {
+            local path="$1"
+            if [ ! -e "/mnt/whisplay-root${path}" ]; then
+              echo "Missing expected path: ${path}" >&2
+              return 1
+            fi
+          }
+
+          check_file /etc/systemd/system/chatbot.service || exit 1
+          check_file /etc/whisplay-image/basic-release || exit 1
+          check_file /etc/cloud/cloud.cfg || exit 1
+
+          chatbot_exec_path_raw="$(sudo awk -F= '
+            $1 == "ExecStart" {
+              gsub(/\r$/, "", $2);
+              sub(/^\/bin\/bash[[:space:]]+/, "", $2);
+              print $2;
+              exit;
+            }
+          ' /mnt/whisplay-root/etc/systemd/system/chatbot.service)"
+          chatbot_exec_path="$(printf '%s' "$chatbot_exec_path_raw" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//')"
+
+          if [ -z "$chatbot_exec_path" ] || ! echo "$chatbot_exec_path" | grep -q "run_chatbot.sh"; then
+            echo "chatbot.service does not contain a valid run_chatbot.sh ExecStart" >&2
+            echo "Raw parsed ExecStart path: ${chatbot_exec_path_raw:-<empty>}" >&2
+            echo "Normalized ExecStart path: ${chatbot_exec_path:-<empty>}" >&2
+            sudo cat /mnt/whisplay-root/etc/systemd/system/chatbot.service >&2
+            exit 1
+          fi
+
+          printf 'Resolved chatbot ExecStart path (normalized): [%q]\n' "$chatbot_exec_path"
+          if [ -z "$chatbot_exec_path" ] || ! sudo test -e "/mnt/whisplay-root${chatbot_exec_path}"; then
+            echo "run_chatbot.sh from chatbot.service is missing: ${chatbot_exec_path:-<empty>}" >&2
+            printf 'Debug missing path (escaped): [%q]\n' "/mnt/whisplay-root${chatbot_exec_path}" >&2
+            echo "Debug: /home layout in image" >&2
+            sudo find /mnt/whisplay-root/home -maxdepth 4 -mindepth 1 -print || true
+            echo "Debug: run_chatbot.sh candidates" >&2
+            sudo find /mnt/whisplay-root -maxdepth 6 -type f -name run_chatbot.sh -print || true
+            echo "Debug: ls on expected target" >&2
+            sudo ls -la "/mnt/whisplay-root${chatbot_exec_path}" >&2 || true
+            sudo cat /mnt/whisplay-root/etc/systemd/system/chatbot.service >&2 || true
+            exit 1
+          fi
+
+          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/chatbot.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/chatbot.service ]; then
+            true
+          else
+            echo "chatbot.service is not enabled in the image" >&2
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
+            exit 1
+          fi
+
+          sudo ls -la /mnt/whisplay-root/etc/whisplay-image
+          rm -f "$raw_img"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: basic-image-release-assets
+          path: release-assets/*
+
+  publish-release:
+    needs: build-image
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: basic-image-release-assets
+          path: release-assets
+
+      - name: Publish stable release
+        if: needs.build-image.outputs.prerelease == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ needs.build-image.outputs.release_tag }}" >/dev/null 2>&1; then
+            gh release upload "${{ needs.build-image.outputs.release_tag }}" release-assets/* --clobber
+          else
+            gh release create "${{ needs.build-image.outputs.release_tag }}" release-assets/* \
+              --title "${{ needs.build-image.outputs.release_name }}" \
+              --generate-notes \
+              --verify-tag
+          fi
+
+      - name: Publish rolling prerelease
+        if: needs.build-image.outputs.prerelease == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init prerelease-repo
+          cd prerelease-repo
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin master
+          git tag -f master-latest FETCH_HEAD
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" refs/tags/master-latest
+
+          if gh release view master-latest >/dev/null 2>&1; then
+            gh release upload master-latest ../release-assets/* --clobber
+            gh release edit master-latest \
+              --title "${{ needs.build-image.outputs.release_name }}" \
+              --prerelease \
+              --notes "Rolling prerelease built from ${GITHUB_SHA}."
+          else
+            gh release create master-latest ../release-assets/* \
+              --title "${{ needs.build-image.outputs.release_name }}" \
+              --prerelease \
+              --notes "Rolling prerelease built from ${GITHUB_SHA}."
+          fi

@@ -108,6 +108,7 @@ whisplay-ai-chatbot/
 │   ├── docker-compose.yml        # Ollama, faster-whisper, piper
 │   ├── faster-whisper-http/      # Faster Whisper HTTP server
 │   └── piper-http/               # Piper TTS HTTP server
+├── packaging/pi-gen/basic/       # GitHub Actions Raspberry Pi OS basic image customization
 ├── wiki/                         # Documentation (GitHub wiki)
 ├── data/                         # Runtime data (recordings, images, knowledge)
 └── patches/                      # patch-package patches
@@ -134,6 +135,9 @@ yarn build
 
 # Full rebuild with dependencies
 bash build.sh
+
+# CI image build inputs
+# See packaging/pi-gen/basic/ for the basic Raspberry Pi OS release image customization
 ```
 
 ### Run Commands
