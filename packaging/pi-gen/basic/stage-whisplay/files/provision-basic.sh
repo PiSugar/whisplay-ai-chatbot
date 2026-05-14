@@ -12,6 +12,7 @@ repo_url="${WHISPLAY_CHATBOT_REPO:-https://github.com/PiSugar/whisplay-ai-chatbo
 repo_ref="${WHISPLAY_CHATBOT_REF:-master}"
 repo_version="${WHISPLAY_RELEASE_VERSION:-$repo_ref}"
 npm_registry="${NPM_REGISTRY:-https://registry.npmjs.org}"
+wifi_country="${WIFI_COUNTRY:-US}"
 
 apt-get update
 apt-get install -y \
@@ -42,6 +43,32 @@ apt-get install -y \
 
 if command -v raspi-config >/dev/null 2>&1; then
   raspi-config nonint do_spi 0
+  raspi-config nonint do_wifi_country "$wifi_country" || true
+fi
+
+# Ensure Wi-Fi is enabled at image build time for sugar-wifi-conf BLE provisioning path.
+boot_config="/boot/firmware/config.txt"
+if [ ! -f "$boot_config" ]; then
+  boot_config="/boot/config.txt"
+fi
+if [ -f "$boot_config" ]; then
+  sed -i'' '/^[[:space:]]*dtoverlay=disable-wifi[[:space:]]*$/d' "$boot_config"
+fi
+rfkill unblock wifi || true
+
+# Keep a baseline wpa_supplicant config present for non-NetworkManager flows.
+mkdir -p /etc/wpa_supplicant
+if [ ! -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
+  cat > /etc/wpa_supplicant/wpa_supplicant.conf <<EOF
+ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=${wifi_country}
+EOF
+  chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
+fi
+mkdir -p /etc/systemd/system/multi-user.target.wants
+if [ -f /usr/lib/systemd/system/wpa_supplicant.service ]; then
+  ln -sf /usr/lib/systemd/system/wpa_supplicant.service /etc/systemd/system/multi-user.target.wants/wpa_supplicant.service
 fi
 
 if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q '^v20\.'; then
