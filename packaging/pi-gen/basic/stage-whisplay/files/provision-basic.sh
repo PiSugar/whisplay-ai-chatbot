@@ -12,7 +12,7 @@ repo_url="${WHISPLAY_CHATBOT_REPO:-https://github.com/PiSugar/whisplay-ai-chatbo
 repo_ref="${WHISPLAY_CHATBOT_REF:-master}"
 repo_version="${WHISPLAY_RELEASE_VERSION:-$repo_ref}"
 npm_registry="${NPM_REGISTRY:-https://registry.npmjs.org}"
-wifi_country="${WIFI_COUNTRY:-US}"
+wifi_country="${WIFI_COUNTRY:-GB}"
 
 apt-get update
 apt-get install -y \
