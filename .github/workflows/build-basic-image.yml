@@ -21,6 +21,7 @@ jobs:
       release_name: ${{ steps.meta.outputs.release_name }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
       source_ref: ${{ steps.meta.outputs.source_ref }}
+      source_branch: ${{ steps.meta.outputs.source_branch }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -49,12 +50,15 @@ jobs:
             asset_name="whisplay-basic-${GITHUB_REF_NAME}.img.xz"
             prerelease="false"
             source_ref="${GITHUB_REF_NAME}"
+            source_branch=""
           else
-            release_tag="master-latest"
-            release_name="master-latest"
-            asset_name="whisplay-basic-master-latest.img.xz"
+            branch_slug="$(printf '%s' "${GITHUB_REF_NAME}" | tr '/[:space:]' '-' | tr -cd '[:alnum:]._-')"
+            release_tag="${branch_slug}-latest"
+            release_name="${branch_slug}-latest"
+            asset_name="whisplay-basic-${branch_slug}-latest.img.xz"
             prerelease="true"
             source_ref="${GITHUB_SHA}"
+            source_branch="${GITHUB_REF_NAME}"
           fi
 
           {
@@ -63,6 +67,7 @@ jobs:
             echo "asset_name=$asset_name"
             echo "prerelease=$prerelease"
             echo "source_ref=$source_ref"
+            echo "source_branch=$source_branch"
           } >> "$GITHUB_OUTPUT"
 
       - name: Install build dependencies
@@ -274,18 +279,18 @@ jobs:
           git init prerelease-repo
           cd prerelease-repo
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin master
-          git tag -f master-latest FETCH_HEAD
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" refs/tags/master-latest
+          git fetch --depth=1 origin "${{ needs.build-image.outputs.source_branch }}"
+          git tag -f "${{ needs.build-image.outputs.release_tag }}" FETCH_HEAD
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${{ needs.build-image.outputs.release_tag }}"
 
-          if gh release view master-latest >/dev/null 2>&1; then
-            gh release upload master-latest ../release-assets/* --clobber
-            gh release edit master-latest \
+          if gh release view "${{ needs.build-image.outputs.release_tag }}" >/dev/null 2>&1; then
+            gh release upload "${{ needs.build-image.outputs.release_tag }}" ../release-assets/* --clobber
+            gh release edit "${{ needs.build-image.outputs.release_tag }}" \
               --title "${{ needs.build-image.outputs.release_name }}" \
               --prerelease \
               --notes "Rolling prerelease built from ${GITHUB_SHA}."
           else
-            gh release create master-latest ../release-assets/* \
+            gh release create "${{ needs.build-image.outputs.release_tag }}" ../release-assets/* \
               --title "${{ needs.build-image.outputs.release_name }}" \
               --prerelease \
               --notes "Rolling prerelease built from ${GITHUB_SHA}."
