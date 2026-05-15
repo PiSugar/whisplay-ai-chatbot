@@ -96,6 +96,8 @@ sudo -u pi touch use_npm
 sudo -u pi env HOME=/home/pi npm config set registry "$npm_registry"
 sudo -u pi env HOME=/home/pi npm install
 sudo -u pi env HOME=/home/pi npm run build
+chmod +x "$repo_dir/bin/whisplay"
+ln -sf "$repo_dir/bin/whisplay" /usr/local/bin/whisplay
 
 cd "$repo_dir/python"
 pip3 install -r requirements.txt --break-system-packages
@@ -125,6 +127,33 @@ for service_defaults in /etc/default/pisugar-server /etc/default/pisugar-powerof
     sed -i'' -E "s/--model '.*'/--model 'PiSugar 3'/g" "$service_defaults"
   fi
 done
+
+ensure_pisugar_auth() {
+  local config_path="$1"
+  local config_dir
+  local tmp_json
+  config_dir="$(dirname "$config_path")"
+  mkdir -p "$config_dir"
+  if [ ! -f "$config_path" ]; then
+    echo '{}' > "$config_path"
+  fi
+
+  tmp_json="$(mktemp)"
+  if jq '. + {digest_auth: ["admin","admin"]}' "$config_path" > "$tmp_json"; then
+    mv "$tmp_json" "$config_path"
+  else
+    rm -f "$tmp_json"
+    cat > "$config_path" <<'EOF'
+{"digest_auth":["admin","admin"]}
+EOF
+  fi
+  chmod 600 "$config_path"
+}
+
+ensure_pisugar_auth /etc/pisugar-server/config.json
+if [ -f /etc/pisugar/config.json ]; then
+  ensure_pisugar_auth /etc/pisugar/config.json
+fi
 
 /usr/local/lib/whisplay-image/install-sugar-wifi-conf.sh
 

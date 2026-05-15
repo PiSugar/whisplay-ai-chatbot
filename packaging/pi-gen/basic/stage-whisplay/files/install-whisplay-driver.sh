@@ -12,14 +12,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+whisplay_dir="/home/pi/Whisplay"
 boot_config="/boot/firmware/config.txt"
 if [ ! -f "$boot_config" ]; then
   boot_config="/boot/config.txt"
 fi
 
-git clone --depth 1 https://github.com/PiSugar/Whisplay.git "$tmpdir/Whisplay"
+if [ ! -d "$whisplay_dir/.git" ]; then
+  mkdir -p /home/pi
+  git clone --depth 1 https://github.com/PiSugar/Whisplay.git "$whisplay_dir"
+else
+  git -C "$whisplay_dir" fetch --depth 1 origin
+  git -C "$whisplay_dir" reset --hard origin/HEAD
+fi
+chown -R pi:pi "$whisplay_dir"
 
-driver_dir="$tmpdir/Whisplay/Driver"
+driver_dir="$whisplay_dir/Driver"
 workdir="$tmpdir/WM8960-Audio-HAT"
 unzip -o "$driver_dir/WM8960-Audio-HAT.zip" -d "$tmpdir"
 
