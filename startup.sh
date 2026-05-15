@@ -44,6 +44,17 @@ NODE_FOLDER=$(dirname $NODE_BIN)
 echo "Found Node at: $NODE_FOLDER"
 echo "----------------------------------------"
 
+if command -v systemctl >/dev/null 2>&1; then
+    if systemctl list-unit-files | grep -q '^whisplay-daemon\.service'; then
+        echo "Detected whisplay-daemon.service on this system."
+        echo "When whisplay-daemon is present, whisplay-ai-chatbot should be managed by the daemon instead of installing chatbot.service."
+        echo "Please stop/disable the daemon service first if you really want the legacy standalone chatbot.service mode:"
+        echo "  sudo systemctl stop whisplay-daemon.service"
+        echo "  sudo systemctl disable whisplay-daemon.service"
+        exit 1
+    fi
+fi
+
 # Create the service file
 echo "Creating systemd service file..."
 sudo tee /etc/systemd/system/chatbot.service > /dev/null <<EOF

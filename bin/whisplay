@@ -14,6 +14,7 @@
 #   whisplay service start|stop|restart    Control the running service
 #   whisplay service status                Show service status
 #   whisplay update                        Pull latest code, install deps & build
+#   whisplay configure                     Interactively manage .env by category
 #   whisplay index-knowledge               Index the knowledge base
 #   whisplay upgrade-env                   Upgrade .env to latest template
 #   whisplay help                          Show this help message
@@ -63,6 +64,7 @@ main() {
     plugin)          cmd_plugin "$@" ;;
     service)         cmd_service "$@" ;;
     update)          cmd_update ;;
+    configure)       cmd_configure ;;
     index-knowledge) cmd_index_knowledge ;;
     upgrade-env)     cmd_upgrade_env ;;
     version|--version|-v) cmd_version ;;

@@ -18,3 +18,4 @@ package-lock.json
 docker/volume
 .DS_Store
 __pycache__
+.env.backups

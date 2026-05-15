@@ -48,6 +48,7 @@ whisplay-ai-chatbot/
 ├── src/                          # Main TypeScript source code
 │   ├── index.ts                  # Application entry point
 │   ├── index-knowledge.ts        # Knowledge base indexing tool
+│   ├── configure-env.ts          # Interactive .env configuration tool
 │   ├── upgrade-env.ts            # Environment upgrade tool
 │   ├── cloud-api/                # AI service providers
 │   │   ├── interface.ts          # Common provider interfaces
@@ -91,6 +92,7 @@ whisplay-ai-chatbot/
 │   ├── whisplay.py               # Hardware board abstraction (GPIO, SPI, LCD)
 │   ├── chatbot-ui.py             # UI rendering server (socket-based)
 │   ├── camera.py                 # Camera module integration
+│   ├── whisplay_client.py        # External Whisplay daemon detection/adaptation
 │   ├── wakeword.py               # Wake word detection host
 │   ├── utils.py                  # Python utilities
 │   ├── speech-service/           # Speech recognition hosts
@@ -106,6 +108,7 @@ whisplay-ai-chatbot/
 │   ├── docker-compose.yml        # Ollama, faster-whisper, piper
 │   ├── faster-whisper-http/      # Faster Whisper HTTP server
 │   └── piper-http/               # Piper TTS HTTP server
+├── packaging/pi-gen/basic/       # GitHub Actions Raspberry Pi OS basic image customization
 ├── wiki/                         # Documentation (GitHub wiki)
 ├── data/                         # Runtime data (recordings, images, knowledge)
 └── patches/                      # patch-package patches
@@ -132,6 +135,9 @@ yarn build
 
 # Full rebuild with dependencies
 bash build.sh
+
+# CI image build inputs
+# See packaging/pi-gen/basic/ for the basic Raspberry Pi OS release image customization
 ```
 
 ### Run Commands
@@ -164,6 +170,7 @@ whisplay service status                   # Check service status
 
 # Utilities
 whisplay update                           # Pull latest code, install deps, build
+whisplay configure                        # Interactively manage .env by category
 whisplay index-knowledge                  # Index knowledge base
 whisplay upgrade-env                      # Upgrade .env to latest template
 whisplay help                             # Show help
@@ -260,6 +267,15 @@ whisplay.on_button_release(callback)
 - JSON messages with newline delimiter
 - Key message types: `button_pressed`, `button_released`, `camera_capture`, display updates
 
+### Optional Hardware Daemon
+- The optional local-only `whisplay-daemon` service now lives in the separate `Whisplay` driver repository, not in this repo.
+- IPC transport: Unix domain socket, fixed default path `/tmp/whisplay-daemon.sock`
+- Protocol: line-delimited JSON with `version: 1`
+- Core commands expected by this repo: `health.ping`, `app.register`, `app.list`, `app.launch`, `app.focus.acquire`, `app.focus.release`, `framebuffer.acquire`, `events.subscribe`
+- `python/chatbot-ui.py` performs daemon auto-detection/adaptation through `python/whisplay_client.py`, maps the shared RGB565 framebuffer directly when foregrounded, and falls back to the legacy embedded `python/whisplay.py` board path when the daemon is unavailable
+- The daemon owns the button globally and reserves 4 rapid clicks as app-exit gesture; foreground apps receive normal press/release events only while focused
+- The framebuffer support is userspace shared-memory/mmap handoff; it does not create a real `/dev/fb*` kernel device
+
 ### Display Update Format
 ```typescript
 display({
@@ -308,6 +324,8 @@ State transitions are triggered by button events, wake word detection, or comple
 python3 python/test/led.py      # RGB LED test
 python3 python/test/key.py      # Button test
 python3 python/test/socket-test.py  # Socket communication test
+# The daemon test client now lives in the separate Whisplay repo:
+# python3 ../Whisplay/example/whisplay_daemon_client.py ping
 
 # Test VLM multi-turn
 python3 python/test/test_vlm_multiturn.py
@@ -333,6 +351,8 @@ bash startup.sh
 whisplay service install
 
 # Service file location: /etc/systemd/system/chatbot.service
+# If whisplay-daemon.service exists, startup.sh refuses to install chatbot.service.
+# In that case the chatbot should be launched and managed by whisplay-daemon instead.
 # Logs: ~/whisplay-ai-chatbot/chatbot.log
 
 # View logs

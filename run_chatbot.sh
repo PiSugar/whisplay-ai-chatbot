@@ -45,7 +45,6 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "Node version: not found"
 fi
-sleep 5
 
 # Start the service
 echo "Starting Node.js application..."

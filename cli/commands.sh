@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # cli/commands.sh — Project-level commands
-#   update, index-knowledge, upgrade-env, help, version
+#   update, index-knowledge, configure, upgrade-env, help, version
 # ============================================================
 
 # ── update ───────────────────────────────────────────────────
@@ -36,6 +36,14 @@ cmd_index_knowledge() {
   source ~/.bashrc 2>/dev/null || true
   pkg_run index-knowledge
   _green "✅ Knowledge base indexed."
+}
+
+# ── configure ────────────────────────────────────────────────
+
+cmd_configure() {
+  cd "$PROJECT_ROOT"
+  source ~/.bashrc 2>/dev/null || true
+  pkg_run configure-env
 }
 
 # ── upgrade-env ──────────────────────────────────────────────
@@ -74,6 +82,7 @@ cmd_help() {
   echo "  service start|stop|restart Control the running service"
   echo "  service status             Show service status"
   echo "  update                     Pull latest code, install deps & build"
+  echo "  configure                  Interactively manage .env by category"
   echo "  index-knowledge            Index the knowledge base"
   echo "  upgrade-env                Upgrade .env to latest template"
   echo "  version                    Show version"

@@ -7,10 +7,9 @@ import sys
 import threading
 import signal
 
-# from whisplay import WhisplayBoard
-from whisplay import WhisplayBoard
 from camera import CameraThread
 from utils import ColorUtils, ImageUtils, TextUtils
+from whisplay_client import create_whisplay_hardware
 
 STATUS_ICON_DIR = os.path.join(os.path.dirname(__file__), "status-bar-icon")
 if STATUS_ICON_DIR not in sys.path:
@@ -61,6 +60,7 @@ camera_thread = None
 render_thread = None
 clients = {}
 status_icon_factories = []
+shutdown_requested = False
 
 
 def register_status_icon_factory(factory, priority=100):
@@ -532,6 +532,27 @@ def on_button_release():
     notification = {"event": "button_released"}
     send_to_all_clients(notification)
 
+
+def on_app_exit_requested():
+    global shutdown_requested, render_thread, whisplay
+    if shutdown_requested:
+        return
+    shutdown_requested = True
+    print("[Server] App exit requested by daemon")
+    notification = {"event": "app_exit_requested"}
+    send_to_all_clients(notification)
+    if render_thread is not None:
+        render_thread.stop()
+    if hasattr(whisplay, "prepare_exit"):
+        try:
+            whisplay.prepare_exit()
+        except Exception as e:
+            print(f"[Server] Failed to prepare exit: {e}")
+    def _delayed_exit():
+        time.sleep(0.5)
+        os._exit(0)
+    threading.Thread(target=_delayed_exit, daemon=True).start()
+
 def handle_client(client_socket, addr, whisplay):
     global camera_capture_image_path, camera_mode, camera_thread, render_thread
     print(f"[Socket] Client {addr} connected")
@@ -680,8 +701,10 @@ def start_socket_server(render_thread, host='0.0.0.0', port=12345):
 
 
 if __name__ == "__main__":
-    whisplay = WhisplayBoard()
+    whisplay = create_whisplay_hardware()
     print(f"[LCD] Initialization finished: {whisplay.LCD_WIDTH}x{whisplay.LCD_HEIGHT}")
+    if hasattr(whisplay, "on_exit_request"):
+        whisplay.on_exit_request(on_app_exit_requested)
     
     # read CUSTOM_FONT_PATH from environment variable
     custom_font_path = os.getenv("CUSTOM_FONT_PATH", None)
