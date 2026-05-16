@@ -251,6 +251,12 @@ jobs:
     needs: build-image
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout repository
+        if: needs.build-image.outputs.prerelease == 'false'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
