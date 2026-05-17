@@ -194,6 +194,7 @@ jobs:
           }
 
           check_file /etc/systemd/system/chatbot.service || exit 1
+          check_file /etc/systemd/system/whisplay-chatbot-register.service || exit 1
           check_file /etc/whisplay-image/basic-release || exit 1
           check_file /etc/cloud/cloud.cfg || exit 1
 
@@ -229,10 +230,10 @@ jobs:
             exit 1
           fi
 
-          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/chatbot.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/chatbot.service ]; then
+          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service ]; then
             true
           else
-            echo "chatbot.service is not enabled in the image" >&2
+            echo "whisplay-chatbot-register.service is not enabled in the image" >&2
             sudo ls -la /mnt/whisplay-root/etc/systemd/system
             sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
             exit 1
@@ -251,6 +252,12 @@ jobs:
     needs: build-image
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout repository
+        if: needs.build-image.outputs.prerelease == 'false'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
