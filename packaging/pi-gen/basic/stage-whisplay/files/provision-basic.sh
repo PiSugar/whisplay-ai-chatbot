@@ -82,10 +82,11 @@ whisplay_dir="/home/pi/Whisplay"
 install_whisplay_daemon() {
   local script
   for script in \
+    "$whisplay_dir/daemon/install_whisplay_daemon_service.sh" \
     "$whisplay_dir/daemon/install.sh" \
     "$whisplay_dir/daemon/startup.sh" \
-    "$whisplay_dir/Driver/install_whisplay_daemon.sh" \
-    "$whisplay_dir/Driver/startup.sh"
+    "$whisplay_dir/script/install_whisplay_daemon_service.sh" \
+    "$whisplay_dir/script/startup.sh"
   do
     if [ -f "$script" ]; then
       bash "$script" || true
