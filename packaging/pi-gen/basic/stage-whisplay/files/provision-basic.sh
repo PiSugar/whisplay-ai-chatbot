@@ -78,6 +78,33 @@ fi
 
 /usr/local/lib/whisplay-image/install-whisplay-driver.sh
 
+whisplay_dir="/home/pi/Whisplay"
+install_whisplay_daemon() {
+  local script
+  for script in \
+    "$whisplay_dir/daemon/install.sh" \
+    "$whisplay_dir/daemon/startup.sh" \
+    "$whisplay_dir/Driver/install_whisplay_daemon.sh" \
+    "$whisplay_dir/Driver/startup.sh"
+  do
+    if [ -f "$script" ]; then
+      bash "$script" || true
+      return 0
+    fi
+  done
+  return 0
+}
+install_whisplay_daemon
+
+# Ensure daemon service is enabled if unit is present.
+if [ -f /etc/systemd/system/whisplay-daemon.service ]; then
+  ln -sf /etc/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+elif [ -f /usr/lib/systemd/system/whisplay-daemon.service ]; then
+  ln -sf /usr/lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+elif [ -f /lib/systemd/system/whisplay-daemon.service ]; then
+  ln -sf /lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+fi
+
 if [ ! -d "$repo_dir/.git" ]; then
   git clone "$repo_url" "$repo_dir"
 fi
@@ -187,7 +214,26 @@ EOF
 touch /home/pi/whisplay-ai-chatbot/chatbot.log
 chown pi:pi /home/pi/whisplay-ai-chatbot/chatbot.log
 mkdir -p /etc/systemd/system/multi-user.target.wants
-ln -sf /etc/systemd/system/chatbot.service /etc/systemd/system/multi-user.target.wants/chatbot.service
+# Do not auto-start chatbot.service. It is launched via whisplay-daemon app registry.
+rm -f /etc/systemd/system/multi-user.target.wants/chatbot.service
+
+cat > /etc/systemd/system/whisplay-chatbot-register.service <<'EOF'
+[Unit]
+Description=Register whisplay-ai-chatbot app to whisplay-daemon
+After=whisplay-daemon.service network.target
+Wants=whisplay-daemon.service
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/whisplay-ai-chatbot
+ExecStart=/usr/bin/node /home/pi/whisplay-ai-chatbot/scripts/register-whisplay-daemon-app.js
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+ln -sf /etc/systemd/system/whisplay-chatbot-register.service /etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service
 
 mkdir -p /etc/whisplay-image
 cat > /etc/whisplay-image/basic-release <<EOF
