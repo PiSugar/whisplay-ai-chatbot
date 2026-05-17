@@ -20,7 +20,7 @@ switch (vectorDBServer) {
   case VectorDBServer.qdrant:
     vectorDB = new VectorDB();
     break;
-  case "aws":
+  case VectorDBServer.aws:
     vectorDB = new AWSVectorDB();
     break;
   default:
@@ -35,7 +35,7 @@ switch (embeddingServer) {
   case EmbeddingServer.ollama:
     embedText = ollamaEmbedText;
     break;
-  case "aws":
+  case EmbeddingServer.aws:
     embedText = awsEmbedText;
     break;
   default:

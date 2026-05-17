@@ -207,7 +207,7 @@ export default class AWSVectorDB implements VectorDBClass {
       }));
       const matches = response.vectors || [];
 
-      return matches.map((m) => ({
+      return matches.filter(m => Object.keys(m.metadata || {}).length > 0).map((m) => ({
         id: m.key,
         score: m.distance,
         payload: m.metadata,
@@ -235,7 +235,7 @@ export default class AWSVectorDB implements VectorDBClass {
       }));
       const matches = response.vectors || [];
 
-      return matches.map((m) => ({
+      return matches.filter(m => Object.keys(m.metadata || {}).length > 0).map((m) => ({
         id: m.key,
         score: null,
         payload: m.metadata,

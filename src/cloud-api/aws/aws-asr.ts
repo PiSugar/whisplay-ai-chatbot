@@ -7,10 +7,14 @@ import {
 } from "@aws-sdk/client-transcribe-streaming";
 import { AWS_REGION, getAwsCredentials, hasAwsCredentials, awsTranscribeLanguageCode } from "./aws";
 
+const client = hasAwsCredentials() 
+  ? new TranscribeStreamingClient({ region: AWS_REGION, credentials: getAwsCredentials() }) 
+  : null;
+
 const recognizeAudio = async (
   audioFilePath: string
 ): Promise<string> => {
-  if (!hasAwsCredentials()) {
+  if (!client) {
     console.error("AWS credentials are not set.");
     return "";
   }
@@ -20,11 +24,6 @@ const recognizeAudio = async (
   }
 
   try {
-    const client = new TranscribeStreamingClient({
-      region: AWS_REGION,
-      credentials: getAwsCredentials(),
-    });
-
     const audioBuffer = fs.readFileSync(audioFilePath);
     // Strip WAV header (44 bytes) to get raw PCM data.
     // Ensure the size is manageable or split if necessary.

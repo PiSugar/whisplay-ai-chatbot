@@ -5,6 +5,7 @@ import { isEmpty } from "lodash";
 import {
   BedrockRuntimeClient,
   ConverseStreamCommand,
+  ConverseCommand,
   Message as BedrockMessage,
   Tool,
   ToolConfiguration
@@ -210,7 +211,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           if (scbs.start?.toolUse) {
             toolCalls.push({
               id: scbs.start.toolUse.toolUseId || "sys_" + Date.now(),
-              index: toolCalls.length,
+              index: scbs.contentBlockIndex || toolCalls.length,
               type: "function",
               function: {
                 name: scbs.start.toolUse.name || "",
@@ -225,7 +226,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             partialCallback(d.delta.text);
           }
           if (d.delta?.toolUse) {
-            toolCalls[toolCalls.length - 1].function.arguments += d.delta.toolUse.input || "";
+            const toolIndex = d.contentBlockIndex ? toolCalls.findIndex(tc => tc.index === d.contentBlockIndex) : toolCalls.length - 1;
+            toolCalls[toolIndex].function.arguments += d.delta.toolUse.input || "";
           }
         }
 
@@ -299,20 +301,12 @@ const summaryTextWithLLM: SummaryTextWithLLMFunction = async (text: string, prom
     return text;
   }
   try {
-    const command = new ConverseStreamCommand({
+    const command = new ConverseCommand({
       modelId: awsBedrockModel,
       messages: [{ role: "user", content: [{ text: `${promptPrefix}\n\n${text}\n\n` }] }],
     });
     const response = await client.send(command);
-    let summary = "";
-    if (response.stream) {
-      for await (const chunk of response.stream) {
-        if (chunk.contentBlockDelta?.delta?.text) {
-          summary += chunk.contentBlockDelta.delta.text;
-        }
-      }
-    }
-    return summary || text;
+    return response.output?.message?.content?.[0]?.text || text;
   } catch (err: any) {
     console.error("AWS Bedrock summary error:", err.message);
     return text;

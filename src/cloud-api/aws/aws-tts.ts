@@ -6,18 +6,17 @@ import { TTSResult } from "../../type";
 import { PollyClient, SynthesizeSpeechCommand, OutputFormat, Engine, VoiceId, LanguageCode } from "@aws-sdk/client-polly";
 import { AWS_REGION, getAwsCredentials, hasAwsCredentials, awsPollyVoice, awsPollyEngine, awsPollyLanguageCode } from "./aws";
 
+const client = hasAwsCredentials() 
+  ? new PollyClient({ region: AWS_REGION, credentials: getAwsCredentials() }) 
+  : null;
+
 const synthesizeSpeech = async (text: string): Promise<TTSResult> => {
-  if (!hasAwsCredentials()) {
+  if (!client) {
     console.error("AWS credentials are not set.");
     return { duration: 0 };
   }
 
   try {
-    const client = new PollyClient({
-      region: AWS_REGION,
-      credentials: getAwsCredentials(),
-    });
-
     const command = new SynthesizeSpeechCommand({
       Engine: awsPollyEngine as Engine,
       LanguageCode: awsPollyLanguageCode as LanguageCode,

@@ -61,10 +61,12 @@ export enum TTSServer {
 
 export enum VectorDBServer {
   qdrant = "qdrant",
+  aws = "aws",
 }
 
 export enum EmbeddingServer {
   ollama = "ollama",
+  aws = "aws",
 }
 
 export enum ImageGenerationServer {
