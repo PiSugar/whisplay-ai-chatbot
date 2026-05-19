@@ -211,7 +211,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           if (scbs.start?.toolUse) {
             toolCalls.push({
               id: scbs.start.toolUse.toolUseId || "sys_" + Date.now(),
-              index: scbs.contentBlockIndex || toolCalls.length,
+              index: scbs.contentBlockIndex === undefined ? toolCalls.length : scbs.contentBlockIndex,
               type: "function",
               function: {
                 name: scbs.start.toolUse.name || "",
@@ -226,7 +226,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
             partialCallback(d.delta.text);
           }
           if (d.delta?.toolUse) {
-            const toolIndex = d.contentBlockIndex ? toolCalls.findIndex(tc => tc.index === d.contentBlockIndex) : toolCalls.length - 1;
+            const toolIndex = d.contentBlockIndex === undefined ? toolCalls.length - 1 : toolCalls.findIndex(tc => tc.index === d.contentBlockIndex);
             toolCalls[toolIndex].function.arguments += d.delta.toolUse.input || "";
           }
         }
