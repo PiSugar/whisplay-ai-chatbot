@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import WebSocket from "ws";
-import zlib from "zlib";
+import zlib from "node:zlib";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import { byteDanceAccessToken, byteDanceAppId } from "./volcengine";
