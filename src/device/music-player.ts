@@ -126,6 +126,7 @@ class LocalMusicPlayer {
     private readonly minScore: number,
     private readonly rescanSeconds: number,
     private readonly soundCardIndex: string,
+    private readonly alsaOutputDevice?: string,
   ) {}
 
   private isConfigured(): boolean {
@@ -361,9 +362,7 @@ class LocalMusicPlayer {
 
   private buildPlaybackCommand(filePath: string): { command: string; args: string[] } {
     const ext = path.extname(filePath).toLowerCase();
-    // Use the "dmixed" ALSA device (dmix software mixer) so music playback
-    // can coexist with the persistent TTS player without ALSA device conflicts.
-    const alsaDevice = "dmixed";
+    const alsaDevice = this.alsaOutputDevice || `hw:${this.soundCardIndex},0`;
     if (ext === ".mp3") {
       return {
         command: "mpg123",
@@ -633,6 +632,7 @@ export const getLocalMusicPlayer = (env: Record<string, string | undefined>): Lo
   const rescanRaw = parseInt(env.MUSIC_RESCAN_SECONDS || "", 60);
   const rescanSeconds = Number.isFinite(rescanRaw) && rescanRaw > 0 ? rescanRaw : DEFAULT_RESCAN_SECONDS;
   const soundCardIndex = env.SOUND_CARD_INDEX || "1";
+  const alsaOutputDevice = env.ALSA_OUTPUT_DEVICE;
 
   const key = JSON.stringify({
     dirs,
@@ -640,10 +640,18 @@ export const getLocalMusicPlayer = (env: Record<string, string | undefined>): Lo
     minScore,
     rescanSeconds,
     soundCardIndex,
+    alsaOutputDevice,
   });
 
   if (!localMusicPlayerInstance || key !== localMusicPlayerKey) {
-    localMusicPlayerInstance = new LocalMusicPlayer(dirs, extensions, minScore, rescanSeconds, soundCardIndex);
+    localMusicPlayerInstance = new LocalMusicPlayer(
+      dirs,
+      extensions,
+      minScore,
+      rescanSeconds,
+      soundCardIndex,
+      alsaOutputDevice,
+    );
     localMusicPlayerKey = key;
     void localMusicPlayerInstance.preloadLibrary();
   }
