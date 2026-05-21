@@ -62,4 +62,19 @@ export function registerImageGenerationPlugins(): void {
       };
     },
   } as ImageGenerationPlugin);
+
+  pluginRegistry.register({
+    name: "aws",
+    displayName: "Amazon Bedrock Image Generation",
+    version: "1.0.0",
+    type: "image-generation",
+    description: "Amazon Bedrock image generation",
+    activate: () => {
+      const { addAwsGenerationTool } = require("../../cloud-api/aws/aws-image-generation");
+      return {
+        addImageGenerationTools: (tools: LLMTool[]) =>
+          addAwsGenerationTool(tools),
+      };
+    },
+  } as ImageGenerationPlugin);
 }
