@@ -27,14 +27,28 @@ else
 fi
 chown -R pi:pi "$whisplay_dir"
 
-driver_dir="$whisplay_dir/Driver"
-workdir="$tmpdir/WM8960-Audio-HAT"
-unzip -o "$driver_dir/WM8960-Audio-HAT.zip" -d "$tmpdir"
+driver_zip="$(find "$whisplay_dir" -type f -name 'WM8960-Audio-HAT.zip' -print -quit || true)"
+if [ -z "${driver_zip:-}" ] || [ ! -f "$driver_zip" ]; then
+  echo "WM8960-Audio-HAT.zip not found in Whisplay repo: $whisplay_dir" >&2
+  exit 1
+fi
+unzip -o "$driver_zip" -d "$tmpdir"
+
+service_path="$(find "$tmpdir" -maxdepth 3 -type f -name 'wm8960-soundcard.service' -print -quit || true)"
+workdir=""
+if [ -n "$service_path" ]; then
+  workdir="$(dirname "$service_path")"
+fi
+if [ -z "${workdir:-}" ] || [ ! -d "$workdir" ]; then
+  echo "Unable to locate unpacked WM8960 driver files from zip: $driver_zip" >&2
+  exit 1
+fi
 
 mkdir -p /etc/wm8960-soundcard
 cp -f "$workdir"/*.conf /etc/wm8960-soundcard/
 cp -f "$workdir"/*.state /etc/wm8960-soundcard/
 cp -f "$workdir/wm8960-soundcard" /usr/bin/
+chmod 0755 /usr/bin/wm8960-soundcard
 
 unit_file="/lib/systemd/system/wm8960-soundcard.service"
 if [ -d /lib/systemd/system ]; then
@@ -44,8 +58,6 @@ else
   mkdir -p /usr/lib/systemd/system
   cp -f "$workdir/wm8960-soundcard.service" "$unit_file"
 fi
-
-chmod 0755 /usr/bin/wm8960-soundcard
 
 touch /etc/modules
 for module in i2c-dev snd-soc-wm8960 snd-soc-wm8960-soundcard; do
@@ -81,4 +93,8 @@ if grep -qxF "alsactl restore" /usr/bin/wm8960-soundcard; then
 fi
 
 mkdir -p /etc/systemd/system/multi-user.target.wants
+if [ ! -f "$unit_file" ]; then
+  echo "wm8960-soundcard.service not found after driver installation" >&2
+  exit 1
+fi
 ln -sf "$unit_file" /etc/systemd/system/multi-user.target.wants/wm8960-soundcard.service

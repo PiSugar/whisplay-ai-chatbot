@@ -12,9 +12,7 @@ export { getDynamicVoiceDetectLevel } from "./voice-detect";
 dotenv.config();
 
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
-// Use the dmix software mixer so TTS and music playback can coexist.
-// Raw "hw:X,0" is exclusive — only one process can open it at a time.
-const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || "dmixed";
+const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || `hw:${soundCardIndex},0`;
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
   const normalized = (value || "").toLowerCase();
   return normalized === "wav" || normalized === "mp3" ? normalized : fallback;
