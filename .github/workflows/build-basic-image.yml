@@ -57,7 +57,7 @@ jobs:
             release_name="${branch_slug}-latest"
             asset_name="whisplay-basic-${branch_slug}-latest.img.xz"
             prerelease="true"
-            source_ref="${GITHUB_SHA}"
+            source_ref="${GITHUB_REF_NAME}"
             source_branch="${GITHUB_REF_NAME}"
           fi
 
