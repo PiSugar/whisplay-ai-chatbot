@@ -89,7 +89,7 @@ install_whisplay_daemon() {
     "$whisplay_dir/script/startup.sh"
   do
     if [ -f "$script" ]; then
-      bash "$script" || true
+      SUDO_USER=pi HOME=/home/pi bash "$script" || true
       return 0
     fi
   done
@@ -104,6 +104,9 @@ elif [ -f /usr/lib/systemd/system/whisplay-daemon.service ]; then
   ln -sf /usr/lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
 elif [ -f /lib/systemd/system/whisplay-daemon.service ]; then
   ln -sf /lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+else
+  echo "whisplay-daemon.service was not installed" >&2
+  exit 1
 fi
 
 if [ ! -d "$repo_dir/.git" ]; then
