@@ -70,6 +70,31 @@ jobs:
             echo "source_branch=$source_branch"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Free runner disk space
+        run: |
+          set -euxo pipefail
+          echo "Disk usage before cleanup:"
+          df -h
+
+          sudo rm -rf \
+            /usr/local/lib/android \
+            /usr/local/share/boost \
+            /usr/local/share/chromium \
+            /usr/share/dotnet \
+            /usr/share/miniconda \
+            /usr/share/swift \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /opt/hostedtoolcache \
+            /opt/az
+
+          sudo docker system prune -af --volumes || true
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+
+          echo "Disk usage after cleanup:"
+          df -h
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -156,6 +181,17 @@ jobs:
           if [ -n "$raw_img" ] && [ -f "${raw_img}.bmap" ]; then
             cp "${raw_img}.bmap" "release-assets/${ASSET_NAME%.xz}.bmap"
           fi
+
+          if [ -n "$raw_img" ]; then
+            rm -f "$raw_img" "${raw_img}.bmap"
+          fi
+
+      - name: Free pi-gen workspace
+        run: |
+          set -euxo pipefail
+          sudo rm -rf pi-gen/work
+          sudo docker system prune -af --volumes || true
+          df -h
 
       - name: Inspect image contents
         env:
