@@ -131,6 +131,15 @@ elif [ -f /usr/lib/systemd/system/NetworkManager.service ]; then
 elif [ -f /lib/systemd/system/NetworkManager.service ]; then
   ln -sf /lib/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
 fi
+mkdir -p /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules <<'EOF'
+polkit.addRule(function(action, subject) {
+  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 && subject.isInGroup("netdev")) {
+    return polkit.Result.YES;
+  }
+});
+EOF
+chmod 0644 /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
 
 if [ -f "$whisplay_dir/example/requirements.txt" ]; then
   pip3 install -r "$whisplay_dir/example/requirements.txt" --break-system-packages

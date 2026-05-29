@@ -235,6 +235,7 @@ jobs:
           check_file /etc/whisplay-image/basic-release || exit 1
           check_file /etc/cloud/cloud.cfg || exit 1
           check_file /usr/bin/nmcli || exit 1
+          check_file /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules || exit 1
 
           chatbot_exec_path_raw="$(sudo awk -F= '
             $1 == "ExecStart" {
@@ -298,6 +299,12 @@ jobs:
           if ! sudo grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service; then
             echo "whisplay-daemon.service is missing netdev in SupplementaryGroups" >&2
             sudo cat /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service >&2
+            exit 1
+          fi
+
+          if ! sudo grep -q 'org.freedesktop.NetworkManager.' /mnt/whisplay-root/etc/polkit-1/rules.d/49-whisplay-networkmanager.rules; then
+            echo "NetworkManager polkit rule is missing expected action prefix" >&2
+            sudo cat /mnt/whisplay-root/etc/polkit-1/rules.d/49-whisplay-networkmanager.rules >&2
             exit 1
           fi
 
