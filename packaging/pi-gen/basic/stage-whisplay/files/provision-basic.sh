@@ -27,9 +27,12 @@ apt-get install -y \
   libdbus-1-3 \
   libsox-fmt-mp3 \
   mpg123 \
+  network-manager \
+  polkitd \
   python3-dev \
   python3-lgpio \
   python3-libgpiod \
+  python3-pygame \
   python3-pip \
   python3-spidev \
   raspi-config \
@@ -37,6 +40,7 @@ apt-get install -y \
   sox \
   sudo \
   unzip \
+  wpasupplicant \
   xz-utils \
   libcairo2 \
   libcairo2-dev
@@ -67,7 +71,10 @@ EOF
   chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
 fi
 mkdir -p /etc/systemd/system/multi-user.target.wants
-if [ -f /usr/lib/systemd/system/wpa_supplicant.service ]; then
+if [ ! -f /etc/systemd/system/NetworkManager.service ] \
+  && [ ! -f /usr/lib/systemd/system/NetworkManager.service ] \
+  && [ ! -f /lib/systemd/system/NetworkManager.service ] \
+  && [ -f /usr/lib/systemd/system/wpa_supplicant.service ]; then
   ln -sf /usr/lib/systemd/system/wpa_supplicant.service /etc/systemd/system/multi-user.target.wants/wpa_supplicant.service
 fi
 
@@ -97,16 +104,36 @@ install_whisplay_daemon() {
 }
 install_whisplay_daemon
 
+getent group netdev >/dev/null 2>&1 || groupadd -r netdev
+usermod -aG netdev pi
+
 # Ensure daemon service is enabled if unit is present.
+daemon_unit=""
 if [ -f /etc/systemd/system/whisplay-daemon.service ]; then
-  ln -sf /etc/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+  daemon_unit="/etc/systemd/system/whisplay-daemon.service"
 elif [ -f /usr/lib/systemd/system/whisplay-daemon.service ]; then
-  ln -sf /usr/lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+  daemon_unit="/usr/lib/systemd/system/whisplay-daemon.service"
 elif [ -f /lib/systemd/system/whisplay-daemon.service ]; then
-  ln -sf /lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+  daemon_unit="/lib/systemd/system/whisplay-daemon.service"
 else
   echo "whisplay-daemon.service was not installed" >&2
   exit 1
+fi
+if ! grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' "$daemon_unit"; then
+  sed -i -E 's/^(SupplementaryGroups=.*)$/\1 netdev/' "$daemon_unit"
+fi
+ln -sf "$daemon_unit" /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+
+if [ -f /etc/systemd/system/NetworkManager.service ]; then
+  ln -sf /etc/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
+elif [ -f /usr/lib/systemd/system/NetworkManager.service ]; then
+  ln -sf /usr/lib/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
+elif [ -f /lib/systemd/system/NetworkManager.service ]; then
+  ln -sf /lib/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
+fi
+
+if [ -f "$whisplay_dir/example/requirements.txt" ]; then
+  pip3 install -r "$whisplay_dir/example/requirements.txt" --break-system-packages
 fi
 
 if [ ! -d "$repo_dir/.git" ]; then
