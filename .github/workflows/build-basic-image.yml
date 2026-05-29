@@ -287,15 +287,6 @@ jobs:
             exit 1
           fi
 
-          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/NetworkManager.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/NetworkManager.service ]; then
-            true
-          else
-            echo "NetworkManager.service is not enabled in the image" >&2
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
-            exit 1
-          fi
-
           if ! sudo grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service; then
             echo "whisplay-daemon.service is missing netdev in SupplementaryGroups" >&2
             sudo cat /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service >&2

@@ -27,8 +27,6 @@ apt-get install -y \
   libdbus-1-3 \
   libsox-fmt-mp3 \
   mpg123 \
-  network-manager \
-  polkitd \
   python3-dev \
   python3-lgpio \
   python3-libgpiod \
@@ -40,7 +38,6 @@ apt-get install -y \
   sox \
   sudo \
   unzip \
-  wpasupplicant \
   xz-utils \
   libcairo2 \
   libcairo2-dev
@@ -71,12 +68,6 @@ EOF
   chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
 fi
 mkdir -p /etc/systemd/system/multi-user.target.wants
-if [ ! -f /etc/systemd/system/NetworkManager.service ] \
-  && [ ! -f /usr/lib/systemd/system/NetworkManager.service ] \
-  && [ ! -f /lib/systemd/system/NetworkManager.service ] \
-  && [ -f /usr/lib/systemd/system/wpa_supplicant.service ]; then
-  ln -sf /usr/lib/systemd/system/wpa_supplicant.service /etc/systemd/system/multi-user.target.wants/wpa_supplicant.service
-fi
 
 if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q '^v20\.'; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
@@ -124,13 +115,6 @@ if ! grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' "$da
 fi
 ln -sf "$daemon_unit" /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
 
-if [ -f /etc/systemd/system/NetworkManager.service ]; then
-  ln -sf /etc/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
-elif [ -f /usr/lib/systemd/system/NetworkManager.service ]; then
-  ln -sf /usr/lib/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
-elif [ -f /lib/systemd/system/NetworkManager.service ]; then
-  ln -sf /lib/systemd/system/NetworkManager.service /etc/systemd/system/multi-user.target.wants/NetworkManager.service
-fi
 mkdir -p /etc/polkit-1/rules.d
 cat > /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules <<'EOF'
 polkit.addRule(function(action, subject) {
