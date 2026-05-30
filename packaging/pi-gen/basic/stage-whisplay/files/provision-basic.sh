@@ -14,6 +14,19 @@ repo_version="${WHISPLAY_RELEASE_VERSION:-$repo_ref}"
 npm_registry="${NPM_REGISTRY:-https://registry.npmjs.org}"
 wifi_country="${WIFI_COUNTRY:-GB}"
 
+install_networkmanager_polkit_rule() {
+  install -d -m 0755 /etc/polkit-1/rules.d
+  cat > /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules <<'EOF'
+polkit.addRule(function(action, subject) {
+  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 && subject.isInGroup("netdev")) {
+    return polkit.Result.YES;
+  }
+});
+EOF
+  chmod 0644 /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
+  test -f /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
+}
+
 apt-get update
 apt-get install -y \
   alsa-utils \
@@ -30,6 +43,7 @@ apt-get install -y \
   python3-dev \
   python3-lgpio \
   python3-libgpiod \
+  python3-pygame \
   python3-pip \
   python3-spidev \
   raspi-config \
@@ -67,9 +81,6 @@ EOF
   chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
 fi
 mkdir -p /etc/systemd/system/multi-user.target.wants
-if [ -f /usr/lib/systemd/system/wpa_supplicant.service ]; then
-  ln -sf /usr/lib/systemd/system/wpa_supplicant.service /etc/systemd/system/multi-user.target.wants/wpa_supplicant.service
-fi
 
 if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q '^v20\.'; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
@@ -88,7 +99,7 @@ install_whisplay_daemon() {
     "$whisplay_dir/Driver/startup.sh"
   do
     if [ -f "$script" ]; then
-      bash "$script" || true
+      SUDO_USER=pi HOME=/home/pi bash "$script" || true
       return 0
     fi
   done
@@ -96,13 +107,30 @@ install_whisplay_daemon() {
 }
 install_whisplay_daemon
 
+getent group netdev >/dev/null 2>&1 || groupadd -r netdev
+usermod -aG netdev pi
+
 # Ensure daemon service is enabled if unit is present.
+daemon_unit=""
 if [ -f /etc/systemd/system/whisplay-daemon.service ]; then
-  ln -sf /etc/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+  daemon_unit="/etc/systemd/system/whisplay-daemon.service"
 elif [ -f /usr/lib/systemd/system/whisplay-daemon.service ]; then
-  ln -sf /usr/lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+  daemon_unit="/usr/lib/systemd/system/whisplay-daemon.service"
 elif [ -f /lib/systemd/system/whisplay-daemon.service ]; then
-  ln -sf /lib/systemd/system/whisplay-daemon.service /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+  daemon_unit="/lib/systemd/system/whisplay-daemon.service"
+else
+  echo "whisplay-daemon.service was not installed" >&2
+  exit 1
+fi
+if ! grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' "$daemon_unit"; then
+  sed -i -E 's/^(SupplementaryGroups=.*)$/\1 netdev/' "$daemon_unit"
+fi
+ln -sf "$daemon_unit" /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+
+install_networkmanager_polkit_rule
+
+if [ -f "$whisplay_dir/example/requirements.txt" ]; then
+  pip3 install -r "$whisplay_dir/example/requirements.txt" --break-system-packages
 fi
 
 if [ ! -d "$repo_dir/.git" ]; then
@@ -234,6 +262,8 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 ln -sf /etc/systemd/system/whisplay-chatbot-register.service /etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service
+
+install_networkmanager_polkit_rule
 
 mkdir -p /etc/whisplay-image
 cat > /etc/whisplay-image/basic-release <<EOF
