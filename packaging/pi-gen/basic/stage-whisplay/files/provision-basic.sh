@@ -14,6 +14,19 @@ repo_version="${WHISPLAY_RELEASE_VERSION:-$repo_ref}"
 npm_registry="${NPM_REGISTRY:-https://registry.npmjs.org}"
 wifi_country="${WIFI_COUNTRY:-GB}"
 
+install_networkmanager_polkit_rule() {
+  install -d -m 0755 /etc/polkit-1/rules.d
+  cat > /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules <<'EOF'
+polkit.addRule(function(action, subject) {
+  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 && subject.isInGroup("netdev")) {
+    return polkit.Result.YES;
+  }
+});
+EOF
+  chmod 0644 /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
+  test -f /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
+}
+
 apt-get update
 apt-get install -y \
   alsa-utils \
@@ -115,15 +128,7 @@ if ! grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' "$da
 fi
 ln -sf "$daemon_unit" /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
 
-mkdir -p /etc/polkit-1/rules.d
-cat > /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules <<'EOF'
-polkit.addRule(function(action, subject) {
-  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 && subject.isInGroup("netdev")) {
-    return polkit.Result.YES;
-  }
-});
-EOF
-chmod 0644 /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
+install_networkmanager_polkit_rule
 
 if [ -f "$whisplay_dir/example/requirements.txt" ]; then
   pip3 install -r "$whisplay_dir/example/requirements.txt" --break-system-packages
@@ -258,6 +263,8 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 ln -sf /etc/systemd/system/whisplay-chatbot-register.service /etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service
+
+install_networkmanager_polkit_rule
 
 mkdir -p /etc/whisplay-image
 cat > /etc/whisplay-image/basic-release <<EOF

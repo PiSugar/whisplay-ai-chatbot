@@ -144,6 +144,7 @@ jobs:
             echo "WHISPLAY_CHATBOT_REF=${WHISPLAY_SOURCE_REF}"
             echo "WHISPLAY_RELEASE_VERSION=${WHISPLAY_RELEASE_VERSION}"
           } >> pi-gen/config
+          grep -n "install_networkmanager_polkit_rule\\|49-whisplay-networkmanager" pi-gen/stage-whisplay/files/provision-basic.sh
 
       - name: Build image with pi-gen
         working-directory: pi-gen
