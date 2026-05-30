@@ -224,4 +224,4 @@ else
     export PATH="$WHISPLAY_BIN_DIR:$PATH"
 fi
 echo "whisplay CLI installed. Run 'whisplay help' to get started."
-echo "If you run into installation issues, ask in our Discord forum: https://discord.gg/H7pb4M32"
+echo "If you run into installation issues, ask in our Discord forum: https://discord.gg/NMpCMP8RS8"

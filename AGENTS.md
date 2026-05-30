@@ -453,5 +453,5 @@ Set `CLEAN_DATA_FOLDER_ON_START=true` in `.env` to clear recordings on startup.
 
 - **Project Wiki**: https://github.com/PiSugar/whisplay-ai-chatbot/wiki
 - **Hardware Docs**: https://docs.pisugar.com/
-- **Discord**: https://discord.gg/H7pb4M32
+- **Discord**: https://discord.gg/NMpCMP8RS8
 - **License**: GPL-3.0
