@@ -36,6 +36,7 @@ jobs:
             packaging/pi-gen/basic/stage-whisplay/01-whisplay/00-run-chroot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-sugar-wifi-conf.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-driver.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-u-boot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/provision-basic.sh
           do
             bash -n "$script"
@@ -135,6 +136,7 @@ jobs:
             pi-gen/stage-whisplay/01-whisplay/00-run-chroot.sh \
             pi-gen/stage-whisplay/files/install-sugar-wifi-conf.sh \
             pi-gen/stage-whisplay/files/install-whisplay-driver.sh \
+            pi-gen/stage-whisplay/files/install-whisplay-u-boot.sh \
             pi-gen/stage-whisplay/files/provision-basic.sh
           touch pi-gen/stage2/SKIP_IMAGES
           touch pi-gen/stage3/SKIP_IMAGES
@@ -205,6 +207,7 @@ jobs:
           raw_img="${asset%.xz}"
           loopdev="$(sudo losetup --find --show --partscan "$raw_img")"
           cleanup() {
+            sudo umount /mnt/whisplay-boot >/dev/null 2>&1 || true
             sudo umount /mnt/whisplay-root >/dev/null 2>&1 || true
             sudo losetup -d "$loopdev" >/dev/null 2>&1 || true
           }
@@ -213,14 +216,22 @@ jobs:
           echo "Loop device: $loopdev"
           sudo lsblk "$loopdev"
           root_part="$(sudo lsblk -lnpo NAME,TYPE "$loopdev" | awk '$2 == "part" { print $1 }' | sed -n '2p')"
+          boot_part="$(sudo lsblk -lnpo NAME,TYPE "$loopdev" | awk '$2 == "part" { print $1 }' | sed -n '1p')"
           if [ -z "$root_part" ]; then
             echo "Could not detect root partition on $loopdev" >&2
+            sudo fdisk -l "$raw_img" || true
+            exit 1
+          fi
+          if [ -z "$boot_part" ]; then
+            echo "Could not detect boot partition on $loopdev" >&2
             sudo fdisk -l "$raw_img" || true
             exit 1
           fi
 
           sudo mkdir -p /mnt/whisplay-root
           sudo mount -o ro "$root_part" /mnt/whisplay-root
+          sudo mkdir -p /mnt/whisplay-boot
+          sudo mount -o ro "$boot_part" /mnt/whisplay-boot
 
           check_file() {
             local path="$1"
@@ -234,9 +245,37 @@ jobs:
           check_file /etc/systemd/system/whisplay-daemon.service || exit 1
           check_file /etc/systemd/system/whisplay-chatbot-register.service || exit 1
           check_file /etc/whisplay-image/basic-release || exit 1
+          check_file /etc/whisplay-image/u-boot-release || exit 1
           check_file /etc/cloud/cloud.cfg || exit 1
           check_file /usr/bin/nmcli || exit 1
           check_file /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules || exit 1
+
+          check_boot_file() {
+            local path="$1"
+            if [ ! -e "/mnt/whisplay-boot${path}" ]; then
+              echo "Missing expected boot path: ${path}" >&2
+              return 1
+            fi
+          }
+          check_boot_file /u-boot-whisplay-rpi-arm64.bin || exit 1
+          check_boot_file /logo_lcd_240_280_rgb565.bmp || exit 1
+          check_boot_file /config.txt || exit 1
+
+          if ! sudo grep -qxF 'enable_uart=1' /mnt/whisplay-boot/config.txt; then
+            echo "config.txt is missing enable_uart=1" >&2
+            sudo cat /mnt/whisplay-boot/config.txt >&2
+            exit 1
+          fi
+          if ! sudo grep -qxF 'uart_2ndstage=1' /mnt/whisplay-boot/config.txt; then
+            echo "config.txt is missing uart_2ndstage=1" >&2
+            sudo cat /mnt/whisplay-boot/config.txt >&2
+            exit 1
+          fi
+          if ! sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' /mnt/whisplay-boot/config.txt; then
+            echo "config.txt is missing Whisplay U-Boot kernel setting" >&2
+            sudo cat /mnt/whisplay-boot/config.txt >&2
+            exit 1
+          fi
 
           chatbot_exec_path_raw="$(sudo awk -F= '
             $1 == "ExecStart" {
