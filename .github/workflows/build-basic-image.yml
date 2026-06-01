@@ -350,10 +350,10 @@ jobs:
 
   publish-release:
     needs: build-image
+    if: needs.build-image.outputs.prerelease == 'false'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
-        if: needs.build-image.outputs.prerelease == 'false'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -365,7 +365,6 @@ jobs:
           path: release-assets
 
       - name: Publish stable release
-        if: needs.build-image.outputs.prerelease == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -376,29 +375,4 @@ jobs:
               --title "${{ needs.build-image.outputs.release_name }}" \
               --generate-notes \
               --verify-tag
-          fi
-
-      - name: Publish rolling prerelease
-        if: needs.build-image.outputs.prerelease == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git init prerelease-repo
-          cd prerelease-repo
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin "${{ needs.build-image.outputs.source_branch }}"
-          git tag -f "${{ needs.build-image.outputs.release_tag }}" FETCH_HEAD
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${{ needs.build-image.outputs.release_tag }}"
-
-          if gh release view "${{ needs.build-image.outputs.release_tag }}" >/dev/null 2>&1; then
-            gh release upload "${{ needs.build-image.outputs.release_tag }}" ../release-assets/* --clobber
-            gh release edit "${{ needs.build-image.outputs.release_tag }}" \
-              --title "${{ needs.build-image.outputs.release_name }}" \
-              --prerelease \
-              --notes "Rolling prerelease built from ${GITHUB_SHA}."
-          else
-            gh release create "${{ needs.build-image.outputs.release_tag }}" ../release-assets/* \
-              --title "${{ needs.build-image.outputs.release_name }}" \
-              --prerelease \
-              --notes "Rolling prerelease built from ${GITHUB_SHA}."
           fi
