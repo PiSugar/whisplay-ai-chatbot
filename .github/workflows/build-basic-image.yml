@@ -48,7 +48,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             release_tag="${GITHUB_REF_NAME}"
             release_name="${GITHUB_REF_NAME}"
-            asset_name="whisplay-basic-${GITHUB_REF_NAME}.img.xz"
+            asset_name="whisplay-basic.img.xz"
             prerelease="false"
             source_ref="${GITHUB_REF_NAME}"
             source_branch=""
@@ -56,7 +56,7 @@ jobs:
             branch_slug="$(printf '%s' "${GITHUB_REF_NAME}" | tr '/[:space:]' '-' | tr -cd '[:alnum:]._-')"
             release_tag="${branch_slug}-latest"
             release_name="${branch_slug}-latest"
-            asset_name="whisplay-basic-${branch_slug}-latest.img.xz"
+            asset_name="whisplay-basic.img.xz"
             prerelease="true"
             source_ref="${GITHUB_REF_NAME}"
             source_branch="${GITHUB_REF_NAME}"
