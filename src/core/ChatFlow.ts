@@ -11,7 +11,10 @@ import { StreamResponser } from "./StreamResponsor";
 import { recordingsDir } from "../utils/dir";
 import dotEnv from "dotenv";
 import { WakeWordListener } from "../device/wakeword";
-import { WhisplayIMBridgeServer } from "../device/im-bridge";
+import {
+  WhisplayIMBridgeServer,
+  type WhisplayIMApprovalRequest,
+} from "../device/im-bridge";
 import { FlowStateMachine } from "./chat-flow/stateMachine";
 import { flowStates } from "./chat-flow/states";
 import { ChatFlowContext, FlowName } from "./chat-flow/types";
@@ -50,6 +53,7 @@ class ChatFlow implements ChatFlowContext {
   pendingExternalReply: string = "";
   pendingExternalEmoji: string = "";
   pendingExternalImageUrl: string = "";
+  pendingApprovalRequest: WhisplayIMApprovalRequest | null = null;
   currentExternalEmoji: string = "";
   stateMachine: FlowStateMachine;
   isFromWakeListening: boolean = false;
@@ -172,6 +176,17 @@ class ChatFlow implements ChatFlowContext {
             text_input_enabled: false,
           };
           display(displayPayload);
+        },
+      );
+      this.whisplayIMBridge.on(
+        "approval",
+        (request: WhisplayIMApprovalRequest) => {
+          if (this.pendingApprovalRequest) {
+            request.respond(false);
+            return;
+          }
+          this.pendingApprovalRequest = request;
+          this.transitionTo("approval");
         },
       );
       this.whisplayIMBridge.start();

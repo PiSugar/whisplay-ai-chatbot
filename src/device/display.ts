@@ -33,6 +33,7 @@ export interface Status {
   image_icon_visible: boolean;
   music_progress: number | undefined;
   music_duration_ms: number | undefined;
+  approval_mode: boolean;
 }
 
 export class WhisplayDisplay {
@@ -56,6 +57,7 @@ export class WhisplayDisplay {
     image_icon_visible: false,
     music_progress: undefined,
     music_duration_ms: undefined,
+    approval_mode: false,
   };
 
   private client = null as Socket | null;
@@ -390,6 +392,7 @@ export class WhisplayDisplay {
       image_icon_visible,
       music_progress,
       music_duration_ms,
+      approval_mode,
     } = {
       ...this.currentStatus,
       ...normalizedStatus,
@@ -419,6 +422,7 @@ export class WhisplayDisplay {
     this.currentStatus.image_icon_visible = image_icon_visible;
     this.currentStatus.music_progress = music_progress;
     this.currentStatus.music_duration_ms = music_duration_ms;
+    this.currentStatus.approval_mode = approval_mode;
     
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;

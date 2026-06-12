@@ -1,4 +1,5 @@
 import { StreamResponser } from "../StreamResponsor";
+import type { WhisplayIMApprovalRequest } from "../../device/im-bridge";
 
 export type FlowName =
   | "sleep"
@@ -9,6 +10,7 @@ export type FlowName =
   | "asr"
   | "answer"
   | "image"
+  | "approval"
   | "external_answer";
 
 export type FlowStateHandler = (ctx: ChatFlowContext) => void;
@@ -34,6 +36,7 @@ export interface ChatFlowContext {
   pendingExternalReply: string;
   pendingExternalEmoji: string;
   pendingExternalImageUrl: string;
+  pendingApprovalRequest: WhisplayIMApprovalRequest | null;
   currentExternalEmoji: string;
   isFromWakeListening: boolean;
   enterMusicAfterAnswer: boolean;

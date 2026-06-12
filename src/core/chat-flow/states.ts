@@ -456,6 +456,72 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonReleased(noop);
   },
+  approval: (ctx: ChatFlowContext) => {
+    const request = ctx.pendingApprovalRequest;
+    if (!request) {
+      ctx.transitionTo("sleep");
+      return;
+    }
+
+    onButtonDoubleClick(null);
+    let pressStartedAt = 0;
+    let finished = false;
+    let timeout: NodeJS.Timeout | null = null;
+    const parsedLongPressMs = parseInt(
+      process.env.WHISPLAY_IM_APPROVAL_LONG_PRESS_MS || "900",
+      10,
+    );
+    const longPressMs = Number.isFinite(parsedLongPressMs)
+      ? Math.max(500, parsedLongPressMs)
+      : 900;
+
+    const finish = (approved: boolean): void => {
+      if (finished) return;
+      finished = true;
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      request.respond(approved);
+      ctx.pendingApprovalRequest = null;
+      display({
+        status: approved ? "Allowed" : "Denied",
+        emoji: approved ? "✅" : "⛔",
+        text: approved ? "Operation allowed." : "Operation denied.",
+        RGB: approved ? "#00c8a3" : "#ff3030",
+        approval_mode: false,
+        scroll_speed: 0,
+      });
+      setTimeout(() => {
+        if (ctx.currentFlowName === "approval") {
+          ctx.transitionTo("sleep");
+        }
+      }, 600);
+    };
+
+    timeout = setTimeout(() => finish(false), request.timeoutMs);
+    onButtonPressed(() => {
+      pressStartedAt = Date.now();
+    });
+    onButtonReleased(() => {
+      const pressDuration = Date.now() - pressStartedAt;
+      finish(pressDuration < longPressMs);
+    });
+
+    const lines = compact([
+      request.tool ? `[${request.tool}] ${request.title}` : request.title,
+      request.text,
+    ]);
+    display({
+      status: "Confirm",
+      emoji: "🔐",
+      text: lines.join("\n\n"),
+      RGB: "#ffb000",
+      approval_mode: true,
+      text_input_enabled: false,
+      scroll_speed: 2,
+      image: "",
+    });
+  },
   external_answer: (ctx: ChatFlowContext) => {
     if (!ctx.pendingExternalReply && !ctx.pendingExternalImageUrl) {
       ctx.transitionTo("sleep");
