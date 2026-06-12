@@ -58,4 +58,18 @@ export function registerVisionPlugins(): void {
       };
     },
   } as VisionPlugin);
+
+  pluginRegistry.register({
+    name: "aws",
+    displayName: "Amazon Bedrock Vision",
+    version: "1.0.0",
+    type: "vision",
+    description: "Amazon Bedrock vision model",
+    activate: () => {
+      const { addAwsVisionTool } = require("../../cloud-api/aws/aws-vision");
+      return {
+        addVisionTools: (tools: LLMTool[]) => addAwsVisionTool(tools),
+      };
+    },
+  } as VisionPlugin);
 }

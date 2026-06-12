@@ -158,6 +158,8 @@ ln -sf "$repo_dir/bin/whisplay" /usr/local/bin/whisplay
 cd "$repo_dir/python"
 pip3 install -r requirements.txt --break-system-packages
 
+/usr/local/lib/whisplay-image/install-whisplay-u-boot.sh
+
 if [ ! -f NotoSansSC-Bold.ttf ]; then
   curl -fL -o NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
 fi

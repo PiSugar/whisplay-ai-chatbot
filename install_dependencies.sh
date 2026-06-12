@@ -16,9 +16,17 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# apt install sox libsox-fmt-mp3 mpg123
+# apt install sox libsox-fmt-mp3 mpg123 and other dependencies
 sudo apt-get update
-sudo apt-get install -y sox mpg123 libsox-fmt-mp3 python3-dev libcairo2 libcairo2-dev unzip python3-lgpio ffmpeg
+sudo apt-get install -y sox mpg123 libsox-fmt-mp3 python3-dev libcairo2 libcairo2-dev unzip python3-lgpio ffmpeg \
+    python3-numpy python3-pillow python3-flask python3-opencv python3-spidev python3-rpi.gpio patchelf
+
+# Fix libmad executable stack issue on modern kernels (required for MP3 support)
+# Without this fix, sox cannot encode/decode MP3 files on Raspberry Pi OS Bookworm+
+if [ -f "/lib/arm-linux-gnueabihf/libmad.so.0" ]; then
+    echo "Fixing libmad executable stack flag for MP3 support..."
+    sudo patchelf --clear-execstack /lib/arm-linux-gnueabihf/libmad.so.0 2>/dev/null || true
+fi
 
 # enable spi
 sudo raspi-config nonint do_spi 0
@@ -127,6 +135,18 @@ install_node_binary() {
     chmod +x $TEMP_DIR/install-node-v20.19.5.sh
     sudo bash $TEMP_DIR/install-node-v20.19.5.sh
     rm -rf $TEMP_DIR
+
+    # Add /opt/nodejs/bin to PATH if not already present
+    if [ -d "/opt/nodejs/bin" ]; then
+        export PATH="/opt/nodejs/bin:$PATH"
+        if ! grep -q "/opt/nodejs/bin" "$HOME/.bashrc" 2>/dev/null; then
+            echo 'export PATH="/opt/nodejs/bin:$PATH"' >> "$HOME/.bashrc"
+            echo "Added /opt/nodejs/bin to PATH in ~/.bashrc"
+        fi
+        if ! grep -q "/opt/nodejs/bin" "$HOME/.profile" 2>/dev/null; then
+            echo 'export PATH="/opt/nodejs/bin:$PATH"' >> "$HOME/.profile"
+        fi
+    fi
 
     # Verify installation
     if command_exists node && [[ "$(node -v)" =~ ^v20 ]]; then
