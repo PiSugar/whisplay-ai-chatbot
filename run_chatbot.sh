@@ -14,17 +14,20 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 
-# Find the sound card index for wm8960soundcard (Linux only)
+# Find the unified Whisplay sound card first; keep legacy names as fallback.
 card_index=""
+card_name=""
 audio_supported=false
 if [ "$is_linux" = true ] && [ -r "/proc/asound/cards" ] && command -v amixer >/dev/null 2>&1; then
-  card_index=$(awk '/wm8960soundcard/ {print $1}' /proc/asound/cards | head -n1)
-  # Default to 1 if not found
-  if [ -z "$card_index" ]; then
-    card_index=1
+  card_info=$(awk '/whisplaysound|wm8960soundcard|es8389soundcard/ {print $1 " " $2; exit}' /proc/asound/cards)
+  if [ -n "$card_info" ]; then
+    card_index=$(echo "$card_info" | awk '{print $1}')
+    card_name=$(echo "$card_info" | awk '{print $2}' | tr -d '[]:')
+    audio_supported=true
+    echo "Using sound card: ${card_name:-unknown} (index ${card_index})"
+  else
+    echo "Whisplay sound card not found; using default audio devices."
   fi
-  audio_supported=true
-  echo "Using sound card index: $card_index"
 else
   echo "Audio setup skipped for OS: $os_name"
 fi
@@ -62,7 +65,9 @@ get_env_value() {
 
 # load .env variables, exclude comments and empty lines
 # check if .env file exists
-initial_volume_level=114
+initial_volume_level=""
+unified_initial_volume_level=80
+legacy_initial_volume_level=114
 serve_ollama=false
 if [ -f ".env" ]; then
   # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
@@ -96,9 +101,28 @@ else
   exit 1
 fi
 
-# Adjust initial volume (Linux only)
+# Adjust initial volume (Linux only). Unified driver uses 0-100; legacy WM8960
+# uses the original raw Speaker scale, so keep its historical default.
 if [ "$audio_supported" = true ]; then
-  amixer -c $card_index set Speaker $initial_volume_level
+  if [ -z "$initial_volume_level" ]; then
+    if [ "$card_name" = "whisplaysound" ]; then
+      initial_volume_level=$unified_initial_volume_level
+    else
+      initial_volume_level=$legacy_initial_volume_level
+    fi
+  fi
+
+  if [ "$card_name" = "whisplaysound" ]; then
+    amixer -c "$card_name" cset name='speaker' "$initial_volume_level" >/dev/null 2>&1 || true
+  else
+    amixer -c "$card_index" set Speaker "$initial_volume_level" >/dev/null 2>&1 || true
+  fi
+fi
+
+if [ -n "$card_name" ]; then
+  export SOUND_CARD_NAME="$card_name"
+  export SOUND_CARD_INDEX="$card_index"
+  export ALSA_OUTPUT_DEVICE="${ALSA_OUTPUT_DEVICE:-hw:${card_name},0}"
 fi
 
 if [ "$serve_ollama" = true ]; then

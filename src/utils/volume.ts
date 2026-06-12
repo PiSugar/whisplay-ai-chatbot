@@ -1,18 +1,32 @@
 import { execSync } from "child_process";
 
-// amixer -c 1 get Speaker
-// Capabilities: volume
-// Playback channels: Front Left - Front Right
-// Limits: Playback 0 - 127
-// Mono:
-// Front Left: Playback 121 [95%] [0.00dB]
-// Front Right: Playback 121 [95%] [0.00dB]
-
+const soundCardName = process.env.SOUND_CARD_NAME || "";
 const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
-console.log(`Using sound card index: ${soundCardIndex}`);
+const soundCardRef = soundCardName || soundCardIndex;
+const isUnifiedWhisplay = soundCardName === "whisplaysound" || soundCardRef === "whisplaysound";
+const speakerControl = isUnifiedWhisplay ? "speaker" : "Speaker";
+console.log(`Using sound card: ${soundCardRef}`);
 
-// curve
-const percentToAmixerValueMap = [
+type VolumePoint = [number, number];
+
+// Measured on Raspberry Pi .175 with the unified whisplaysound driver:
+// setting speaker to X% through ALSA simple mixer reads back X from
+// `amixer -c whisplaysound cget name=speaker`.
+const unifiedDriverPercentToControlValueMap: VolumePoint[] = [
+  [0, 0],
+  [10, 10],
+  [20, 20],
+  [30, 30],
+  [40, 40],
+  [50, 50],
+  [60, 60],
+  [70, 70],
+  [80, 80],
+  [90, 90],
+  [100, 100],
+];
+
+const legacyWm8960PercentToAmixerValueMap: VolumePoint[] = [
   [0, 0],
   [10, 67],
   [20, 85],
@@ -26,8 +40,20 @@ const percentToAmixerValueMap = [
   [100, 127],
 ];
 
+const percentToAmixerValueMap = isUnifiedWhisplay
+  ? unifiedDriverPercentToControlValueMap
+  : legacyWm8960PercentToAmixerValueMap;
+
 const getVolumeValueFromAmixer = (): number => {
-  const output = execSync(`amixer -c ${soundCardIndex} get Speaker`).toString();
+  const output = isUnifiedWhisplay
+    ? execSync(`amixer -c ${soundCardRef} cget name='${speakerControl}'`).toString()
+    : execSync(`amixer -c ${soundCardRef} get ${speakerControl}`).toString();
+  if (isUnifiedWhisplay) {
+    const unifiedMatch = output.match(/: values=(\d+)/);
+    if (unifiedMatch && unifiedMatch[1]) {
+      return parseFloat(unifiedMatch[1]);
+    }
+  }
   const regex = /Front Left: Playback (\d+) \[(\d+)%\] \[([-\d.]+)dB\]/;
   const match = output.match(regex);
   if (match && match[1]) {
@@ -59,7 +85,7 @@ function logPercentToAmixerValue(logPercent: number): number {
 
 export const getCurrentLogPercent = (): number => {
   const value = getVolumeValueFromAmixer();
-  // 根据percentToAmixerValueMap获得logPercent，曲线中间的值则根据线性插值
+  // 根据当前驱动的 percentToAmixerValueMap 获得 logPercent，曲线中间的值则根据线性插值
   for (let i = 0; i < percentToAmixerValueMap.length - 1; i++) {
     const [percent1, amixerValue1] = percentToAmixerValueMap[i];
     const [percent2, amixerValue2] = percentToAmixerValueMap[i + 1];
@@ -76,6 +102,9 @@ export const getCurrentLogPercent = (): number => {
 };
 
 export const setVolumeByAmixer = (logPercent: number): void => {
-  const value = logPercentToAmixerValue(logPercent);
-  execSync(`amixer -c ${soundCardIndex} set Speaker ${value}`);
+  const value = Math.round(logPercentToAmixerValue(logPercent));
+  const command = isUnifiedWhisplay
+    ? `amixer -c ${soundCardRef} cset name='${speakerControl}' ${value}`
+    : `amixer -c ${soundCardRef} set ${speakerControl} ${value}`;
+  execSync(command);
 };

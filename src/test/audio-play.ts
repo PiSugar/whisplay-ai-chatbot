@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 
-const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
+const soundCardIndex = process.env.SOUND_CARD_NAME || process.env.SOUND_CARD_INDEX || "1";
 
 export const listWavFilesInTtsDir = (): string[] => {
   if (!fs.existsSync(ttsDir)) {

@@ -399,19 +399,20 @@ class WhisplayBoard:
             self.backlight_mode = True
 
     def _detect_wm8960(self):
-        """Detect if a sound card containing wm8960 exists"""
+        """Detect the Whisplay unified sound card or legacy WM8960 card."""
         try:
             with open("/proc/asound/cards", "r") as f:
                 lines = f.readlines()
                 for line in lines:
-                    if "wm8960" in line.lower():
-                        print("wm8960 sound card detected.")
+                    lower = line.lower()
+                    if "whisplaysound" in lower or "wm8960" in lower or "es8389" in lower:
+                        print("Whisplay sound card detected.")
                         return True
         except Exception as e:
-            print(f"Error detecting wm8960 sound card: {e}")
+            print(f"Error detecting Whisplay sound card: {e}")
             return False
 
-        print("wm8960 sound card not detected. Please refer to the following page for installation instructions.")
+        print("Whisplay sound card not detected. Please refer to the following page for installation instructions.")
         print("https://docs.pisugar.com/")
         return False
 
