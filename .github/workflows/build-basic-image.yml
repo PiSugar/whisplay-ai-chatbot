@@ -37,6 +37,7 @@ jobs:
             packaging/pi-gen/basic/stage-whisplay/files/install-sugar-wifi-conf.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-driver.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-u-boot.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/expand-rootfs-firstboot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/provision-basic.sh
           do
             bash -n "$script"
@@ -137,6 +138,7 @@ jobs:
             pi-gen/stage-whisplay/files/install-sugar-wifi-conf.sh \
             pi-gen/stage-whisplay/files/install-whisplay-driver.sh \
             pi-gen/stage-whisplay/files/install-whisplay-u-boot.sh \
+            pi-gen/stage-whisplay/files/expand-rootfs-firstboot.sh \
             pi-gen/stage-whisplay/files/provision-basic.sh
           touch pi-gen/stage2/SKIP_IMAGES
           touch pi-gen/stage3/SKIP_IMAGES
@@ -244,6 +246,8 @@ jobs:
           check_file /etc/systemd/system/chatbot.service || exit 1
           check_file /etc/systemd/system/whisplay-daemon.service || exit 1
           check_file /etc/systemd/system/whisplay-chatbot-register.service || exit 1
+          check_file /etc/systemd/system/whisplay-expand-rootfs.service || exit 1
+          check_file /usr/local/sbin/whisplay-expand-rootfs || exit 1
           check_file /etc/whisplay-image/basic-release || exit 1
           check_file /etc/whisplay-image/u-boot-release || exit 1
           check_file /etc/cloud/cloud.cfg || exit 1
@@ -322,6 +326,15 @@ jobs:
             true
           else
             echo "whisplay-daemon.service is not enabled in the image" >&2
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
+            exit 1
+          fi
+
+          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service ]; then
+            true
+          else
+            echo "whisplay-expand-rootfs.service is not enabled in the image" >&2
             sudo ls -la /mnt/whisplay-root/etc/systemd/system
             sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
             exit 1

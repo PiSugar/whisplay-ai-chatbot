@@ -81,6 +81,7 @@ EOF
   chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
 fi
 mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /etc/systemd/system/whisplay-expand-rootfs.service /etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service
 
 if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q '^v20\.'; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
