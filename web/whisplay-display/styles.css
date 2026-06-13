@@ -177,7 +177,7 @@ body {
 .approval-bar {
   display: none;
   height: 38px;
-  padding: 0 18px;
+  padding: 0 20px;
   align-items: center;
   justify-content: space-between;
   background: #000;
@@ -193,9 +193,9 @@ body {
 .approval-action {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -203,14 +203,14 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #ffb000;
+  background: #32d74b;
 }
 
 .hold-dot {
-  width: 24px;
+  width: 22px;
   height: 10px;
   border-radius: 999px;
-  background: #919aa6;
+  background: #ff453a;
 }
 
 .music-progress-track {

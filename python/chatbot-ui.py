@@ -385,30 +385,30 @@ class RenderThread(threading.Thread):
 
     def render_approval_actions(self, image, draw):
         width, height = image.size
-        font = ImageFont.truetype(self.font_path, 15)
-        muted = (145, 154, 166, 255)
+        font = ImageFont.truetype(self.font_path, 12)
+        allow_color = (48, 209, 88, 255)
+        deny_color = (255, 69, 58, 255)
         text_color = (235, 242, 247, 255)
-        accent = (255, 176, 0, 255)
         draw.line([(10, 0), (width - 10, 0)], fill=(38, 38, 38, 255), width=1)
 
-        allow_x = 26
+        allow_x = 20
         deny_x = width // 2 + 12
         cy = height // 2 + 1
         dot_r = 5
         draw.ellipse(
             [allow_x, cy - dot_r, allow_x + dot_r * 2, cy + dot_r],
-            fill=accent,
+            fill=allow_color,
         )
-        draw.text((allow_x + 18, cy - 10), "Allow", font=font, fill=text_color)
+        draw.text((allow_x + 16, cy - 8), "Allow", font=font, fill=text_color)
 
-        pill_w = 24
+        pill_w = 22
         pill_h = 10
         draw.rounded_rectangle(
             [deny_x, cy - pill_h // 2, deny_x + pill_w, cy + pill_h // 2],
             radius=pill_h // 2,
-            fill=muted,
+            fill=deny_color,
         )
-        draw.text((deny_x + pill_w + 10, cy - 10), "Deny", font=font, fill=text_color)
+        draw.text((deny_x + pill_w + 8, cy - 8), "Denied", font=font, fill=text_color)
 
     def run(self):
         frame_interval = 1 / self.fps
