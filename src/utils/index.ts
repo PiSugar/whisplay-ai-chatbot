@@ -1,7 +1,5 @@
-import { Type as GeminiType } from "@google/genai";
 import { get, isArray } from "lodash";
 import { FunctionCall } from "../type";
-import moment from "moment";
 import { exec } from "child_process";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import mp3Duration from "mp3-duration";
@@ -62,7 +60,17 @@ export const extractEmojis = (str: string): string => {
 };
 
 export const getCurrentTimeTag = (): string => {
-  return moment().format("YYYY-MM-DD HH:mm:ss");
+  const date = new Date();
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join("-") + " " + [
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join(":");
 };
 
 export function splitSentences(text: string): {
@@ -167,6 +175,7 @@ export const killAllProcesses = (pid: number) => {
 };
 
 export const transformToGeminiType = (parameters: Object) => {
+  const { Type: GeminiType } = require("@google/genai");
   // 遍历 parameters 对象，将所有key为type字段值转换为geminiType的类型
   const jsonString = JSON.stringify(parameters);
   const newObject = JSON.parse(jsonString, (key, value) => {

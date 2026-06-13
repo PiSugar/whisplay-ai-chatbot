@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "yarn build && yarn start",
     "build": "rm -rf dist && tsc && node scripts/register-whisplay-daemon-app.js",
-    "start": "node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/index.js",
+    "start": "node dist/index.js",
     "index-knowledge": "node -r ts-node/register -r tsconfig-paths/register dist/index-knowledge.js",
     "configure-env": "node -r ts-node/register -r tsconfig-paths/register dist/configure-env.js",
     "upgrade-env": "node -r ts-node/register -r tsconfig-paths/register dist/upgrade-env.js",

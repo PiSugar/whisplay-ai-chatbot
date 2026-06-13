@@ -1,4 +1,4 @@
-import { VisionServer, LLMTool } from "../type";
+import { VisionServer, LLMTool, ToolReturnTag } from "../type";
 import dotenv from "dotenv";
 import { showLatestCapturedImg } from "../utils/image";
 import { pluginRegistry } from "../plugin";
@@ -10,6 +10,23 @@ const visionServer: VisionServer = (
 ).toLowerCase() as VisionServer;
 const enableCamera = process.env.ENABLE_CAMERA === "true";
 
+const getVisionTool = (): LLMTool | null => {
+  if (!visionServer) return null;
+
+  const visionTools: LLMTool[] = [];
+  try {
+    const provider = pluginRegistry.activatePluginSync<"vision">(
+      "vision",
+      visionServer,
+    );
+    provider.addVisionTools(visionTools);
+  } catch (e: any) {
+    console.warn(e.message);
+  }
+
+  return visionTools.find((tool) => tool.function.name === "describeImage") || null;
+};
+
 const visionTools: LLMTool[] = [];
 
 if (enableCamera) {
@@ -20,26 +37,40 @@ if (enableCamera) {
       description: "Show the latest captured image",
       parameters: {},
     },
-    func: async (params) => {
+    func: async () => {
       const result = showLatestCapturedImg();
       return result
-        ? "[success] Ready to show."
-        : "[error] No captured image to display.";
+        ? `${ToolReturnTag.Success} Ready to show.`
+        : `${ToolReturnTag.Error} No captured image to display.`;
     },
   });
 }
 
-// Activate vision plugin
 if (visionServer) {
-  try {
-    const provider = pluginRegistry.activatePluginSync<"vision">(
-      "vision",
-      visionServer,
-    );
-    provider.addVisionTools(visionTools);
-  } catch (e: any) {
-    console.warn(e.message);
-  }
+  visionTools.push({
+    type: "function",
+    function: {
+      name: "describeImage",
+      description:
+        "Use this tool when user wants to analyze and interpret an image with the help of vision model, the tool will get the latest showed image byitself and answer questions about the image.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description:
+              "The query or prompt to help with interpreting the image, e.g., 'What is in this image?'",
+          },
+        },
+        required: ["prompt"],
+      },
+    },
+    func: async (params) => {
+      const tool = getVisionTool();
+      if (!tool) return `${ToolReturnTag.Error} Vision is not available.`;
+      return tool.func(params);
+    },
+  });
 }
 
 export const addVisionTools = (tools: LLMTool[]) => {

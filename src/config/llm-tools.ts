@@ -50,15 +50,18 @@ addMemPalaceTools(pluginTools);
 // ── Exported aggregated tool lists ──────────────────────────
 export const llmTools: LLMTool[] = [...pluginTools];
 
-export const llmToolsForGemini: LLMTool[] = pluginTools.map((tool) => {
-  const newTool = cloneDeep(tool);
-  if (newTool.function && newTool.function.parameters) {
-    newTool.function.parameters = transformToGeminiType(
-      newTool.function.parameters,
-    );
-  }
-  return newTool;
-});
+export const llmToolsForGemini: LLMTool[] =
+  (process.env.LLM_SERVER || "").toLowerCase() === "gemini"
+    ? pluginTools.map((tool) => {
+        const newTool = cloneDeep(tool);
+        if (newTool.function && newTool.function.parameters) {
+          newTool.function.parameters = transformToGeminiType(
+            newTool.function.parameters,
+          );
+        }
+        return newTool;
+      })
+    : [];
 
 export const llmFuncMap = llmTools.reduce(
   (acc, tool) => {

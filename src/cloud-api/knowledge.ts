@@ -1,10 +1,6 @@
-import VectorDB from "./local/qdrant-vectordb";
-import AWSVectorDB from "./aws/aws-vectordb";
-import { embedText as ollamaEmbedText } from "./local/ollama-embedding";
-import { embedText as awsEmbedText } from "./aws/aws-embedding";
 import { summaryTextWithLLM } from "./llm";
 import { EmbeddingServer, VectorDBServer } from "../type";
-import { VectorDBClass } from "./interface";
+import type { VectorDBClass } from "./interface";
 
 const embeddingServer = (process.env.EMBEDDING_SERVER || "ollama")
   .toLowerCase()
@@ -14,43 +10,65 @@ const vectorDBServer = (process.env.VECTOR_DB_SERVER || "qdrant")
   .trim();
 const envEnableRAG = (process.env.ENABLE_RAG || "false").toLowerCase() === "true";
 
-let vectorDB: VectorDBClass = null as any;
+let vectorDBInstance: VectorDBClass | null = null;
 
-switch (vectorDBServer) {
-  case VectorDBServer.qdrant:
-    vectorDB = new VectorDB();
-    break;
-  case VectorDBServer.aws:
-    vectorDB = new AWSVectorDB();
-    break;
-  default:
-    throw new Error(
-      `Unsupported VECTOR_DB_SERVER: ${vectorDBServer}. Supported options are: qdrant, aws.`,
-    );
+function getVectorDB(): VectorDBClass {
+  if (vectorDBInstance) return vectorDBInstance;
+
+  switch (vectorDBServer) {
+    case VectorDBServer.qdrant: {
+      const VectorDB = require("./local/qdrant-vectordb").default;
+      vectorDBInstance = new VectorDB();
+      break;
+    }
+    case VectorDBServer.aws: {
+      const AWSVectorDB = require("./aws/aws-vectordb").default;
+      vectorDBInstance = new AWSVectorDB();
+      break;
+    }
+    default:
+      throw new Error(
+        `Unsupported VECTOR_DB_SERVER: ${vectorDBServer}. Supported options are: qdrant, aws.`,
+      );
+  }
+
+  return vectorDBInstance as VectorDBClass;
 }
 
-let embedText: ((text: string) => Promise<number[]>) = null as any;
+const vectorDB = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      const db = getVectorDB() as any;
+      const value = db[prop];
+      return typeof value === "function" ? value.bind(db) : value;
+    },
+  },
+) as VectorDBClass;
 
-switch (embeddingServer) {
-  case EmbeddingServer.ollama:
-    embedText = ollamaEmbedText;
-    break;
-  case EmbeddingServer.aws:
-    embedText = awsEmbedText;
-    break;
-  default:
-    throw new Error(
-      `Unsupported EMBEDDING_SERVER: ${embeddingServer}. Supported options are: ollama, aws.`,
-    );
+let embedTextImpl: ((text: string) => Promise<number[]>) | null = null;
+
+function getEmbedText(): (text: string) => Promise<number[]> {
+  if (embedTextImpl) return embedTextImpl;
+
+  switch (embeddingServer) {
+    case EmbeddingServer.ollama:
+      embedTextImpl = require("./local/ollama-embedding").embedText;
+      break;
+    case EmbeddingServer.aws:
+      embedTextImpl = require("./aws/aws-embedding").embedText;
+      break;
+    default:
+      throw new Error(
+        `Unsupported EMBEDDING_SERVER: ${embeddingServer}. Supported options are: ollama, aws.`,
+      );
+  }
+
+  return embedTextImpl as (text: string) => Promise<number[]>;
 }
 
-let enableRAG = envEnableRAG;
+const embedText = async (text: string): Promise<number[]> => getEmbedText()(text);
 
-if (envEnableRAG && (!vectorDB || !embedText)) {
-  console.warn(
-    `[RAG] RAG is enabled but required components are missing. Disabling RAG.`,
-  );
-  enableRAG = false;
-}
+const enableRAG = envEnableRAG;
 
 export { vectorDB, embedText, summaryTextWithLLM, enableRAG };

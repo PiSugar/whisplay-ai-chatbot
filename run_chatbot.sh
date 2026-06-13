@@ -138,7 +138,14 @@ else
   use_npm=false
 fi
 
-if [ "$use_npm" = true ]; then
+if [ -f "dist/index.js" ] && command -v node >/dev/null 2>&1; then
+  echo "Starting compiled application directly..."
+  if [ -n "$card_index" ]; then
+    SOUND_CARD_INDEX=$card_index node dist/index.js
+  else
+    node dist/index.js
+  fi
+elif [ "$use_npm" = true ]; then
   echo "Using npm to start the application..."
   if [ -n "$card_index" ]; then
     SOUND_CARD_INDEX=$card_index npm start
