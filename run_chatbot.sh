@@ -80,6 +80,12 @@ if [ -f ".env" ]; then
   INITIAL_VOLUME_LEVEL=$(get_env_value "INITIAL_VOLUME_LEVEL")
   [ -n "$INITIAL_VOLUME_LEVEL" ] && export INITIAL_VOLUME_LEVEL
 
+  INITIAL_VOLUME_LEVEL_UNIFIED=$(get_env_value "INITIAL_VOLUME_LEVEL_UNIFIED")
+  [ -n "$INITIAL_VOLUME_LEVEL_UNIFIED" ] && unified_initial_volume_level=$INITIAL_VOLUME_LEVEL_UNIFIED
+
+  INITIAL_VOLUME_LEVEL_LEGACY=$(get_env_value "INITIAL_VOLUME_LEVEL_LEGACY")
+  [ -n "$INITIAL_VOLUME_LEVEL_LEGACY" ] && legacy_initial_volume_level=$INITIAL_VOLUME_LEVEL_LEGACY
+
   WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
   [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
 
@@ -93,7 +99,7 @@ if [ -f ".env" ]; then
     serve_ollama=true
   fi
 
-  if [ -n "$INITIAL_VOLUME_LEVEL" ]; then
+  if [ -n "$INITIAL_VOLUME_LEVEL" ] && [ "$INITIAL_VOLUME_LEVEL" != "auto" ]; then
     initial_volume_level=$INITIAL_VOLUME_LEVEL
   fi
 else
