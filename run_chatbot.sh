@@ -66,8 +66,7 @@ get_env_value() {
 # load .env variables, exclude comments and empty lines
 # check if .env file exists
 initial_volume_percent=""
-unified_initial_volume_percent=80
-legacy_initial_volume_percent=60
+default_initial_volume_percent=80
 serve_ollama=false
 if [ -f ".env" ]; then
   # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
@@ -79,11 +78,10 @@ if [ -f ".env" ]; then
 
   INITIAL_VOLUME_PERCENT=$(get_env_value "INITIAL_VOLUME_PERCENT")
 
-  INITIAL_VOLUME_PERCENT_UNIFIED=$(get_env_value "INITIAL_VOLUME_PERCENT_UNIFIED")
-  [ -n "$INITIAL_VOLUME_PERCENT_UNIFIED" ] && unified_initial_volume_percent=$INITIAL_VOLUME_PERCENT_UNIFIED
-
-  INITIAL_VOLUME_PERCENT_LEGACY=$(get_env_value "INITIAL_VOLUME_PERCENT_LEGACY")
-  [ -n "$INITIAL_VOLUME_PERCENT_LEGACY" ] && legacy_initial_volume_percent=$INITIAL_VOLUME_PERCENT_LEGACY
+  INITIAL_VOLUME_LEVEL=$(get_env_value "INITIAL_VOLUME_LEVEL")
+  if [ -n "$INITIAL_VOLUME_LEVEL" ]; then
+    echo "[Volume] INITIAL_VOLUME_LEVEL is deprecated and ignored. Please use INITIAL_VOLUME_PERCENT (0-100) instead."
+  fi
 
   WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
   [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
@@ -111,11 +109,7 @@ fi
 # legacy WM8960 accepts percentages through amixer set Speaker.
 if [ "$audio_supported" = true ]; then
   if [ -z "$initial_volume_percent" ]; then
-    if [ "$card_name" = "whisplaysound" ]; then
-      initial_volume_percent=$unified_initial_volume_percent
-    else
-      initial_volume_percent=$legacy_initial_volume_percent
-    fi
+    initial_volume_percent=$default_initial_volume_percent
   fi
 
   if [ "$card_name" = "whisplaysound" ]; then
