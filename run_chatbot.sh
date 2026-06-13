@@ -65,9 +65,9 @@ get_env_value() {
 
 # load .env variables, exclude comments and empty lines
 # check if .env file exists
-initial_volume_level=""
-unified_initial_volume_level=80
-legacy_initial_volume_level=114
+initial_volume_percent=""
+unified_initial_volume_percent=80
+legacy_initial_volume_percent=60
 serve_ollama=false
 if [ -f ".env" ]; then
   # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
@@ -77,14 +77,13 @@ if [ -f ".env" ]; then
   CUSTOM_FONT_PATH=$(get_env_value "CUSTOM_FONT_PATH")
   [ -n "$CUSTOM_FONT_PATH" ] && export CUSTOM_FONT_PATH
 
-  INITIAL_VOLUME_LEVEL=$(get_env_value "INITIAL_VOLUME_LEVEL")
-  [ -n "$INITIAL_VOLUME_LEVEL" ] && export INITIAL_VOLUME_LEVEL
+  INITIAL_VOLUME_PERCENT=$(get_env_value "INITIAL_VOLUME_PERCENT")
 
-  INITIAL_VOLUME_LEVEL_UNIFIED=$(get_env_value "INITIAL_VOLUME_LEVEL_UNIFIED")
-  [ -n "$INITIAL_VOLUME_LEVEL_UNIFIED" ] && unified_initial_volume_level=$INITIAL_VOLUME_LEVEL_UNIFIED
+  INITIAL_VOLUME_PERCENT_UNIFIED=$(get_env_value "INITIAL_VOLUME_PERCENT_UNIFIED")
+  [ -n "$INITIAL_VOLUME_PERCENT_UNIFIED" ] && unified_initial_volume_percent=$INITIAL_VOLUME_PERCENT_UNIFIED
 
-  INITIAL_VOLUME_LEVEL_LEGACY=$(get_env_value "INITIAL_VOLUME_LEVEL_LEGACY")
-  [ -n "$INITIAL_VOLUME_LEVEL_LEGACY" ] && legacy_initial_volume_level=$INITIAL_VOLUME_LEVEL_LEGACY
+  INITIAL_VOLUME_PERCENT_LEGACY=$(get_env_value "INITIAL_VOLUME_PERCENT_LEGACY")
+  [ -n "$INITIAL_VOLUME_PERCENT_LEGACY" ] && legacy_initial_volume_percent=$INITIAL_VOLUME_PERCENT_LEGACY
 
   WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
   [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
@@ -99,29 +98,30 @@ if [ -f ".env" ]; then
     serve_ollama=true
   fi
 
-  if [ -n "$INITIAL_VOLUME_LEVEL" ] && [ "$INITIAL_VOLUME_LEVEL" != "auto" ]; then
-    initial_volume_level=$INITIAL_VOLUME_LEVEL
+  if [ -n "$INITIAL_VOLUME_PERCENT" ] && [ "$INITIAL_VOLUME_PERCENT" != "auto" ]; then
+    initial_volume_percent=$INITIAL_VOLUME_PERCENT
   fi
 else
   echo ".env file not found, please create one based on .env.template."
   exit 1
 fi
 
-# Adjust initial volume (Linux only). Unified driver uses 0-100; legacy WM8960
-# uses the original raw Speaker scale, so keep its historical default.
+# Adjust initial volume (Linux only). INITIAL_VOLUME_PERCENT is the percentage
+# users see in alsamixer. The unified driver exposes a 0-100 speaker control;
+# legacy WM8960 accepts percentages through amixer set Speaker.
 if [ "$audio_supported" = true ]; then
-  if [ -z "$initial_volume_level" ]; then
+  if [ -z "$initial_volume_percent" ]; then
     if [ "$card_name" = "whisplaysound" ]; then
-      initial_volume_level=$unified_initial_volume_level
+      initial_volume_percent=$unified_initial_volume_percent
     else
-      initial_volume_level=$legacy_initial_volume_level
+      initial_volume_percent=$legacy_initial_volume_percent
     fi
   fi
 
   if [ "$card_name" = "whisplaysound" ]; then
-    amixer -c "$card_name" cset name='speaker' "$initial_volume_level" >/dev/null 2>&1 || true
+    amixer -c "$card_name" cset name='speaker' "$initial_volume_percent" >/dev/null 2>&1 || true
   else
-    amixer -c "$card_index" set Speaker "$initial_volume_level" >/dev/null 2>&1 || true
+    amixer -c "$card_index" set Speaker "${initial_volume_percent}%" >/dev/null 2>&1 || true
   fi
 fi
 
