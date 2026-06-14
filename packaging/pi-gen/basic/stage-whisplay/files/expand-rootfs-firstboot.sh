@@ -28,8 +28,21 @@ if [ "$root_fstype" != "ext4" ]; then
   exit 0
 fi
 
-parent_name="$(lsblk -no PKNAME "$root_device" | head -n1)"
-part_num="$(lsblk -no PARTN "$root_device" | head -n1)"
+parent_name="$(lsblk -no PKNAME "$root_device" | awk 'NF { print $1; exit }')"
+part_num="$(lsblk -no PARTN "$root_device" | awk 'NF { print $1; exit }')"
+
+if [ -z "$parent_name" ] || [ -z "$part_num" ]; then
+  root_block="$(basename "$root_device")"
+  sys_block="/sys/class/block/${root_block}"
+  if [ -d "$sys_block" ]; then
+    if [ -z "$parent_name" ]; then
+      parent_name="$(basename "$(readlink -f "${sys_block}/.." 2>/dev/null || true)")"
+    fi
+    if [ -z "$part_num" ] && [ -r "${sys_block}/partition" ]; then
+      part_num="$(tr -d '[:space:]' < "${sys_block}/partition")"
+    fi
+  fi
+fi
 
 if [ -z "$parent_name" ] || [ -z "$part_num" ]; then
   log "could not resolve parent disk or partition number for $root_device"

@@ -398,6 +398,10 @@ jobs:
           fi
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            while IFS= read -r asset_name; do
+              [ -n "$asset_name" ] || continue
+              gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes
+            done < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
             gh release upload "$RELEASE_TAG" release-assets/* --clobber
             gh release edit "$RELEASE_TAG" --title "$RELEASE_NAME"
             if [ "$PRERELEASE" = "true" ]; then
