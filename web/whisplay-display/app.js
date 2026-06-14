@@ -18,6 +18,7 @@ const btnText = document.getElementById("btnText");
 const dim = document.getElementById("dim");
 const imageLayer = document.getElementById("imageLayer");
 const imageDisplay = document.getElementById("imageDisplay");
+const approvalBar = document.getElementById("approvalBar");
 
 let scrollTop = 0;
 let scrollSpeed = 0;
@@ -164,6 +165,7 @@ function applyState(data) {
   const status = data.status || "";
   statusText.textContent = status;
   emojiText.textContent = data.emoji || "";
+  approvalBar.classList.toggle("visible", Boolean(data.approval_mode));
   updateText(data.text || "", data.scroll_sync, data.scroll_speed);
   updateTextInputState(data.text_input_enabled, status);
 
@@ -714,4 +716,3 @@ updateTextInputState(false, "");
 // Unlock AudioContext on first user interaction (required by browsers).
 document.addEventListener("click", () => { try { ensureAudioContext(); } catch {} }, { once: true });
 document.addEventListener("touchstart", () => { try { ensureAudioContext(); } catch {} }, { once: true });
-

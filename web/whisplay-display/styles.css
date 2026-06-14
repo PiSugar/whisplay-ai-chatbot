@@ -166,6 +166,53 @@ body {
   height: calc(280px - 98px - 18px);
 }
 
+.body:has(+ .approval-bar.visible) {
+  height: calc(280px - 98px - 38px);
+}
+
+.music-progress.visible + .body:has(+ .approval-bar.visible) {
+  height: calc(280px - 98px - 18px - 38px);
+}
+
+.approval-bar {
+  display: none;
+  height: 38px;
+  padding: 0 20px;
+  align-items: center;
+  justify-content: space-between;
+  background: #000;
+  border-top: 1px solid #262626;
+  position: relative;
+  z-index: 1;
+}
+
+.approval-bar.visible {
+  display: flex;
+}
+
+.approval-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tap-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #32d74b;
+}
+
+.hold-dot {
+  width: 22px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ff453a;
+}
+
 .music-progress-track {
   height: 4px;
   background: #3c3c3c;

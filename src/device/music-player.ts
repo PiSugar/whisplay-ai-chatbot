@@ -631,7 +631,7 @@ export const getLocalMusicPlayer = (env: Record<string, string | undefined>): Lo
   const minScore = Number.isFinite(minScoreRaw) ? Math.min(1, Math.max(0, minScoreRaw)) : DEFAULT_MIN_SCORE;
   const rescanRaw = parseInt(env.MUSIC_RESCAN_SECONDS || "", 60);
   const rescanSeconds = Number.isFinite(rescanRaw) && rescanRaw > 0 ? rescanRaw : DEFAULT_RESCAN_SECONDS;
-  const soundCardIndex = env.SOUND_CARD_INDEX || "1";
+  const soundCardIndex = env.SOUND_CARD_NAME || env.SOUND_CARD_INDEX || "1";
   const alsaOutputDevice = env.ALSA_OUTPUT_DEVICE;
 
   const key = JSON.stringify({

@@ -11,8 +11,8 @@ export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
 dotenv.config();
 
-const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
-const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || `hw:${soundCardIndex},0`;
+const soundCardRef = process.env.SOUND_CARD_NAME || process.env.SOUND_CARD_INDEX || "1";
+const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || `hw:${soundCardRef},0`;
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
   const normalized = (value || "").toLowerCase();
   return normalized === "wav" || normalized === "mp3" ? normalized : fallback;

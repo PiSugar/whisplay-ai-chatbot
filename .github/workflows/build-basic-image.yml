@@ -37,6 +37,7 @@ jobs:
             packaging/pi-gen/basic/stage-whisplay/files/install-sugar-wifi-conf.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-driver.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-u-boot.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/expand-rootfs-firstboot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/provision-basic.sh
           do
             bash -n "$script"
@@ -137,6 +138,7 @@ jobs:
             pi-gen/stage-whisplay/files/install-sugar-wifi-conf.sh \
             pi-gen/stage-whisplay/files/install-whisplay-driver.sh \
             pi-gen/stage-whisplay/files/install-whisplay-u-boot.sh \
+            pi-gen/stage-whisplay/files/expand-rootfs-firstboot.sh \
             pi-gen/stage-whisplay/files/provision-basic.sh
           touch pi-gen/stage2/SKIP_IMAGES
           touch pi-gen/stage3/SKIP_IMAGES
@@ -244,6 +246,8 @@ jobs:
           check_file /etc/systemd/system/chatbot.service || exit 1
           check_file /etc/systemd/system/whisplay-daemon.service || exit 1
           check_file /etc/systemd/system/whisplay-chatbot-register.service || exit 1
+          check_file /etc/systemd/system/whisplay-expand-rootfs.service || exit 1
+          check_file /usr/local/sbin/whisplay-expand-rootfs || exit 1
           check_file /etc/whisplay-image/basic-release || exit 1
           check_file /etc/whisplay-image/u-boot-release || exit 1
           check_file /etc/cloud/cloud.cfg || exit 1
@@ -327,6 +331,15 @@ jobs:
             exit 1
           fi
 
+          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service ]; then
+            true
+          else
+            echo "whisplay-expand-rootfs.service is not enabled in the image" >&2
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
+            exit 1
+          fi
+
           if ! sudo grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service; then
             echo "whisplay-daemon.service is missing netdev in SupplementaryGroups" >&2
             sudo cat /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service >&2
@@ -350,7 +363,7 @@ jobs:
 
   publish-release:
     needs: build-image
-    if: needs.build-image.outputs.prerelease == 'false'
+    if: needs.build-image.outputs.prerelease == 'false' || needs.build-image.outputs.source_branch == 'develop'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -358,21 +371,42 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Sync prerelease tag
+        if: needs.build-image.outputs.prerelease == 'true'
+        env:
+          RELEASE_TAG: ${{ needs.build-image.outputs.release_tag }}
+        run: |
+          git tag -f "$RELEASE_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/${RELEASE_TAG}" --force
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: basic-image-release-assets
           path: release-assets
 
-      - name: Publish stable release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.build-image.outputs.prerelease }}
+          RELEASE_NAME: ${{ needs.build-image.outputs.release_name }}
+          RELEASE_TAG: ${{ needs.build-image.outputs.release_tag }}
         run: |
-          if gh release view "${{ needs.build-image.outputs.release_tag }}" >/dev/null 2>&1; then
-            gh release upload "${{ needs.build-image.outputs.release_tag }}" release-assets/* --clobber
+          release_flags=(--title "$RELEASE_NAME" --generate-notes --verify-tag)
+          if [ "$PRERELEASE" = "true" ]; then
+            release_flags+=(--prerelease)
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            while IFS= read -r asset_name; do
+              [ -n "$asset_name" ] || continue
+              gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes
+            done < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+            gh release edit "$RELEASE_TAG" --title "$RELEASE_NAME"
+            if [ "$PRERELEASE" = "true" ]; then
+              gh release edit "$RELEASE_TAG" --prerelease
+            fi
           else
-            gh release create "${{ needs.build-image.outputs.release_tag }}" release-assets/* \
-              --title "${{ needs.build-image.outputs.release_name }}" \
-              --generate-notes \
-              --verify-tag
+            gh release create "$RELEASE_TAG" release-assets/* "${release_flags[@]}"
           fi

@@ -1,0 +1,16 @@
+[Unit]
+Description=Expand root filesystem on first boot
+DefaultDependencies=no
+After=systemd-remount-fs.service
+Before=multi-user.target
+ConditionPathExists=!/var/lib/whisplay-image/rootfs-expanded
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/whisplay-expand-rootfs
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

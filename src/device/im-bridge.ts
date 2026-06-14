@@ -19,6 +19,15 @@ type WhisplayIMPayload = {
   imageBase64?: string;
 };
 
+export type WhisplayIMApprovalRequest = {
+  id: string;
+  title: string;
+  text: string;
+  tool: string;
+  timeoutMs: number;
+  respond: (approved: boolean) => void;
+};
+
 type PendingPoll = {
   res: ServerResponse;
   timer: NodeJS.Timeout;
@@ -32,6 +41,7 @@ export class WhisplayIMBridgeServer extends EventEmitter {
   private pollPath: string;
   private sendPath: string;
   private statusPath: string;
+  private approvalPath: string;
   private queue: WhisplayIMPayload[] = [];
   private pending: PendingPoll[] = [];
 
@@ -42,6 +52,8 @@ export class WhisplayIMBridgeServer extends EventEmitter {
     this.pollPath = process.env.WHISPLAY_IM_POLL_PATH || "/whisplay-im/poll";
     this.sendPath = process.env.WHISPLAY_IM_SEND_PATH || "/whisplay-im/send";
     this.statusPath = process.env.WHISPLAY_IM_STATUS_PATH || "/whisplay-im/status";
+    this.approvalPath =
+      process.env.WHISPLAY_IM_APPROVAL_PATH || "/whisplay-im/approval";
     this.token = process.env.WHISPLAY_IM_TOKEN || "";
   }
 
@@ -136,6 +148,11 @@ export class WhisplayIMBridgeServer extends EventEmitter {
             return;
           }
 
+          if (pathname === this.approvalPath) {
+            this.handleApprovalRequest(payload, res);
+            return;
+          }
+
           res.statusCode = 404;
           res.end("Not Found");
         } catch (error) {
@@ -150,6 +167,55 @@ export class WhisplayIMBridgeServer extends EventEmitter {
         `[WhisplayIM] Bridge server listening on ${this.port}${this.inboxPath}`,
       );
     });
+  }
+
+  private handleApprovalRequest(payload: any, res: ServerResponse): void {
+    if (this.listenerCount("approval") === 0) {
+      res.statusCode = 503;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ ok: false, error: "approval unavailable" }));
+      return;
+    }
+
+    const timeoutMs = Math.max(
+      1000,
+      parseInt(
+        `${payload.timeoutMs || process.env.WHISPLAY_IM_APPROVAL_TIMEOUT_MS || "120000"}`,
+        10,
+      ) || 120000,
+    );
+    const id = `${payload.id || `approval-${Date.now()}`}`;
+    const title = `${payload.title || payload.summary || "Confirm operation"}`;
+    const tool = `${payload.tool || payload.name || ""}`;
+    const text = `${payload.text || payload.operation || payload.message || ""}`;
+    let responded = false;
+
+    const finish = (approved: boolean): void => {
+      if (responded) return;
+      responded = true;
+      clearTimeout(timer);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          ok: true,
+          id,
+          approved,
+          decision: approved ? "allow" : "deny",
+        }),
+      );
+    };
+
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    const request: WhisplayIMApprovalRequest = {
+      id,
+      title,
+      text,
+      tool,
+      timeoutMs,
+      respond: finish,
+    };
+    this.emit("approval", request);
   }
 
   stop(): void {

@@ -54,6 +54,7 @@ current_rag_icon_visible = False
 current_image_icon_visible = False
 current_music_progress = None
 current_music_duration_ms = None
+current_approval_mode = False
 camera_mode = False
 camera_capture_image_path = ""
 camera_thread = None
@@ -177,11 +178,17 @@ class RenderThread(threading.Thread):
                 self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, progress_bar_height, ImageUtils.image_to_rgb565(pb_image, self.whisplay.LCD_WIDTH, progress_bar_height))
 
             # render main text area
-            text_area_height = self.whisplay.LCD_HEIGHT - header_height - progress_bar_height
+            approval_bar_height = 38 if current_approval_mode else 0
+            text_area_height = self.whisplay.LCD_HEIGHT - header_height - progress_bar_height - approval_bar_height
             text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
             text_draw = ImageDraw.Draw(text_bg_image)
             animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
             self.whisplay.draw_image(0, header_height + progress_bar_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
+            if current_approval_mode:
+                approval_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, approval_bar_height), (0, 0, 0, 255))
+                approval_draw = ImageDraw.Draw(approval_image)
+                self.render_approval_actions(approval_image, approval_draw)
+                self.whisplay.draw_image(0, self.whisplay.LCD_HEIGHT - approval_bar_height, self.whisplay.LCD_WIDTH, approval_bar_height, ImageUtils.image_to_rgb565(approval_image, self.whisplay.LCD_WIDTH, approval_bar_height))
 
             return animation_active
 
@@ -376,6 +383,33 @@ class RenderThread(threading.Thread):
             icon.render(draw, icon_x, icon_y)
             cursor_x = icon_x - icon_gap
 
+    def render_approval_actions(self, image, draw):
+        width, height = image.size
+        font = ImageFont.truetype(self.font_path, 12)
+        allow_color = (48, 209, 88, 255)
+        deny_color = (255, 69, 58, 255)
+        text_color = (235, 242, 247, 255)
+        draw.line([(10, 0), (width - 10, 0)], fill=(38, 38, 38, 255), width=1)
+
+        allow_x = 20
+        deny_x = width // 2 + 12
+        cy = height // 2 + 1
+        dot_r = 5
+        draw.ellipse(
+            [allow_x, cy - dot_r, allow_x + dot_r * 2, cy + dot_r],
+            fill=allow_color,
+        )
+        draw.text((allow_x + 16, cy - 8), "Allow", font=font, fill=text_color)
+
+        pill_w = 22
+        pill_h = 10
+        draw.rounded_rectangle(
+            [deny_x, cy - pill_h // 2, deny_x + pill_w, cy + pill_h // 2],
+            radius=pill_h // 2,
+            fill=deny_color,
+        )
+        draw.text((deny_x + pill_w + 8, cy - 8), "Denied", font=font, fill=text_color)
+
     def run(self):
         frame_interval = 1 / self.fps
         while self.running:
@@ -398,7 +432,7 @@ def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
                   network_connected=None, vpn_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None,
                   wifi_signal_level=None,
-                  music_progress=None, music_duration_ms=None):
+                  music_progress=None, music_duration_ms=None, approval_mode=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
@@ -407,6 +441,7 @@ def update_display_data(status=None, emoji=None, text=None,
     global current_network_connected, current_vpn_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
     global current_wifi_signal_level
     global current_music_progress, current_music_duration_ms
+    global current_approval_mode
     global render_thread
 
     next_text = text
@@ -489,6 +524,8 @@ def update_display_data(status=None, emoji=None, text=None,
         current_music_progress = music_progress if music_progress >= 0 else None
     if music_duration_ms is not None:
         current_music_duration_ms = music_duration_ms if music_duration_ms > 0 else None
+    if approval_mode is not None:
+        current_approval_mode = bool(approval_mode)
     if render_thread is not None:
         render_thread.request_render()
 
@@ -592,6 +629,7 @@ def handle_client(client_socket, addr, whisplay):
                     image_icon_visible = content.get("image_icon_visible", None)
                     music_progress = content.get("music_progress", None)
                     music_duration_ms = content.get("music_duration_ms", None)
+                    approval_mode = content.get("approval_mode", None)
                     capture_image_path = content.get("capture_image_path", None)
                     trigger_camera_capture = content.get("camera_capture", None)
                     # boolean to enable camera mode
@@ -640,7 +678,7 @@ def handle_client(client_socket, addr, whisplay):
                             (wifi_signal_level is not None) or \
                             (vpn_connected is not None) or \
                             (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None) or \
-                            (music_progress is not None) or (music_duration_ms is not None):
+                            (music_progress is not None) or (music_duration_ms is not None) or (approval_mode is not None):
                         update_display_data(status=status, emoji=emoji,
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
@@ -651,7 +689,8 @@ def handle_client(client_socket, addr, whisplay):
                                          image_icon_visible=image_icon_visible,
                                                  transaction_id=transaction_id,
                                                  music_progress=music_progress,
-                                                 music_duration_ms=music_duration_ms)
+                                                 music_duration_ms=music_duration_ms,
+                                                 approval_mode=approval_mode)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:
