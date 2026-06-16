@@ -27,6 +27,46 @@ else
 fi
 chown -R pi:pi "$whisplay_dir"
 
+install_unified_driver() {
+  local installer="$whisplay_dir/audio/whisplay-soundcard/scripts/install.sh"
+  local fakebin="$tmpdir/bin"
+
+  echo "Installing Whisplay unified sound card driver from $installer"
+
+  mkdir -p "$fakebin"
+  cat > "$fakebin/uname" <<'EOF'
+#!/bin/bash
+if [ "$#" -eq 1 ] && [ "$1" = "-r" ]; then
+  target_kver="$(
+    find /lib/modules -mindepth 1 -maxdepth 1 -type d \
+      -exec test -e '{}/build' ';' -printf '%f\n' 2>/dev/null \
+      | sort -V \
+      | tail -n 1
+  )"
+  if [ -n "${target_kver:-}" ]; then
+    printf '%s\n' "$target_kver"
+    exit 0
+  fi
+fi
+exec /usr/bin/uname "$@"
+EOF
+  chmod 0755 "$fakebin/uname"
+
+  # The upstream installer is meant to run on the target Pi. In pi-gen's chroot,
+  # make `uname -r` resolve to the target image kernel and run depmod for that
+  # kernel explicitly instead of the Docker host kernel.
+  sed -i 's/^depmod -a$/depmod -a "$KVER"/' "$installer"
+  PATH="$fakebin:$PATH" bash "$installer"
+  return 0
+}
+
+if [ -f "$whisplay_dir/audio/whisplay-soundcard/scripts/install.sh" ]; then
+  install_unified_driver
+  exit 0
+fi
+
+echo "Unified Whisplay sound card installer not found; falling back to legacy WM8960 driver."
+
 driver_zip="$(find "$whisplay_dir" -type f -name 'WM8960-Audio-HAT.zip' -print -quit || true)"
 if [ -z "${driver_zip:-}" ] || [ ! -f "$driver_zip" ]; then
   echo "WM8960-Audio-HAT.zip not found in Whisplay repo: $whisplay_dir" >&2
