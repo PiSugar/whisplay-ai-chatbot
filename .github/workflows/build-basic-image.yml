@@ -253,6 +253,8 @@ jobs:
           check_file /etc/cloud/cloud.cfg || exit 1
           check_file /usr/bin/nmcli || exit 1
           check_file /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules || exit 1
+          check_file /etc/asound.conf || exit 1
+          check_file /etc/systemd/system/whisplay-soundcard-warmup.service || exit 1
 
           check_boot_file() {
             local path="$1"
@@ -278,6 +280,38 @@ jobs:
           if ! sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' /mnt/whisplay-boot/config.txt; then
             echo "config.txt is missing Whisplay U-Boot kernel setting" >&2
             sudo cat /mnt/whisplay-boot/config.txt >&2
+            exit 1
+          fi
+          if ! sudo grep -qxF 'dtoverlay=whisplay-soundcard' /mnt/whisplay-boot/config.txt; then
+            echo "config.txt is missing unified Whisplay sound card overlay" >&2
+            sudo cat /mnt/whisplay-boot/config.txt >&2
+            exit 1
+          fi
+          if sudo grep -qxF 'dtoverlay=wm8960-soundcard' /mnt/whisplay-boot/config.txt; then
+            echo "config.txt still enables the legacy WM8960 sound card overlay" >&2
+            sudo cat /mnt/whisplay-boot/config.txt >&2
+            exit 1
+          fi
+          if ! sudo grep -q 'whisplaysound' /mnt/whisplay-root/etc/asound.conf; then
+            echo "/etc/asound.conf does not route audio through whisplaysound" >&2
+            sudo cat /mnt/whisplay-root/etc/asound.conf >&2
+            exit 1
+          fi
+          if ! sudo find /mnt/whisplay-root/lib/modules -type f -name 'snd-soc-whisplay-soundcard.ko*' -print -quit | grep -q .; then
+            echo "Unified Whisplay sound card kernel module is missing from /lib/modules" >&2
+            sudo find /mnt/whisplay-root/lib/modules -maxdepth 6 -type f -name '*whisplay*' -print >&2 || true
+            exit 1
+          fi
+          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ]; then
+            true
+          else
+            echo "whisplay-soundcard-warmup.service is not enabled in the image" >&2
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
+            exit 1
+          fi
+          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/wm8960-soundcard.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/wm8960-soundcard.service ]; then
+            echo "Legacy wm8960-soundcard.service is still enabled in the image" >&2
+            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants >&2 || true
             exit 1
           fi
 
