@@ -30,6 +30,8 @@ chown -R pi:pi "$whisplay_dir"
 install_unified_driver() {
   local installer="$whisplay_dir/audio/whisplay-soundcard/scripts/install.sh"
   local fakebin="$tmpdir/bin"
+  local target_kernels=()
+  local target_kver
 
   echo "Installing Whisplay unified sound card driver from $installer"
 
@@ -37,14 +39,8 @@ install_unified_driver() {
   cat > "$fakebin/uname" <<'EOF'
 #!/bin/bash
 if [ "$#" -eq 1 ] && [ "$1" = "-r" ]; then
-  target_kver="$(
-    find /lib/modules -mindepth 1 -maxdepth 1 -type d \
-      -exec test -e '{}/build' ';' -printf '%f\n' 2>/dev/null \
-      | sort -V \
-      | tail -n 1
-  )"
-  if [ -n "${target_kver:-}" ]; then
-    printf '%s\n' "$target_kver"
+  if [ -n "${WHISPLAY_TARGET_KVER:-}" ]; then
+    printf '%s\n' "$WHISPLAY_TARGET_KVER"
     exit 0
   fi
 fi
@@ -52,11 +48,31 @@ exec /usr/bin/uname "$@"
 EOF
   chmod 0755 "$fakebin/uname"
 
+  while IFS= read -r target_kver; do
+    target_kernels+=("$target_kver")
+  done < <(
+    find /lib/modules -mindepth 1 -maxdepth 1 -type d \
+      -printf '%f\n' 2>/dev/null \
+      | sort -V
+  )
+
+  if [ "${#target_kernels[@]}" -eq 0 ]; then
+    echo "No kernel module directories found under /lib/modules" >&2
+    find /lib/modules -mindepth 1 -maxdepth 2 -print >&2 2>/dev/null || true
+    return 1
+  fi
+
   # The upstream installer is meant to run on the target Pi. In pi-gen's chroot,
-  # make `uname -r` resolve to the target image kernel and run depmod for that
-  # kernel explicitly instead of the Docker host kernel.
+  # make `uname -r` resolve to each target image kernel and run depmod for that
+  # kernel explicitly instead of the Docker host kernel. Pi 5 images can carry
+  # both rpi-v8 and rpi-2712 module trees, and the booted kernel must have its
+  # own copy of the Whisplay module.
   sed -i 's/^depmod -a$/depmod -a "$KVER"/' "$installer"
-  PATH="$fakebin:$PATH" bash "$installer"
+
+  for target_kver in "${target_kernels[@]}"; do
+    echo "Installing Whisplay unified sound card driver for kernel ${target_kver}"
+    WHISPLAY_TARGET_KVER="$target_kver" PATH="$fakebin:$PATH" bash "$installer"
+  done
   return 0
 }
 

@@ -297,11 +297,26 @@ jobs:
             sudo cat /mnt/whisplay-root/etc/asound.conf >&2
             exit 1
           fi
-          if ! sudo find /mnt/whisplay-root/lib/modules -type f -name 'snd-soc-whisplay-soundcard.ko*' -print -quit | grep -q .; then
-            echo "Unified Whisplay sound card kernel module is missing from /lib/modules" >&2
-            sudo find /mnt/whisplay-root/lib/modules -maxdepth 6 -type f -name '*whisplay*' -print >&2 || true
+          whisplay_kernel_releases="$(sudo find /mnt/whisplay-root/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V)"
+          if [ -z "$whisplay_kernel_releases" ]; then
+            echo "No kernel module directories found in image" >&2
+            sudo find /mnt/whisplay-root/lib/modules -mindepth 1 -maxdepth 2 -print >&2 || true
             exit 1
           fi
+          while IFS= read -r kernel_release; do
+            [ -n "$kernel_release" ] || continue
+            module_path="/mnt/whisplay-root/lib/modules/${kernel_release}/kernel/sound/soc/codecs/snd-soc-whisplay-soundcard.ko"
+            if ! sudo test -f "$module_path"; then
+              echo "Unified Whisplay sound card kernel module is missing for ${kernel_release}" >&2
+              sudo find "/mnt/whisplay-root/lib/modules/${kernel_release}" -maxdepth 6 -type f -name '*whisplay*' -print >&2 || true
+              exit 1
+            fi
+            if ! sudo grep -q 'snd-soc-whisplay-soundcard.ko' "/mnt/whisplay-root/lib/modules/${kernel_release}/modules.dep"; then
+              echo "modules.dep does not include the Whisplay sound card module for ${kernel_release}" >&2
+              sudo grep -n 'whisplay' "/mnt/whisplay-root/lib/modules/${kernel_release}/modules.dep" >&2 || true
+              exit 1
+            fi
+          done <<< "$whisplay_kernel_releases"
           if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ]; then
             true
           else
