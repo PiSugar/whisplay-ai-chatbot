@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from "child_process";
+import { readFileSync } from "fs";
 import { isEmpty, noop, set } from "lodash";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
@@ -11,8 +12,26 @@ export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
 dotenv.config();
 
-const soundCardRef = process.env.SOUND_CARD_NAME || process.env.SOUND_CARD_INDEX || "1";
-const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || `hw:${soundCardRef},0`;
+const detectWhisplaySoundCardRef = (): string | undefined => {
+  try {
+    const cards = readFileSync("/proc/asound/cards", "utf8");
+    const line = cards
+      .split("\n")
+      .find((item) => /whisplaysound|wm8960soundcard|es8389soundcard/i.test(item));
+    const match = line?.match(/^\s*(\d+)\s+\[/);
+    return match?.[1];
+  } catch (e) {
+    return undefined;
+  }
+};
+
+const soundCardRef =
+  process.env.SOUND_CARD_NAME ||
+  process.env.SOUND_CARD_INDEX ||
+  detectWhisplaySoundCardRef();
+const defaultAlsaDevice = soundCardRef ? `hw:${soundCardRef},0` : "default";
+const alsaInputDevice = process.env.ALSA_INPUT_DEVICE || defaultAlsaDevice;
+const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || defaultAlsaDevice;
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
   const normalized = (value || "").toLowerCase();
   return normalized === "wav" || normalized === "mp3" ? normalized : fallback;
@@ -75,12 +94,21 @@ function startPlayerProcess() {
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
 
+const removeRecordingProcess = (child: ChildProcess): void => {
+  recordingProcessList = recordingProcessList.filter((item) => item !== child);
+};
+
+const killRecordingProcess = (child: ChildProcess): void => {
+  console.log("Killing recording process", child.pid);
+  try {
+    child.kill("SIGINT");
+  } catch (e) { }
+  removeRecordingProcess(child);
+};
+
 const killAllRecordingProcesses = (): void => {
   recordingProcessList.forEach((child) => {
-    console.log("Killing recording process", child.pid);
-    try {
-      child.kill("SIGINT");
-    } catch (e) { }
+    killRecordingProcess(child);
   });
   recordingProcessList.length = 0;
 };
@@ -158,7 +186,7 @@ const recordAudio = async (
     const args = [
       "-t",
       "alsa",
-      "default",
+      alsaInputDevice,
       "-t",
       recordFileFormat,
       "-c",
@@ -191,20 +219,19 @@ const recordAudio = async (
     });
 
     recordingProcess.on("exit", (code) => {
+      removeRecordingProcess(recordingProcess);
       if (code && code !== 0) {
-        killAllRecordingProcesses();
         reject(code);
         return;
       }
       resolve(outputPath);
-      killAllRecordingProcesses();
     });
     recordingProcessList.push(recordingProcess);
 
     // Set a timeout to kill the recording process after the specified duration
     setTimeout(() => {
       if (recordingProcessList.includes(recordingProcess)) {
-        killAllRecordingProcesses();
+        killRecordingProcess(recordingProcess);
         resolve(outputPath);
       }
     }, duration * 1000);
@@ -226,7 +253,7 @@ const recordAudioManually = (
     const recordingProcess = spawn("sox", [
       "-t",
       "alsa",
-      "default",
+      alsaInputDevice,
       "-t",
       recordFileFormat,
       "-c",
@@ -237,7 +264,7 @@ const recordAudioManually = (
     ]);
 
     recordingProcess.on("error", (err) => {
-      killAllRecordingProcesses();
+      removeRecordingProcess(recordingProcess);
       reject(err);
     });
 
@@ -246,9 +273,10 @@ const recordAudioManually = (
     });
     recordingProcessList.push(recordingProcess);
     stopFunc = () => {
-      killAllRecordingProcesses();
+      killRecordingProcess(recordingProcess);
     };
     recordingProcess.on("exit", () => {
+      removeRecordingProcess(recordingProcess);
       resolve(outputPath);
     });
   });

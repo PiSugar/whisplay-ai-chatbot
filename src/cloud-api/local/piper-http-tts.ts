@@ -87,23 +87,19 @@ const piperHttpTTS = async (
       }
 
       try {
-        // get sample rate and channels of the generated wav file
-        const originalBuffer = fs.readFileSync(tempWavFile);
-        const header = originalBuffer.subarray(0, 44);
-        const originalSampleRate = header.readUInt32LE(24);
-        const originalChannels = header.readUInt16LE(22);
-
-        // use sox to convert wav to 24kHz, 16bit, stereo
+        // The Whisplay ES8389 ALSA device rejects Piper's 22050 Hz mono output
+        // when opened directly through hw:*, so normalize to the codec format.
         await new Promise<void>((res, rej) => {
-            
           const soxProcess = spawn("sox", [
             "-v",
             "0.9",
             tempWavFile,
             "-r",
-            originalSampleRate.toString(),
+            "48000",
             "-c",
-            originalChannels.toString(),
+            "2",
+            "-b",
+            "16",
             convertedWavFile,
           ]);
 
