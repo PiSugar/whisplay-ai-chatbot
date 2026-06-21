@@ -1,6 +1,7 @@
 const statusText = document.getElementById("statusText");
 const emojiText = document.getElementById("emojiText");
 const textContent = document.getElementById("textContent");
+const terminalContent = document.getElementById("terminalContent");
 const batteryFill = document.getElementById("batteryFill");
 const batteryText = document.getElementById("batteryText");
 const wifiIcon = document.getElementById("wifiIcon");
@@ -29,6 +30,7 @@ let scrollSyncFrom = 0;
 let lastFrameTime = 0;
 let maxScroll = 0;
 let lastText = "";
+let lastTerminalText = "";
 let lastImageRevision = -1;
 let isPressed = false;
 let activePointerId = null;
@@ -124,6 +126,20 @@ function updateText(text, sync, speed) {
   maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
 }
 
+function updateTerminalText(text) {
+  const nextText = text || "";
+  const isVisible = nextText.length > 0;
+  terminalContent.classList.toggle("visible", isVisible);
+  textContent.classList.toggle("hidden-by-terminal", isVisible);
+  if (nextText !== lastTerminalText) {
+    terminalContent.textContent = nextText;
+    lastTerminalText = nextText;
+    const viewportHeight = document.querySelector(".text-viewport").offsetHeight;
+    const terminalMaxScroll = Math.max(0, terminalContent.offsetHeight - viewportHeight);
+    terminalContent.style.transform = `translateY(${-terminalMaxScroll}px)`;
+  }
+}
+
 function animateScroll(timestamp) {
   if (!lastFrameTime) {
     lastFrameTime = timestamp;
@@ -167,6 +183,7 @@ function applyState(data) {
   emojiText.textContent = data.emoji || "";
   approvalBar.classList.toggle("visible", Boolean(data.approval_mode));
   updateText(data.text || "", data.scroll_sync, data.scroll_speed);
+  updateTerminalText(data.terminal_text || "");
   updateTextInputState(data.text_input_enabled, status);
 
   const ledColor = normalizeColor(data.RGB);

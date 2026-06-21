@@ -33,6 +33,7 @@ IDLE_RENDER_INTERVAL = 0.5
 current_status = "Hello"
 current_emoji = "😄"
 current_text = "Waiting for message..."
+current_terminal_text = ""
 current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
@@ -81,6 +82,8 @@ class RenderThread(threading.Thread):
         self.emoji_font = ImageFont.truetype(self.font_path, emoji_font_size)
         self.battery_font = ImageFont.truetype(self.font_path, battery_font_size)
         self.main_text_font = ImageFont.truetype(self.font_path, 20)
+        self.terminal_text_font = ImageFont.truetype(self.font_path, 12)
+        self.terminal_text_line_height = self.terminal_text_font.getmetrics()[0] + self.terminal_text_font.getmetrics()[1]
         self.music_time_font = ImageFont.truetype(self.font_path, 10)
         self.main_text_line_height = self.main_text_font.getmetrics()[0] + self.main_text_font.getmetrics()[1]
         self.text_cache_image = None
@@ -182,7 +185,10 @@ class RenderThread(threading.Thread):
             text_area_height = self.whisplay.LCD_HEIGHT - header_height - progress_bar_height - approval_bar_height
             text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
             text_draw = ImageDraw.Draw(text_bg_image)
-            animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
+            if current_terminal_text:
+                animation_active = self.render_terminal_text(text_bg_image, text_area_height, text_draw, current_terminal_text)
+            else:
+                animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
             self.whisplay.draw_image(0, header_height + progress_bar_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
             if current_approval_mode:
                 approval_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, approval_bar_height), (0, 0, 0, 255))
@@ -217,12 +223,9 @@ class RenderThread(threading.Thread):
         if not text:
             self.pending_auto_scroll_after_hold = False
             return False
-        # Use main text font
         font = self.main_text_font
-        lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
-
-        # Line height
         line_height = self.main_text_line_height
+        lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
 
         max_scroll_top = max(0, (len(lines) + 1) * line_height - area_height)
 
@@ -299,6 +302,45 @@ class RenderThread(threading.Thread):
                 and time.time() >= current_scroll_sync_hold_until
             )
         )
+
+    def render_terminal_text(self, main_text_image, area_height, draw, text):
+        global current_scroll_top, current_scroll_sync_speed, current_scroll_sync_target_top
+        self.pending_auto_scroll_after_hold = False
+        current_scroll_top = 0
+        current_scroll_sync_speed = None
+        current_scroll_sync_target_top = None
+        font = self.terminal_text_font
+        line_height = self.terminal_text_line_height
+        lines = self.wrap_terminal_text(draw, text, font, self.whisplay.LCD_WIDTH - 12)
+        visible_line_count = max(1, area_height // max(1, line_height))
+        display_lines = lines[-visible_line_count:]
+        render_text = "\n".join(display_lines)
+        if self.current_render_text != render_text:
+            self.current_render_text = render_text
+            show_text_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, len(display_lines) * line_height), (0, 0, 0, 255))
+            show_text_draw = ImageDraw.Draw(show_text_image)
+            render_y = 0
+            for line in display_lines:
+                show_text_draw.text((6, render_y), line, font=font, fill=(216, 255, 228, 255))
+                render_y += line_height
+            self.text_cache_image = show_text_image
+        main_text_image.paste(self.text_cache_image, (0, 0), self.text_cache_image)
+        return False
+
+    def wrap_terminal_text(self, draw, text, font, max_width):
+        lines = []
+        for raw_line in text.splitlines() or [""]:
+            current = ""
+            for char in raw_line:
+                candidate = current + char
+                bbox = draw.textbbox((0, 0), candidate, font=font)
+                if current and bbox[2] - bbox[0] > max_width:
+                    lines.append(current)
+                    current = char
+                else:
+                    current = candidate
+            lines.append(current)
+        return lines
 
     def request_render(self):
         self.render_event.set()
@@ -432,8 +474,9 @@ def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
                   network_connected=None, vpn_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None,
                   wifi_signal_level=None,
-                  music_progress=None, music_duration_ms=None, approval_mode=None):
+                  music_progress=None, music_duration_ms=None, approval_mode=None, terminal_text=None):
     global current_status, current_emoji, current_text, current_battery_level
+    global current_terminal_text
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
     global current_scroll_sync_target_top, current_scroll_sync_speed
@@ -517,6 +560,14 @@ def update_display_data(status=None, emoji=None, text=None,
     current_status = status if status is not None else current_status
     current_emoji = emoji if emoji is not None else current_emoji
     current_text = next_text if text is not None else current_text
+    if terminal_text is not None:
+        next_terminal_text = terminal_text or ""
+        if next_terminal_text != current_terminal_text:
+            current_scroll_top = 0
+            TextUtils.clean_line_image_cache()
+            if render_thread is not None:
+                render_thread.current_render_text = ""
+        current_terminal_text = next_terminal_text
     current_battery_level = battery_level if battery_level is not None else current_battery_level
     current_battery_color = battery_color if battery_color is not None else current_battery_color
     current_image_path = image_path if image_path is not None else current_image_path
@@ -614,6 +665,7 @@ def handle_client(client_socket, addr, whisplay):
                     status = content.get("status", None)
                     emoji = content.get("emoji", None)
                     text = content.get("text", None)
+                    terminal_text = content.get("terminal_text", None)
                     rgbled = content.get("RGB", None)
                     brightness = content.get("brightness", None)
                     scroll_speed = content.get("scroll_speed", None)
@@ -678,7 +730,8 @@ def handle_client(client_socket, addr, whisplay):
                             (wifi_signal_level is not None) or \
                             (vpn_connected is not None) or \
                             (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None) or \
-                            (music_progress is not None) or (music_duration_ms is not None) or (approval_mode is not None):
+                            (music_progress is not None) or (music_duration_ms is not None) or (approval_mode is not None) or \
+                            (terminal_text is not None):
                         update_display_data(status=status, emoji=emoji,
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
@@ -690,7 +743,8 @@ def handle_client(client_socket, addr, whisplay):
                                                  transaction_id=transaction_id,
                                                  music_progress=music_progress,
                                                  music_duration_ms=music_duration_ms,
-                                                 approval_mode=approval_mode)
+                                                 approval_mode=approval_mode,
+                                                 terminal_text=terminal_text)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:

@@ -79,6 +79,7 @@ class ChatFlow implements ChatFlowContext {
           status: "answering",
           emoji,
           text: fullText,
+          terminal_text: "",
           RGB: "#0000ff",
           scroll_speed: 3,
         });
@@ -88,6 +89,7 @@ class ChatFlow implements ChatFlowContext {
         display({
           status: "answering",
           text: text || undefined,
+          terminal_text: "",
           scroll_speed: 3,
         });
       },
