@@ -6,6 +6,7 @@ import json
 import sys
 import threading
 import signal
+import re
 
 from camera import CameraThread
 from utils import ColorUtils, ImageUtils, TextUtils
@@ -28,6 +29,16 @@ status_font_size=20
 emoji_font_size=40
 battery_font_size=13
 IDLE_RENDER_INTERVAL = 0.5
+MAX_MAIN_TEXT_CHARS = 2200
+TRUNCATION_PREFIX = "... "
+TOOL_TAG_RE = re.compile(
+    r"[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?",
+    re.IGNORECASE,
+)
+TOOL_TAG_BG = (8, 42, 112, 255)
+TOOL_TAG_FG = (255, 255, 255, 255)
+TOOL_TAG_COUNT_FG = (122, 205, 255, 255)
+TOOL_TAG_MARGIN_Y = 2
 
 # Global variables
 current_status = "Hello"
@@ -82,12 +93,16 @@ class RenderThread(threading.Thread):
         self.emoji_font = ImageFont.truetype(self.font_path, emoji_font_size)
         self.battery_font = ImageFont.truetype(self.font_path, battery_font_size)
         self.main_text_font = ImageFont.truetype(self.font_path, 20)
+        self.tool_tag_font = ImageFont.truetype(self.font_path, 17)
         self.terminal_text_font = ImageFont.truetype(self.font_path, 12)
         self.terminal_text_line_height = self.terminal_text_font.getmetrics()[0] + self.terminal_text_font.getmetrics()[1]
         self.music_time_font = ImageFont.truetype(self.font_path, 10)
         self.main_text_line_height = self.main_text_font.getmetrics()[0] + self.main_text_font.getmetrics()[1]
         self.text_cache_image = None
         self.current_render_text = ""
+        self.main_text_cache_key = ""
+        self.main_text_cache_lines = []
+        self.main_text_cache_char_offset = 0
         self.pending_auto_scroll_after_hold = False
         self.render_event = threading.Event()
 
@@ -204,15 +219,21 @@ class RenderThread(threading.Thread):
         if char_end is None or char_end <= 0:
             return 0
         total_chars = 0
+        line_top = 0
         target_line = 0
+        target_top = 0
         for i, line in enumerate(lines):
-            total_chars += len(line)
+            item_height = self.line_item_height(line, line_height)
+            line_text = "" if self.is_tool_tag_line(line) else str(line)
+            total_chars += len(line_text)
             if total_chars >= char_end:
                 target_line = i
+                target_top = line_top
                 break
             if i < len(lines) - 1:
                 total_chars += 1
-        target_top = target_line * line_height - (area_height // 2)
+            line_top += item_height
+        target_top = target_top - (area_height // 2)
         return max(0, target_top)
 
     def render_main_text(self, main_text_image, area_height, draw, text, scroll_speed=2):
@@ -225,13 +246,27 @@ class RenderThread(threading.Thread):
             return False
         font = self.main_text_font
         line_height = self.main_text_line_height
-        lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
+        display_text, char_offset = self.limit_main_text(text)
+        if display_text != self.main_text_cache_key:
+            self.main_text_cache_key = display_text
+            self.main_text_cache_char_offset = char_offset
+            self.main_text_cache_lines = self.build_main_text_lines(
+                draw,
+                display_text,
+                font,
+                self.whisplay.LCD_WIDTH - 20,
+            )
+        lines = self.main_text_cache_lines
 
-        max_scroll_top = max(0, (len(lines) + 1) * line_height - area_height)
+        content_height = sum(self.line_item_height(line, line_height) for line in lines) + line_height
+        max_scroll_top = max(0, content_height - area_height)
+        if current_scroll_top > max_scroll_top:
+            current_scroll_top = max_scroll_top
 
         if current_scroll_sync_char_end is not None and current_scroll_sync_duration_ms is not None:
+            adjusted_char_end = max(0, current_scroll_sync_char_end - char_offset)
             target_top = self.compute_scroll_target_from_char_end(
-                lines, line_height, area_height, current_scroll_sync_char_end
+                lines, line_height, area_height, adjusted_char_end
             )
             target_top = min(max_scroll_top, target_top)
             target_top = max(current_scroll_top, target_top)
@@ -245,25 +280,39 @@ class RenderThread(threading.Thread):
         # Calculate currently visible lines
         display_lines = []
         render_y = 0
+        line_top = 0
         fin_show_lines = False
-        for i, line in enumerate(lines):
-            if (i + 1) * line_height >= current_scroll_top and i * line_height - current_scroll_top <= area_height:
-                display_lines.append(line)
+        for line in lines:
+            item_height = self.line_item_height(line, line_height)
+            line_bottom = line_top + item_height
+            if line_bottom >= current_scroll_top and line_top - current_scroll_top <= area_height:
+                display_lines.append((line, line_top))
                 fin_show_lines = True
             elif fin_show_lines is False:
-                render_y += line_height
+                render_y += item_height
+            line_top = line_bottom
         
         # render_text
         render_text = ""
-        for line in display_lines:
-            render_text += line
+        for line, _ in display_lines:
+            if self.is_tool_tag_line(line):
+                render_text += f"%{line.get('label', '')}{line.get('elapsed', '')}x{line.get('count', 1)}"
+            else:
+                render_text += str(line)
         if self.current_render_text != render_text:
             self.current_render_text = render_text
-            show_text_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, render_y + len(display_lines) * line_height), (0, 0, 0, 255))
+            visible_height = 0
+            for line, _ in display_lines:
+                visible_height += self.line_item_height(line, line_height)
+            show_text_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, render_y + visible_height), (0, 0, 0, 255))
             show_text_draw = ImageDraw.Draw(show_text_image)
-            for line in display_lines:
-                TextUtils.draw_mixed_text(show_text_draw, show_text_image, line, font, (10, render_y))
-                render_y += line_height
+            for line, _ in display_lines:
+                item_height = self.line_item_height(line, line_height)
+                if self.is_tool_tag_line(line):
+                    self.draw_tool_tag(show_text_draw, line.get("label", ""), int(line.get("count", 1)), line.get("elapsed", ""), 10, render_y, self.whisplay.LCD_WIDTH - 20, item_height)
+                else:
+                    TextUtils.draw_mixed_text(show_text_draw, show_text_image, str(line), font, (10, render_y))
+                render_y += item_height
             # Update cache image
             self.text_cache_image = show_text_image
         # Draw text_cache_image to main_text_image
@@ -302,6 +351,155 @@ class RenderThread(threading.Thread):
                 and time.time() >= current_scroll_sync_hold_until
             )
         )
+
+    def limit_main_text(self, text):
+        if len(text) <= MAX_MAIN_TEXT_CHARS:
+            return text, 0
+        start = max(0, len(text) - MAX_MAIN_TEXT_CHARS)
+        while start < len(text) and not text[start].isspace():
+            start += 1
+        if start >= len(text):
+            start = max(0, len(text) - MAX_MAIN_TEXT_CHARS)
+        return TRUNCATION_PREFIX + text[start:].lstrip(), start
+
+    def is_tool_tag_line(self, line):
+        return isinstance(line, dict) and line.get("type") == "tool_tag"
+
+    def line_item_height(self, line, line_height):
+        if self.is_tool_tag_line(line):
+            return line_height + TOOL_TAG_MARGIN_Y * 2
+        return line_height
+
+    def build_main_text_lines(self, draw, text, font, max_width):
+        lines = []
+        pending_tool_name = ""
+        pending_tool_count = 0
+        pending_tool_elapsed = ""
+
+        def flush_tool_tag():
+            nonlocal pending_tool_name, pending_tool_count, pending_tool_elapsed
+            if not pending_tool_name or pending_tool_count <= 0:
+                return
+            lines.append({
+                "type": "tool_tag",
+                "label": pending_tool_name,
+                "count": pending_tool_count,
+                "elapsed": pending_tool_elapsed,
+            })
+            pending_tool_name = ""
+            pending_tool_count = 0
+            pending_tool_elapsed = ""
+
+        def append_tool_tag(name, elapsed=""):
+            nonlocal pending_tool_name, pending_tool_count, pending_tool_elapsed
+            if pending_tool_name and pending_tool_name != name:
+                flush_tool_tag()
+            pending_tool_name = name
+            pending_tool_count += 1
+            if elapsed:
+                pending_tool_elapsed = elapsed
+
+        def append_text(value):
+            parts = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            for i, raw_line in enumerate(parts):
+                if raw_line:
+                    lines.extend(TextUtils.wrap_text(draw, raw_line, font, max_width))
+                elif lines and 0 < i < len(parts) - 1:
+                    lines.append("")
+
+        def is_tool_arg_token(token, current_tool=""):
+            if re.fullmatch(r"[A-Za-z0-9_./:=+-]+", token):
+                return True
+            return False
+
+        def consume_tail_after_marker(value, tool_name=""):
+            tail = value.lstrip(" \t:-—,，.。…")
+            if not tail:
+                return "", 0
+            extra_count = 0
+            consumed_current_arg = False
+            while tail:
+                parts = tail.split(None, 1)
+                first = parts[0]
+                rest = parts[1].lstrip(" \t:-—,，.。…") if len(parts) > 1 else ""
+                if tool_name and first.lower() == tool_name.lower():
+                    extra_count += 1
+                    tail = rest
+                    parts = tail.split(None, 1)
+                    if parts and is_tool_arg_token(parts[0], tool_name):
+                        tail = parts[1].lstrip(" \t:-—,，.。…") if len(parts) > 1 else ""
+                    continue
+                if not consumed_current_arg and is_tool_arg_token(first, tool_name):
+                    consumed_current_arg = True
+                    tail = rest
+                    continue
+                return tail, extra_count
+            return "", extra_count
+
+        for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+            matches = list(TOOL_TAG_RE.finditer(raw_line))
+            if not matches:
+                flush_tool_tag()
+                append_text(raw_line)
+                continue
+            before = raw_line[:matches[0].start()]
+            if before.strip():
+                flush_tool_tag()
+                append_text(before)
+            cursor = matches[0].start()
+            for match in matches:
+                between = raw_line[cursor:match.start()]
+                visible_between, extra_count = consume_tail_after_marker(
+                    between,
+                    pending_tool_name if pending_tool_name else "",
+                )
+                for _ in range(extra_count):
+                    append_tool_tag(pending_tool_name)
+                if visible_between.strip():
+                    flush_tool_tag()
+                    append_text(visible_between)
+                append_tool_tag(match.group(1), match.group(2) or "")
+                cursor = match.end()
+            tail, extra_count = consume_tail_after_marker(raw_line[cursor:], pending_tool_name)
+            for _ in range(extra_count):
+                append_tool_tag(pending_tool_name)
+            if tail.strip():
+                flush_tool_tag()
+                append_text(tail)
+        flush_tool_tag()
+        return lines
+
+    def draw_tool_tag(self, draw, label, count, elapsed, x, y, max_width, line_height):
+        tag_font = self.tool_tag_font
+        bbox = tag_font.getbbox(label)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        suffix_texts = []
+        if count > 1:
+            suffix_texts.append(f"x{count}")
+        if elapsed:
+            suffix_texts.append(str(elapsed))
+        suffix_text = " ".join(suffix_texts)
+        suffix_bbox = tag_font.getbbox(suffix_text) if suffix_text else (0, 0, 0, 0)
+        suffix_w = suffix_bbox[2] - suffix_bbox[0]
+        suffix_gap = 7 if suffix_text else 0
+        pad_x = 10
+        tag_w = min(max_width, text_w + suffix_gap + suffix_w + pad_x * 2)
+        inner_h = max(1, line_height - TOOL_TAG_MARGIN_Y * 2)
+        tag_h = min(max(12, inner_h - 2), 22)
+        tag_y = y + TOOL_TAG_MARGIN_Y + max(0, (inner_h - tag_h) // 2)
+        draw.rounded_rectangle(
+            [x, tag_y, x + tag_w, tag_y + tag_h],
+            radius=6,
+            fill=TOOL_TAG_BG,
+        )
+        content_w = text_w + suffix_gap + suffix_w
+        text_x = x + (tag_w - content_w) // 2
+        text_y = tag_y + (tag_h - text_h) // 2 - bbox[1]
+        draw.text((text_x, text_y), label, font=tag_font, fill=TOOL_TAG_FG)
+        if suffix_text:
+            suffix_x = text_x + text_w + suffix_gap
+            draw.text((suffix_x, text_y), suffix_text, font=tag_font, fill=TOOL_TAG_COUNT_FG)
 
     def render_terminal_text(self, main_text_image, area_height, draw, text):
         global current_scroll_top, current_scroll_sync_speed, current_scroll_sync_target_top
@@ -471,6 +669,7 @@ class RenderThread(threading.Thread):
         self.render_event.set()
 
 def update_display_data(status=None, emoji=None, text=None,
+                  text_delta=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
                   network_connected=None, vpn_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None,
                   wifi_signal_level=None,
@@ -488,6 +687,8 @@ def update_display_data(status=None, emoji=None, text=None,
     global render_thread
 
     next_text = text
+    if text is None and text_delta is not None:
+        next_text = (current_text or "") + (text_delta or "")
     if text is not None:
         previous_text = current_text or ""
         incoming_text = text or ""
@@ -559,7 +760,7 @@ def update_display_data(status=None, emoji=None, text=None,
         current_transaction_id = transaction_id
     current_status = status if status is not None else current_status
     current_emoji = emoji if emoji is not None else current_emoji
-    current_text = next_text if text is not None else current_text
+    current_text = next_text if (text is not None or text_delta is not None) else current_text
     if terminal_text is not None:
         next_terminal_text = terminal_text or ""
         if next_terminal_text != current_terminal_text:
@@ -665,6 +866,7 @@ def handle_client(client_socket, addr, whisplay):
                     status = content.get("status", None)
                     emoji = content.get("emoji", None)
                     text = content.get("text", None)
+                    text_delta = content.get("text_delta", None)
                     terminal_text = content.get("terminal_text", None)
                     rgbled = content.get("RGB", None)
                     brightness = content.get("brightness", None)
@@ -724,7 +926,7 @@ def handle_client(client_socket, addr, whisplay):
                             notification = {"event": "camera_capture"}
                             send_to_all_clients(notification)
 
-                    if (text is not None) or (status is not None) or (emoji is not None) or \
+                    if (text is not None) or (text_delta is not None) or (status is not None) or (emoji is not None) or \
                        (battery_level is not None) or (battery_color is not None) or \
                               (image_path is not None) or (network_connected is not None) or \
                             (wifi_signal_level is not None) or \
@@ -733,7 +935,7 @@ def handle_client(client_socket, addr, whisplay):
                             (music_progress is not None) or (music_duration_ms is not None) or (approval_mode is not None) or \
                             (terminal_text is not None):
                         update_display_data(status=status, emoji=emoji,
-                                     text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
+                                     text=text, text_delta=text_delta, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
                                                  wifi_signal_level=wifi_signal_level,

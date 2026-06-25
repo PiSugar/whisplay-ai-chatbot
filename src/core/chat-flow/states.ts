@@ -283,6 +283,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
   answer: (ctx: ChatFlowContext) => {
     ctx.enterMusicAfterAnswer = false;
     ctx.musicDisplayText = "";
+    ctx.resetToolCallDisplay();
+    ctx.answerDisplayText = "";
     display({
       status: "answering...",
       RGB: "#00c8a3",
@@ -335,7 +337,10 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     let llmResponseText = "";
     const trackingPartial = (text: string): void => {
       llmResponseText += text;
-      if (currentAnswerId === ctx.answerId) partial(text);
+      if (currentAnswerId === ctx.answerId) {
+        partial(text);
+        ctx.updateAnswerDisplayText(llmResponseText);
+      }
     };
     ctx.partialThinking = "";
     ctx.thinkingSentences = [];
@@ -403,14 +408,10 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
               ctx.enterMusicAfterAnswer = true;
               ctx.musicDisplayText = result.replace(/^\[success\]/, "").trim();
             }
-            if (result) {
-              display({
-                text: `[${functionName}]${result}`,
-              });
+            if (!result) {
+              ctx.appendToolCallDisplay(functionName);
             } else {
-              display({
-                text: `Invoking [${functionName}]... {count}s`,
-              });
+              ctx.finishToolCallDisplay(functionName);
             }
           },
         );
@@ -527,6 +528,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       ctx.transitionTo("sleep");
       return;
     }
+    ctx.resetToolCallDisplay();
+    ctx.answerDisplayText = "";
     display({
       status: "answering...",
       RGB: "#00c8a3",

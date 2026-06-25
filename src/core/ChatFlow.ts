@@ -59,6 +59,17 @@ class ChatFlow implements ChatFlowContext {
   isFromWakeListening: boolean = false;
   enterMusicAfterAnswer: boolean = false;
   musicDisplayText: string = "";
+  toolDisplayText: string = "";
+  answerDisplayText: string = "";
+  private toolDisplayItems: {
+    name: string;
+    anchorIndex: number;
+    startedAt: number;
+    elapsedSeconds?: number;
+    timer?: ReturnType<typeof setInterval>;
+  }[] = [];
+  private answerDisplayTimer?: ReturnType<typeof setTimeout>;
+  private lastAnswerDisplayAt = 0;
 
   constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -69,6 +80,7 @@ class ChatFlow implements ChatFlowContext {
       (sentences: string[]) => {
         if (!this.isAnswerFlow()) return;
         const fullText = sentences.join(" ");
+        this.answerDisplayText = fullText;
         let emoji = DEFAULT_EMOJI;
         if (this.currentFlowName === "external_answer") {
           emoji = this.currentExternalEmoji || extractEmojis(fullText) || emoji;
@@ -78,7 +90,7 @@ class ChatFlow implements ChatFlowContext {
         display({
           status: "answering",
           emoji,
-          text: fullText,
+          text: this.composeAnswerDisplayText(fullText),
           terminal_text: "",
           RGB: "#0000ff",
           scroll_speed: 3,
@@ -86,9 +98,10 @@ class ChatFlow implements ChatFlowContext {
       },
       (text: string) => {
         if (!this.isAnswerFlow()) return;
+        this.answerDisplayText = text || "";
         display({
           status: "answering",
-          text: text || undefined,
+          text: this.composeAnswerDisplayText(text) || undefined,
           terminal_text: "",
           scroll_speed: 3,
         });
@@ -237,6 +250,135 @@ class ChatFlow implements ChatFlowContext {
       this.currentFlowName === "answer" ||
       this.currentFlowName === "external_answer"
     );
+  };
+
+  composeAnswerDisplayText = (text?: string): string => {
+    const answerText = text ?? this.answerDisplayText;
+    if (this.toolDisplayItems.length === 0) {
+      return answerText || "";
+    }
+    const sortedItems = [...this.toolDisplayItems].sort((a, b) => {
+      if (a.anchorIndex !== b.anchorIndex) {
+        return a.anchorIndex - b.anchorIndex;
+      }
+      return a.startedAt - b.startedAt;
+    });
+    let result = "";
+    let cursor = 0;
+    sortedItems.forEach((item) => {
+      const anchorIndex = Math.min(Math.max(item.anchorIndex, 0), answerText.length);
+      if (anchorIndex > cursor) {
+        result += answerText.slice(cursor, anchorIndex);
+        cursor = anchorIndex;
+      }
+      const needsSeparatorBefore =
+        result.length > 0 && !/[\s\n]$/.test(result);
+      const needsSeparatorAfter =
+        anchorIndex < answerText.length && !/^[\s\n]/.test(answerText.slice(anchorIndex));
+      result += `${needsSeparatorBefore ? " " : ""}${this.formatToolDisplayItem(item)}${needsSeparatorAfter ? " " : ""}`;
+    });
+    result += answerText.slice(cursor);
+    return result;
+  };
+
+  private formatToolDisplayItem = (item: {
+    name: string;
+    elapsedSeconds?: number;
+  }): string =>
+    item.elapsedSeconds && item.elapsedSeconds >= 10
+      ? `% ${item.name} ${item.elapsedSeconds}s...`
+      : `% ${item.name}...`;
+
+  private refreshToolDisplayText = (): void => {
+    this.toolDisplayText = this.toolDisplayItems
+      .map((item) => this.formatToolDisplayItem(item))
+      .join("");
+  };
+
+  private updateAnswerDisplay = (immediate = false): void => {
+    const render = () => {
+      this.answerDisplayTimer = undefined;
+      if (!this.isAnswerFlow()) return;
+      this.lastAnswerDisplayAt = Date.now();
+      display({
+        status: "answering",
+        text: this.composeAnswerDisplayText(),
+        terminal_text: "",
+        scroll_speed: 3,
+      });
+    };
+    if (immediate || Date.now() - this.lastAnswerDisplayAt >= 80) {
+      if (this.answerDisplayTimer) {
+        clearTimeout(this.answerDisplayTimer);
+        this.answerDisplayTimer = undefined;
+      }
+      render();
+      return;
+    }
+    if (this.answerDisplayTimer) {
+      return;
+    }
+    this.answerDisplayTimer = setTimeout(render, 80);
+  };
+
+  updateAnswerDisplayText = (text: string): void => {
+    if (!this.isAnswerFlow()) return;
+    this.answerDisplayText = text || "";
+    this.updateAnswerDisplay();
+  };
+
+  appendToolCallDisplay = (functionName: string): void => {
+    const item = {
+      name: functionName,
+      anchorIndex: this.answerDisplayText.length,
+      startedAt: Date.now(),
+      elapsedSeconds: undefined as number | undefined,
+      timer: undefined as ReturnType<typeof setInterval> | undefined,
+    };
+    item.timer = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - item.startedAt) / 1000);
+      if (elapsedSeconds < 10 || item.elapsedSeconds === elapsedSeconds) {
+        return;
+      }
+      item.elapsedSeconds = elapsedSeconds;
+      this.refreshToolDisplayText();
+      this.updateAnswerDisplay(true);
+    }, 1000);
+    this.toolDisplayItems.push(item);
+    this.refreshToolDisplayText();
+    this.updateAnswerDisplay(true);
+  };
+
+  finishToolCallDisplay = (functionName: string): void => {
+    const item = [...this.toolDisplayItems]
+      .reverse()
+      .find((candidate) => candidate.name === functionName && candidate.timer);
+    if (!item) {
+      return;
+    }
+    if (item.timer) {
+      clearInterval(item.timer);
+      item.timer = undefined;
+    }
+    const elapsedSeconds = Math.floor((Date.now() - item.startedAt) / 1000);
+    item.elapsedSeconds = elapsedSeconds >= 10 ? elapsedSeconds : undefined;
+    this.refreshToolDisplayText();
+    this.updateAnswerDisplay(true);
+  };
+
+  resetToolCallDisplay = (): void => {
+    this.toolDisplayItems.forEach((item) => {
+      if (item.timer) {
+        clearInterval(item.timer);
+      }
+    });
+    if (this.answerDisplayTimer) {
+      clearTimeout(this.answerDisplayTimer);
+      this.answerDisplayTimer = undefined;
+    }
+    this.toolDisplayItems = [];
+    this.toolDisplayText = "";
+    this.lastAnswerDisplayAt = 0;
   };
 
   streamExternalReply = async (text: string, emoji?: string): Promise<void> => {

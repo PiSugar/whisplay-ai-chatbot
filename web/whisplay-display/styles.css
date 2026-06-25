@@ -258,6 +258,32 @@ body {
   word-break: break-word;
 }
 
+.tool-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  max-width: 100%;
+  margin: 2px 0;
+  padding: 1px 10px 2px;
+  border-radius: 6px;
+  background: #082a70;
+  color: #fff;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.tool-tag-name {
+  color: #fff;
+}
+
+.tool-tag-count,
+.tool-tag-elapsed {
+  color: #7ac9ff;
+}
+
 .text-content.hidden-by-terminal {
   visibility: hidden;
 }

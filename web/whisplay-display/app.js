@@ -86,13 +86,167 @@ function applyScrollSync(text, sync, viewportHeight) {
   }
   const charEnd = Math.max(0, parseInt(sync.char_end || 0, 10));
   const duration = Math.max(1, parseInt(sync.duration_ms || 1, 10));
-  const totalChars = text.length || 1;
+  const totalChars = getSyncTextLength(text) || 1;
   const ratio = Math.min(1, charEnd / totalChars);
   maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
   scrollTarget = Math.max(scrollTop, Math.round(maxScroll * ratio));
   scrollSyncFrom = scrollTop;
   scrollSyncStart = performance.now();
   scrollSyncDuration = duration;
+}
+
+const TOOL_TAG_RE = /[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?/gi;
+
+function getSyncTextLength(text) {
+  return text
+    .replace(TOOL_TAG_RE, "")
+    .replace(/^[ \t:\-—,，.。…]+/gm, "")
+    .length;
+}
+
+function isToolArgToken(token, toolName = "") {
+  if (/^[A-Za-z0-9_./:=+-]+$/.test(token)) {
+    return true;
+  }
+  return false;
+}
+
+function consumeTailAfterMarker(value, toolName = "") {
+  let tail = value.replace(/^[ \t:\-—,，.。…]+/, "");
+  if (!tail) {
+    return { tail: "", extraCount: 0 };
+  }
+  let extraCount = 0;
+  let consumedCurrentArg = false;
+  while (tail) {
+    const parts = tail.split(/\s+/, 2);
+    const first = parts[0];
+    const firstLength = first.length;
+    const restRaw = tail.slice(firstLength).replace(/^[\s:\-—,，.。…]+/, "");
+
+    if (toolName && first.toLowerCase() === toolName.toLowerCase()) {
+      extraCount += 1;
+      tail = restRaw;
+      const nextParts = tail.split(/\s+/, 2);
+      if (nextParts[0] && isToolArgToken(nextParts[0], toolName)) {
+        tail = tail.slice(nextParts[0].length).replace(/^[\s:\-—,，.。…]+/, "");
+      }
+      continue;
+    }
+
+    if (!consumedCurrentArg && isToolArgToken(first, toolName)) {
+      consumedCurrentArg = true;
+      tail = restRaw;
+      continue;
+    }
+
+    return { tail, extraCount };
+  }
+  return { tail: "", extraCount };
+}
+
+function createToolTagNode(label, count, elapsed = "") {
+  const tag = document.createElement("span");
+  tag.className = "tool-tag";
+  const name = document.createElement("span");
+  name.className = "tool-tag-name";
+  name.textContent = label;
+  tag.appendChild(name);
+  if (count > 1) {
+    const countNode = document.createElement("span");
+    countNode.className = "tool-tag-count";
+    countNode.textContent = `x${count}`;
+    tag.appendChild(countNode);
+  }
+  if (elapsed) {
+    const elapsedNode = document.createElement("span");
+    elapsedNode.className = "tool-tag-elapsed";
+    elapsedNode.textContent = elapsed;
+    tag.appendChild(elapsedNode);
+  }
+  return tag;
+}
+
+function renderToolTaggedText(container, text) {
+  const fragment = document.createDocumentFragment();
+  let pendingToolName = "";
+  let pendingToolCount = 0;
+  let pendingToolElapsed = "";
+
+  const flushToolTag = () => {
+    if (!pendingToolName || pendingToolCount <= 0) {
+      return;
+    }
+    fragment.appendChild(createToolTagNode(pendingToolName, pendingToolCount, pendingToolElapsed));
+    pendingToolName = "";
+    pendingToolCount = 0;
+    pendingToolElapsed = "";
+  };
+
+  const appendToolTag = (name, elapsed = "") => {
+    if (pendingToolName && pendingToolName !== name) {
+      flushToolTag();
+    }
+    pendingToolName = name;
+    pendingToolCount += 1;
+    if (elapsed) {
+      pendingToolElapsed = elapsed;
+    }
+  };
+
+  const appendText = (value) => {
+    if (!value) {
+      return;
+    }
+    fragment.appendChild(document.createTextNode(value));
+  };
+
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  lines.forEach((rawLine, lineIndex) => {
+    TOOL_TAG_RE.lastIndex = 0;
+    const matches = [...rawLine.matchAll(TOOL_TAG_RE)];
+    if (lineIndex > 0) {
+      flushToolTag();
+      appendText("\n");
+    }
+    if (matches.length === 0) {
+      flushToolTag();
+      appendText(rawLine);
+      return;
+    }
+
+    const before = rawLine.slice(0, matches[0].index);
+    if (before.trim()) {
+      flushToolTag();
+      appendText(before);
+    }
+
+    let cursor = matches[0].index;
+    matches.forEach((match) => {
+      const between = rawLine.slice(cursor, match.index);
+      const consumed = consumeTailAfterMarker(between, pendingToolName || "");
+      for (let i = 0; i < consumed.extraCount; i += 1) {
+        appendToolTag(pendingToolName);
+      }
+      if (consumed.tail.trim()) {
+        flushToolTag();
+        appendText(consumed.tail);
+      }
+      appendToolTag(match[1], match[2] || "");
+      cursor = match.index + match[0].length;
+    });
+
+    const consumed = consumeTailAfterMarker(rawLine.slice(cursor), pendingToolName);
+    for (let i = 0; i < consumed.extraCount; i += 1) {
+      appendToolTag(pendingToolName);
+    }
+    if (consumed.tail.trim()) {
+      flushToolTag();
+      appendText(consumed.tail);
+    }
+  });
+  flushToolTag();
+  container.replaceChildren(fragment);
 }
 
 function updateText(text, sync, speed) {
@@ -110,7 +264,7 @@ function updateText(text, sync, speed) {
 
   if (nextText !== lastText) {
     const isContinuation = nextText.startsWith(lastText);
-    textContent.textContent = nextText;
+    renderToolTaggedText(textContent, nextText);
     if (!isContinuation) {
       scrollTop = 0;
       scrollTarget = null;

@@ -48,6 +48,7 @@ const ttsAudioFormat: AudioFormat = normalizeAudioFormat(
 );
 
 const useWavPlayer = ttsAudioFormat === "wav";
+const MP3_SOX_GAIN_DB = "2";
 
 const defaultAsrAudioFormat: AudioFormat = [
   ASRServer.vosk,
@@ -67,28 +68,7 @@ export const recordFileFormat: AudioFormat = normalizeAudioFormat(
 );
 
 function startPlayerProcess() {
-  if (useWavPlayer) {
-    return null;
-  } else {
-    // use mpg123 for mp3 files
-    const proc = spawn("mpg123", [
-      "-",
-      "--scale",
-      "2",
-      "-o",
-      "alsa",
-      "-a",
-      alsaOutputDevice,
-    ]);
-    // Prevent EPIPE from becoming an uncaught exception when the process dies
-    proc.stdin?.on("error", (err) => {
-      console.error("Player stdin error:", err.message);
-    });
-    proc.on("error", (err) => {
-      console.error("Player process error:", err.message);
-    });
-    return proc;
-  }
+  return null;
 }
 
 let recordingProcessList: ChildProcess[] = [];
@@ -131,6 +111,7 @@ export const playWakeupChime = (): Promise<void> => {
     // fade q 0.02 0.30 0.08 gain -30
 
     const chimeProcess = spawn("sox", [
+      "-q",
       "-n",
       "-t",
       "alsa",
@@ -338,7 +319,7 @@ const playAudioData = (params: TTSResult): Promise<void> => {
       new Promise<void>((resolve, reject) => {
         console.log("Playback duration:", audioDuration);
         player.isPlaying = true;
-        const process = spawn("sox", [filePath, "-t", "alsa", alsaOutputDevice]);
+        const process = spawn("sox", ["-q", filePath, "-t", "alsa", alsaOutputDevice]);
         process.on("close", (code: number) => {
           player.isPlaying = false;
           if (code !== 0) {
@@ -360,14 +341,10 @@ const playAudioData = (params: TTSResult): Promise<void> => {
     const audioBuffer = base64 ? Buffer.from(base64, "base64") : buffer;
     console.log("Playback duration:", audioDuration);
     player.isPlaying = true;
-    setTimeout(() => {
-      resolve();
-      player.isPlaying = false;
-      console.log("Audio playback completed");
-    }, audioDuration); // Add 1 second buffer
 
     if (ttsAudioFormat === "wav") {
       const process = spawn("sox", [
+        "-q",
         "-t",
         "wav",
         "-",
@@ -375,15 +352,39 @@ const playAudioData = (params: TTSResult): Promise<void> => {
         "alsa",
         alsaOutputDevice,
       ]);
+      player.process = process;
       process.stdin?.on("error", (err) => {
         console.error("Sox stdin error:", err.message);
       });
-      process.stdout?.on("data", (data) => console.log(data.toString()));
-      process.stderr?.on("data", (data) => console.error(data.toString()));
-      process.on("exit", (code) => {
+      let stderr = "";
+      process.stderr?.on("data", (data) => {
+        stderr += data.toString();
+      });
+      let settled = false;
+      const watchdog = setTimeout(() => {
+        if (settled) return;
+        settled = true;
         player.isPlaying = false;
+        if (player.process === process) {
+          player.process = null;
+        }
+        process.kill();
+        console.error("Audio playback timed out.");
+        resolve();
+      }, audioDuration + 2000);
+      process.on("exit", (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(watchdog);
+        player.isPlaying = false;
+        if (player.process === process) {
+          player.process = null;
+        }
         if (code !== 0) {
           console.error(`Audio playback error: ${code}`);
+          if (stderr.trim()) {
+            console.error(stderr.trim());
+          }
           reject(code);
         } else {
           console.log("Audio playback completed");
@@ -394,26 +395,57 @@ const playAudioData = (params: TTSResult): Promise<void> => {
       return;
     }
 
-    const process = player.process;
-    if (!process) {
-      return reject(new Error("Audio player is not initialized."));
-    }
-
-    try {
-      process.stdin?.write(audioBuffer);
-    } catch (e) { }
-    process.stdout?.on("data", (data) => console.log(data.toString()));
-    process.stderr?.on("data", (data) => console.error(data.toString()));
-    process.on("exit", (code) => {
+    const process = spawn("sox", [
+      "-q",
+      "-t",
+      "mp3",
+      "-",
+      "-t",
+      "alsa",
+      alsaOutputDevice,
+      "gain",
+      MP3_SOX_GAIN_DB,
+    ]);
+    player.process = process;
+    process.stdin?.on("error", (err) => {
+      console.error("Sox stdin error:", err.message);
+    });
+    let stderr = "";
+    process.stderr?.on("data", (data) => {
+      stderr += data.toString();
+    });
+    let settled = false;
+    const watchdog = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       player.isPlaying = false;
+      if (player.process === process) {
+        player.process = null;
+      }
+      process.kill();
+      console.error("Audio playback timed out.");
+      resolve();
+    }, audioDuration + 2000);
+    process.on("exit", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
+      player.isPlaying = false;
+      if (player.process === process) {
+        player.process = null;
+      }
       if (code !== 0) {
         console.error(`Audio playback error: ${code}`);
+        if (stderr.trim()) {
+          console.error(stderr.trim());
+        }
         reject(code);
       } else {
         console.log("Audio playback completed");
         resolve();
       }
     });
+    process.stdin?.end(audioBuffer);
   });
 };
 

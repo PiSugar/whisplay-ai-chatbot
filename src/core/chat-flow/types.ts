@@ -41,8 +41,15 @@ export interface ChatFlowContext {
   isFromWakeListening: boolean;
   enterMusicAfterAnswer: boolean;
   musicDisplayText: string;
+  toolDisplayText: string;
+  answerDisplayText: string;
 
   transitionTo: (flowName: FlowName) => void;
+  composeAnswerDisplayText: (text?: string) => string;
+  updateAnswerDisplayText: (text: string) => void;
+  appendToolCallDisplay: (functionName: string) => void;
+  finishToolCallDisplay: (functionName: string) => void;
+  resetToolCallDisplay: () => void;
   recognizeAudio: (path: string, isFromAutoListening?: boolean) => Promise<string>;
   partialThinkingCallback: (partialThinking: string) => void;
   startWakeSession: () => void;

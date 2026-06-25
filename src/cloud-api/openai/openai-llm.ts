@@ -40,6 +40,30 @@ const openaiMaxMessagesLength = parseInt(
   10,
 );
 
+const emptyObjectParameters = {
+  type: "object",
+  properties: {},
+};
+
+const normalizeToolParameters = (parameters: any) => {
+  if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) {
+    return emptyObjectParameters;
+  }
+  return {
+    ...parameters,
+    type: parameters.type || "object",
+    properties: parameters.properties || {},
+  };
+};
+
+const openaiTools = llmTools.map((tool) => ({
+  ...tool,
+  function: {
+    ...tool.function,
+    parameters: normalizeToolParameters(tool.function.parameters),
+  },
+}));
+
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
   const base64 = fs.readFileSync(imagePath).toString("base64");
@@ -157,7 +181,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       model: openaiLLMModel,
       messages: requestMessages as any,
       stream: true,
-      tools: shouldIncludeTools ? llmTools : undefined,
+      tools: shouldIncludeTools ? openaiTools : undefined,
     }).catch((error) => {
       console.log("Error during OpenAI chat completion request:", error.message);
       endResolve();
@@ -182,7 +206,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       model: openaiLLMModel,
       messages: requestMessages as any,
       stream: false,
-      tools: shouldIncludeTools ? llmTools : undefined,
+      tools: shouldIncludeTools ? openaiTools : undefined,
     }).catch((error) => {
       console.log("Error during OpenAI chat completion request:", error.message);
       endResolve();

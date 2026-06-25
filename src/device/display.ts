@@ -358,6 +358,7 @@ export class WhisplayDisplay {
   }
 
   async display(newStatus: Partial<Status> = {}): Promise<void> {
+    const previousText = this.currentStatus.text || "";
     const hasTextOverride = Object.prototype.hasOwnProperty.call(
       newStatus,
       "text",
@@ -430,8 +431,20 @@ export class WhisplayDisplay {
     
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;
+    if (
+      isTextChanged &&
+      typeof changedValuesObj.text === "string" &&
+      changedValuesObj.text.startsWith(previousText)
+    ) {
+      changedValuesObj.text_delta = changedValuesObj.text.slice(previousText.length);
+      delete changedValuesObj.text;
+    }
     const data = JSON.stringify(changedValuesObj);
-    if (isTextChanged) console.log("send data:", data);
+    if (isTextChanged) {
+      const preview =
+        data.length > 240 ? `${data.slice(0, 120)}...${data.slice(-80)}` : data;
+      console.log("send data:", preview);
+    }
 
     if (normalizedStatus.camera_capture) {
       const capturePath = normalizedStatus.capture_image_path || this.currentStatus.capture_image_path;

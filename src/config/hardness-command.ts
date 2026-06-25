@@ -28,9 +28,6 @@ const DEFAULT_RETURN_CHARS = 1_200;
 const DEFAULT_TEMP_DIR = "/tmp/whisplay-hardness";
 const DEFAULT_SKILL_RETURN_CHARS = 8_000;
 const MAX_SKILL_SCAN_DEPTH = 3;
-const DISPLAY_UPDATE_MS = 400;
-const DISPLAY_TAIL_CHARS = 900;
-
 const SAFE_COMMANDS = new Set([
   "pwd",
   "ls",
@@ -187,28 +184,6 @@ const isWritableUserPath = (rawPath: string): boolean => {
   return allowedWrite && !protectedWrite;
 };
 
-const updateTerminalDisplay = async (
-  command: string,
-  output: string,
-  finalLine?: string,
-): Promise<void> => {
-  try {
-    const { display } = await import("../device/display");
-    const text = [`$ ${command}`, tailText(output, DISPLAY_TAIL_CHARS), finalLine]
-      .filter(Boolean)
-      .join("\n");
-    await display({
-      status: finalLine ? "Command done" : "Running command",
-      emoji: "🔧",
-      terminal_text: text,
-      RGB: finalLine?.includes("exit_code=0") ? "#00c8a3" : "#ff6800",
-      scroll_speed: 0,
-    });
-  } catch (error: any) {
-    console.error("[HardnessCommand] Failed to update display:", error?.message || error);
-  }
-};
-
 const spillOutputIfNeeded = (
   command: string,
   output: string,
@@ -232,9 +207,6 @@ const runShellCommand = async (command: string): Promise<CommandResult> => {
   const startedAt = Date.now();
   let output = "";
   let timedOut = false;
-  let lastDisplayUpdate = 0;
-
-  await updateTerminalDisplay(command, "");
 
   return await new Promise<CommandResult>((resolve) => {
     const child = spawn("bash", ["-lc", command], {
@@ -244,11 +216,6 @@ const runShellCommand = async (command: string): Promise<CommandResult> => {
 
     const append = (chunk: Buffer): void => {
       output += chunk.toString("utf8");
-      const now = Date.now();
-      if (now - lastDisplayUpdate >= DISPLAY_UPDATE_MS) {
-        lastDisplayUpdate = now;
-        void updateTerminalDisplay(command, output);
-      }
     };
 
     child.stdout.on("data", append);
@@ -427,13 +394,10 @@ const runCommandTool: LLMTool = {
     const command = `${params?.command ?? ""}`.trim();
     const validationError = validateCommand(command);
     if (validationError) {
-      await updateTerminalDisplay(command || "(empty)", validationError, "exit_code=null rejected=true");
       return `${ToolReturnTag.Error} exit_code=null duration_ms=0 timed_out=false truncated=false\nreason:\n${validationError}`;
     }
 
     const result = await runShellCommand(command);
-    const finalLine = `exit_code=${result.exitCode ?? "null"} duration_ms=${result.durationMs} truncated=${result.truncated}`;
-    await updateTerminalDisplay(command, result.output, finalLine);
     return formatResult(result);
   },
 };

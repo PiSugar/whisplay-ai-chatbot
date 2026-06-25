@@ -47,7 +47,10 @@ export function registerLLMToolsPlugins(): void {
             function: {
               name: "increaseVolume",
               description: "increase the volume level by a specified amount",
-              parameters: {},
+              parameters: {
+                type: "object",
+                properties: {},
+              },
             },
             func: async () => {
               const currentLogPercent = getCurrentLogPercent();
@@ -67,7 +70,10 @@ export function registerLLMToolsPlugins(): void {
             function: {
               name: "decreaseVolume",
               description: "decrease the volume level by a specified amount",
-              parameters: {},
+              parameters: {
+                type: "object",
+                properties: {},
+              },
             },
             func: async () => {
               const currentLogPercent = getCurrentLogPercent();
