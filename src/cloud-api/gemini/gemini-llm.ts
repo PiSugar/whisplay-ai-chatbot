@@ -23,6 +23,7 @@ import {
   hasPendingCapturedImgForChat,
   getImageMimeType,
 } from "../../utils/image";
+import { formatToolResultsForLog } from "../../utils";
 
 dotenv.config();
 
@@ -233,7 +234,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         }),
       );
 
-      console.log("call results: ", results);
+      console.log("call results: ", formatToolResultsForLog(results, functionCalls));
       const newMessages: Message[] = results.map(([id, result]: any) => ({
         role: "tool",
         content: result as string,

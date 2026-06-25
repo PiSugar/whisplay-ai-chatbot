@@ -18,8 +18,12 @@ const detectWhisplaySoundCardRef = (): string | undefined => {
     const line = cards
       .split("\n")
       .find((item) => /whisplaysound|wm8960soundcard|es8389soundcard/i.test(item));
-    const match = line?.match(/^\s*(\d+)\s+\[/);
-    return match?.[1];
+    const nameMatch = line?.match(/\[([^\]]+)\]/);
+    if (nameMatch?.[1]) {
+      return nameMatch[1].trim();
+    }
+    const indexMatch = line?.match(/^\s*(\d+)\s+\[/);
+    return indexMatch?.[1];
   } catch (e) {
     return undefined;
   }
@@ -29,9 +33,14 @@ const soundCardRef =
   process.env.SOUND_CARD_NAME ||
   process.env.SOUND_CARD_INDEX ||
   detectWhisplaySoundCardRef();
-const defaultAlsaDevice = soundCardRef ? `hw:${soundCardRef},0` : "default";
-const alsaInputDevice = process.env.ALSA_INPUT_DEVICE || defaultAlsaDevice;
-const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || defaultAlsaDevice;
+const defaultAlsaInputDevice = soundCardRef ? `hw:${soundCardRef},0` : "default";
+const defaultAlsaOutputDevice = soundCardRef === "whisplaysound"
+  ? "playback"
+  : soundCardRef
+    ? `plughw:${soundCardRef},0`
+    : "default";
+const alsaInputDevice = process.env.ALSA_INPUT_DEVICE || defaultAlsaInputDevice;
+const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || defaultAlsaOutputDevice;
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
   const normalized = (value || "").toLowerCase();
   return normalized === "wav" || normalized === "mp3" ? normalized : fallback;

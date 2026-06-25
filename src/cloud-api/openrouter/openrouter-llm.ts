@@ -10,7 +10,7 @@ import {
   updateLastMessageTime,
 } from "../../config/llm-config";
 import { FunctionCall, Message, ToolReturnTag } from "../../type";
-import { combineFunction } from "../../utils";
+import { combineFunction, formatToolResultsForLog } from "../../utils";
 import { llmFuncMap, llmTools } from "../../config/llm-tools";
 import {
   ChatWithLLMStreamFunction,
@@ -276,7 +276,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       }),
     );
 
-    console.log("[OpenRouter] call results: ", results);
+    console.log("[OpenRouter] call results: ", formatToolResultsForLog(results, functionCalls));
     const newMessages: Message[] = results.map(([id, result]: any) => ({
       role: "tool",
       content: result as string,

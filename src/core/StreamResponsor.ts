@@ -32,6 +32,17 @@ export class StreamResponser {
   private isPlaying: boolean = false;
   private ttsChain: Promise<void> = Promise.resolve();
   private hasStartedTTS: boolean = false;
+  private firstTTSPromise: Promise<TTSResult> | null = null;
+  private activeTTSCount = 0;
+  private pendingTTSQueue: {
+    text: string;
+    resolve: (result: TTSResult) => void;
+    reject: (error: unknown) => void;
+  }[] = [];
+  private readonly maxConcurrentTTS = Math.max(
+    1,
+    parseInt(process.env.TTS_CONCURRENCY_LIMIT || "5", 10) || 5,
+  );
 
   constructor(
     ttsFunc: TTSFunc,
@@ -41,9 +52,11 @@ export class StreamResponser {
   ) {
     this.ttsFunc = async (text) => {
       console.time("[TTS time]");
-      const result = await ttsFunc(text);
-      console.timeEnd("[TTS time]");
-      return result;
+      try {
+        return await this.synthesizeWithRetry(ttsFunc, text);
+      } finally {
+        console.timeEnd("[TTS time]");
+      }
     };
     this.sentencesCallback = sentencesCallback;
     this.textCallback = textCallback;
@@ -56,6 +69,40 @@ export class StreamResponser {
     }
     return this.displaySentences.slice(0, sentenceIndex + 1).join(" ").length;
   }
+
+  private synthesizeWithRetry = async (
+    ttsFunc: TTSFunc,
+    text: string,
+  ): Promise<TTSResult> => {
+    const maxEmptyRetries = Math.max(
+      0,
+      parseInt(process.env.TTS_EMPTY_RETRY_COUNT || "1", 10) || 0,
+    );
+    let lastResult: TTSResult = { duration: 0 };
+
+    for (let attempt = 0; attempt <= maxEmptyRetries; attempt++) {
+      lastResult = await ttsFunc(text);
+      if (this.hasPlayableAudio(lastResult)) {
+        return lastResult;
+      }
+      if (attempt < maxEmptyRetries) {
+        console.warn(
+          `[TTS] Empty audio result, retrying (${attempt + 1}/${maxEmptyRetries})...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    }
+
+    return lastResult;
+  };
+
+  private hasPlayableAudio = (result: TTSResult): boolean => {
+    return !!(
+      result &&
+      result.duration > 0 &&
+      (result.filePath || result.base64 || result.buffer)
+    );
+  };
 
   private playAudioInOrder = async (): Promise<void> => {
     // Prevent multiple concurrent calls
@@ -100,6 +147,8 @@ export class StreamResponser {
         this.speakQueue = [];
         this.displaySentences.length = 0;
         this.hasStartedTTS = false;
+        this.firstTTSPromise = null;
+        this.pendingTTSQueue.length = 0;
       }
     };
     playNext();
@@ -113,9 +162,40 @@ export class StreamResponser {
         () => undefined,
         () => undefined,
       );
+      this.firstTTSPromise = task;
       return task;
     }
-    return this.ttsFunc(text);
+
+    return (this.firstTTSPromise || Promise.resolve({ duration: 0 })).then(
+      () => this.enqueueLimitedTTS(text),
+      () => this.enqueueLimitedTTS(text),
+    );
+  };
+
+  private enqueueLimitedTTS = (text: string): Promise<TTSResult> => {
+    return new Promise((resolve, reject) => {
+      this.pendingTTSQueue.push({ text, resolve, reject });
+      this.pumpTTSQueue();
+    });
+  };
+
+  private pumpTTSQueue = (): void => {
+    while (
+      this.activeTTSCount < this.maxConcurrentTTS &&
+      this.pendingTTSQueue.length > 0
+    ) {
+      const item = this.pendingTTSQueue.shift();
+      if (!item) {
+        return;
+      }
+      this.activeTTSCount++;
+      this.ttsFunc(item.text)
+        .then(item.resolve, item.reject)
+        .finally(() => {
+          this.activeTTSCount = Math.max(0, this.activeTTSCount - 1);
+          this.pumpTTSQueue();
+        });
+    }
   };
 
   partial = (text: string): void => {
@@ -200,6 +280,9 @@ export class StreamResponser {
     this.isPlaying = false;
     this.ttsChain = Promise.resolve();
     this.hasStartedTTS = false;
+    this.firstTTSPromise = null;
+    this.activeTTSCount = 0;
+    this.pendingTTSQueue.length = 0;
     this.playEndResolve();
     stopPlaying();
   };

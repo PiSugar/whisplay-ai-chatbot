@@ -80,7 +80,6 @@ class ChatFlow implements ChatFlowContext {
       (sentences: string[]) => {
         if (!this.isAnswerFlow()) return;
         const fullText = sentences.join(" ");
-        this.answerDisplayText = fullText;
         let emoji = DEFAULT_EMOJI;
         if (this.currentFlowName === "external_answer") {
           emoji = this.currentExternalEmoji || extractEmojis(fullText) || emoji;
@@ -90,7 +89,6 @@ class ChatFlow implements ChatFlowContext {
         display({
           status: "answering",
           emoji,
-          text: this.composeAnswerDisplayText(fullText),
           terminal_text: "",
           RGB: "#0000ff",
           scroll_speed: 3,
@@ -98,13 +96,9 @@ class ChatFlow implements ChatFlowContext {
       },
       (text: string) => {
         if (!this.isAnswerFlow()) return;
-        this.answerDisplayText = text || "";
-        display({
-          status: "answering",
-          text: this.composeAnswerDisplayText(text) || undefined,
-          terminal_text: "",
-          scroll_speed: 3,
-        });
+        if (!this.answerDisplayText) {
+          this.updateAnswerDisplayText(text || "");
+        }
       },
       ({ charEnd, durationMs }) => {
         if (!this.isAnswerFlow()) return;
@@ -400,6 +394,7 @@ class ChatFlow implements ChatFlowContext {
     }
     for (const part of parts) {
       this.streamResponser.partial(part);
+      this.updateAnswerDisplayText(`${this.answerDisplayText}${part}`);
       await new Promise((resolve) => setTimeout(resolve, 120));
     }
     this.streamResponser.endPartial();

@@ -129,7 +129,15 @@ if [ -n "$card_name" ]; then
   export SOUND_CARD_NAME="$card_name"
   export SOUND_CARD_INDEX="$card_index"
   export ALSA_INPUT_DEVICE="${ALSA_INPUT_DEVICE:-hw:${card_name},0}"
-  export ALSA_OUTPUT_DEVICE="${ALSA_OUTPUT_DEVICE:-hw:${card_name},0}"
+  if [ -z "$ALSA_OUTPUT_DEVICE" ]; then
+    if [ "$card_name" = "whisplaysound" ]; then
+      export ALSA_OUTPUT_DEVICE="playback"
+    else
+      export ALSA_OUTPUT_DEVICE="plughw:${card_name},0"
+    fi
+  fi
+  echo "ALSA input device: $ALSA_INPUT_DEVICE"
+  echo "ALSA output device: $ALSA_OUTPUT_DEVICE"
 fi
 
 if [ "$serve_ollama" = true ]; then

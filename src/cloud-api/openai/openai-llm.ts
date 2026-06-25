@@ -9,7 +9,7 @@ import {
   updateLastMessageTime,
 } from "../../config/llm-config";
 import { FunctionCall, Message, ToolReturnTag } from "../../type";
-import { combineFunction } from "../../utils";
+import { combineFunction, formatToolResultsForLog } from "../../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../../config/llm-tools";
 import {
@@ -263,7 +263,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       }),
     );
 
-    console.log("call results: ", results);
+    console.log("call results: ", formatToolResultsForLog(results, functionCalls));
     const newMessages: Message[] = results.map(([id, result]: any) => ({
       role: "tool",
       content: result as string,

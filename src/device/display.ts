@@ -441,9 +441,7 @@ export class WhisplayDisplay {
     }
     const data = JSON.stringify(changedValuesObj);
     if (isTextChanged) {
-      const preview =
-        data.length > 240 ? `${data.slice(0, 120)}...${data.slice(-80)}` : data;
-      console.log("send data:", preview);
+      console.log("send data:", formatDisplayPayloadForLog(changedValuesObj));
     }
 
     if (normalizedStatus.camera_capture) {
@@ -602,4 +600,28 @@ function parseBoolEnv(key: string, defaultValue: boolean): boolean {
     return defaultValue;
   }
   return raw.toLowerCase() === "true" || raw === "1";
+}
+
+function formatDisplayPayloadForLog(payload: Record<string, any>): string {
+  const logPayload = { ...payload };
+
+  if (typeof logPayload.text_delta === "string") {
+    logPayload.deltaText = summarizeLogText(logPayload.text_delta);
+    delete logPayload.text_delta;
+  }
+
+  if (typeof logPayload.text === "string") {
+    logPayload.textPreview = summarizeLogText(logPayload.text);
+    logPayload.textLength = logPayload.text.length;
+    delete logPayload.text;
+  }
+
+  return JSON.stringify(logPayload);
+}
+
+function summarizeLogText(text: string, maxChars = 80): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `${text.slice(0, maxChars)}... (${text.length} chars)`;
 }

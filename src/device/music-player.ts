@@ -362,7 +362,11 @@ class LocalMusicPlayer {
 
   private buildPlaybackCommand(filePath: string): { command: string; args: string[] } {
     const ext = path.extname(filePath).toLowerCase();
-    const alsaDevice = this.alsaOutputDevice || `hw:${this.soundCardIndex},0`;
+    const alsaDevice = this.alsaOutputDevice || (
+      this.soundCardIndex === "whisplaysound"
+        ? "playback"
+        : `plughw:${this.soundCardIndex},0`
+    );
     if (ext === ".mp3") {
       return {
         command: "mpg123",

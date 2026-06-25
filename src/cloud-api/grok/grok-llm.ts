@@ -8,7 +8,7 @@ import {
   systemPrompt,
   updateLastMessageTime,
 } from "../../config/llm-config";
-import { combineFunction } from "../../utils";
+import { combineFunction, formatToolResultsForLog } from "../../utils";
 import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message, ToolReturnTag } from "../../type";
@@ -177,7 +177,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           }),
         );
 
-        console.log("call results: ", results);
+        console.log("call results: ", formatToolResultsForLog(results, functionCalls));
         const newMessages: Message[] = results.map(([id, result]: any) => ({
           role: "tool",
           content: result as string,

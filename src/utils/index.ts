@@ -37,6 +37,67 @@ export const combineFunction = (packages: FunctionCall[][]): FunctionCall[] => {
   }, []);
 };
 
+const verboseToolNames = new Set([
+  "web_search",
+  "search_web",
+  "fetch_webpage",
+  "webSearch",
+  "searchWeb",
+  "fetchWebpage",
+]);
+
+export const formatToolResultsForLog = (
+  results: any[],
+  functionCalls: FunctionCall[] = [],
+): any[] => {
+  const toolNameById = new Map(
+    functionCalls
+      .filter((call) => call.id && call.function?.name)
+      .map((call) => [call.id as string, call.function.name as string]),
+  );
+
+  return results.map((result) => {
+    if (!Array.isArray(result)) {
+      return result;
+    }
+
+    const [first, second, third] = result;
+    if (typeof second === "string" && verboseToolNames.has(second)) {
+      return [first, second, summarizeVerboseToolResult(second, third)];
+    }
+    if (typeof first === "string" && verboseToolNames.has(first)) {
+      return [first, summarizeVerboseToolResult(first, second)];
+    }
+
+    const toolName = typeof first === "string" ? toolNameById.get(first) : undefined;
+    if (toolName && verboseToolNames.has(toolName)) {
+      return [first, summarizeVerboseToolResult(toolName, second)];
+    }
+
+    return result;
+  });
+};
+
+function summarizeVerboseToolResult(toolName: string, result: any): any {
+  if (typeof result !== "string") {
+    return result;
+  }
+
+  return {
+    tool: toolName,
+    resultLength: result.length,
+    resultPreview: summarizeLogText(result),
+  };
+}
+
+function summarizeLogText(text: string, maxChars = 300): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxChars) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, maxChars)}...`;
+}
+
 // combineFunction([[{"function":{"arguments":"","name":"setVolume"},"id":"call_wdpwgmiszun2ej6radzriaq0","index":0,"type":"function"}],[{"function":{"arguments":" {\""},"index":0}],[{"function":{"arguments":"volume"},"index":0}],[{"function":{"arguments":"\":"},"index":0}],[{"function":{"arguments":" "},"index":0}],[{"function":{"arguments":"2"},"index":0}],[{"function":{"arguments":"1"},"index":0}],[{"function":{"arguments":"}"},"index":0}]])
 
 const _isEmoji = (s: string): boolean =>

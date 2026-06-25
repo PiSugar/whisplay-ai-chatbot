@@ -1,7 +1,24 @@
 import { execSync } from "child_process";
+import { readFileSync } from "fs";
 
 const soundCardName = process.env.SOUND_CARD_NAME || "";
-const soundCardIndex = process.env.SOUND_CARD_INDEX || "1";
+const detectWhisplaySoundCardRef = (): string => {
+  try {
+    const cards = readFileSync("/proc/asound/cards", "utf8");
+    const line = cards
+      .split("\n")
+      .find((item) => /whisplaysound|wm8960soundcard|es8389soundcard/i.test(item));
+    const nameMatch = line?.match(/\[([^\]]+)\]/);
+    if (nameMatch?.[1]) {
+      return nameMatch[1].trim();
+    }
+    const indexMatch = line?.match(/^\s*(\d+)\s+\[/);
+    return indexMatch?.[1] || "1";
+  } catch {
+    return "1";
+  }
+};
+const soundCardIndex = process.env.SOUND_CARD_INDEX || detectWhisplaySoundCardRef();
 const soundCardRef = soundCardName || soundCardIndex;
 const isUnifiedWhisplay = soundCardName === "whisplaysound" || soundCardRef === "whisplaysound";
 const speakerControl = isUnifiedWhisplay ? "speaker" : "Speaker";

@@ -23,6 +23,7 @@ type SkillInfo = {
 };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_COMMAND_CHARS = 3_000;
 const DEFAULT_SPILL_CHARS = 4_000;
 const DEFAULT_RETURN_CHARS = 1_200;
 const DEFAULT_TEMP_DIR = "/tmp/whisplay-hardness";
@@ -127,8 +128,14 @@ const getCommandHead = (segment: string): string => {
 const validateCommand = (command: string): string | null => {
   if (parseBoolEnv("HARDNESS_COMMAND_ALLOW_DANGEROUS")) return null;
   const trimmed = command.trim();
+  const maxCommandChars = parseIntEnv(
+    "HARDNESS_COMMAND_MAX_CHARS",
+    DEFAULT_MAX_COMMAND_CHARS,
+  );
   if (!trimmed) return "Command is empty.";
-  if (trimmed.length > 1000) return "Command is too long.";
+  if (trimmed.length > maxCommandChars) {
+    return `Command is too long. Maximum length is ${maxCommandChars} characters.`;
+  }
   for (const pattern of DANGEROUS_PATTERNS) {
     if (pattern.test(trimmed)) {
       return `Command rejected by safety policy: ${pattern.source}`;
@@ -384,7 +391,7 @@ const runCommandTool: LLMTool = {
         command: {
           type: "string",
           description:
-            "A short shell command such as pwd, ls -la /home/pi, date, hostname -I, ip neigh show, curl -s URL, mkdir -p /home/pi/example, or printf text > /home/pi/example/file.txt.",
+            "One allowlisted shell command, up to 3000 characters, such as pwd, ls -la /home/pi, date, hostname -I, ip neigh show, curl -s URL, mkdir -p /home/pi/example, or printf text > /home/pi/example/file.txt.",
         },
       },
       required: ["command"],
