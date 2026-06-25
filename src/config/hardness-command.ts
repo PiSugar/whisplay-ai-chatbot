@@ -16,10 +16,18 @@ type CommandResult = {
   truncated: boolean;
 };
 
+type SkillInfo = {
+  name: string;
+  description: string;
+  filePath: string;
+};
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_SPILL_CHARS = 4_000;
 const DEFAULT_RETURN_CHARS = 1_200;
 const DEFAULT_TEMP_DIR = "/tmp/whisplay-hardness";
+const DEFAULT_SKILL_RETURN_CHARS = 8_000;
+const MAX_SKILL_SCAN_DEPTH = 3;
 const DISPLAY_UPDATE_MS = 400;
 const DISPLAY_TAIL_CHARS = 900;
 
@@ -107,6 +115,11 @@ const parseIntEnv = (key: string, defaultValue: number): number => {
 const tailText = (text: string, maxChars: number): string => {
   if (text.length <= maxChars) return text;
   return text.slice(text.length - maxChars);
+};
+
+const truncateText = (text: string, maxChars: number): string => {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n\n[truncated: ${text.length - maxChars} chars omitted]`;
 };
 
 const getCommandHead = (segment: string): string => {
@@ -294,6 +307,104 @@ const formatResult = (result: CommandResult): string => {
   ].join("\n");
 };
 
+const parseSkillRoots = (): string[] => {
+  const configured = process.env.HARDNESS_SKILL_DIRS;
+  const roots = configured
+    ? configured
+        .split(/[,:]/)
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [path.join(process.cwd(), "skills")];
+
+  const seen = new Set<string>();
+  return roots
+    .map((root) =>
+      root.startsWith("~/") ? path.join(os.homedir(), root.slice(2)) : root,
+    )
+    .map((root) => path.resolve(root))
+    .filter((root) => {
+      if (seen.has(root)) return false;
+      seen.add(root);
+      return true;
+    });
+};
+
+const findSkillFiles = (root: string, depth = 0): string[] => {
+  if (depth > MAX_SKILL_SCAN_DEPTH) return [];
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const directSkill = path.join(root, "SKILL.md");
+  if (fs.existsSync(directSkill)) return [directSkill];
+
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => findSkillFiles(path.join(root, entry.name), depth + 1));
+};
+
+const getFrontmatterValue = (frontmatter: string, key: string): string => {
+  const match = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
+  return match ? match[1].trim().replace(/^['"]|['"]$/g, "") : "";
+};
+
+const summarizeMarkdown = (content: string): string => {
+  const withoutFrontmatter = content.replace(/^---\n[\s\S]*?\n---\n?/, "").trim();
+  const lines = withoutFrontmatter
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !line.startsWith("```"));
+  return lines[0]?.replace(/^[-*]\s+/, "").slice(0, 280) || "";
+};
+
+const readSkillInfo = (filePath: string): SkillInfo | null => {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+
+  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  const frontmatter = frontmatterMatch?.[1] || "";
+  const name =
+    getFrontmatterValue(frontmatter, "name") || path.basename(path.dirname(filePath));
+  const description =
+    getFrontmatterValue(frontmatter, "description") || summarizeMarkdown(content);
+
+  if (!/^[A-Za-z0-9_.-]+$/.test(name)) return null;
+  return { name, description, filePath };
+};
+
+const getSkillRegistry = (): SkillInfo[] => {
+  const byName = new Map<string, SkillInfo>();
+  for (const root of parseSkillRoots()) {
+    for (const filePath of findSkillFiles(root)) {
+      const info = readSkillInfo(filePath);
+      if (info && !byName.has(info.name)) {
+        byName.set(info.name, info);
+      }
+    }
+  }
+
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const formatSkillList = (skills: SkillInfo[]): string => {
+  if (skills.length === 0) {
+    return `${ToolReturnTag.Success} No skills found. Add skills under ./skills or configure HARDNESS_SKILL_DIRS.`;
+  }
+
+  const rows = skills.map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+  }));
+  return `${ToolReturnTag.Success} ${JSON.stringify(rows, null, 2)}`;
+};
+
 const runCommandTool: LLMTool = {
   type: "function",
   function: {
@@ -327,6 +438,61 @@ const runCommandTool: LLMTool = {
   },
 };
 
+const listSkillsTool: LLMTool = {
+  type: "function",
+  function: {
+    name: "listSkills",
+    description:
+      "List installed local skills available to guide command-line work on this device. Use this before readSkill when the user asks to use a skill or when a task may match a reusable local workflow.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+  func: async (): Promise<string> => {
+    return formatSkillList(getSkillRegistry());
+  },
+};
+
+const readSkillTool: LLMTool = {
+  type: "function",
+  function: {
+    name: "readSkill",
+    description:
+      "Read the SKILL.md instructions for one installed local skill. Follow the skill's safety and workflow guidance, then use runCommand for any needed shell checks or actions.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Exact skill name from listSkills, such as sync-agentneo-clash-to-synology.",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  func: async (params: any): Promise<string> => {
+    const name = `${params?.name ?? ""}`.trim();
+    if (!/^[A-Za-z0-9_.-]+$/.test(name)) {
+      return `${ToolReturnTag.Error} Invalid skill name. Use listSkills and pass the exact name.`;
+    }
+
+    const skill = getSkillRegistry().find((candidate) => candidate.name === name);
+    if (!skill) {
+      return `${ToolReturnTag.Error} Skill not found: ${name}. Use listSkills to see available skills.`;
+    }
+
+    const maxChars = parseIntEnv("HARDNESS_SKILL_RETURN_CHARS", DEFAULT_SKILL_RETURN_CHARS);
+    const content = fs.readFileSync(skill.filePath, "utf8");
+    return [
+      `${ToolReturnTag.Success} name=${skill.name} path=${skill.filePath}`,
+      truncateText(content, maxChars),
+    ].join("\n\n");
+  },
+};
+
 export const addHardnessCommandTools = (tools: LLMTool[]): void => {
   if (!parseBoolEnv("HARDNESS_COMMAND_TOOL_ENABLED")) {
     console.log("[HardnessCommand] Command tool disabled.");
@@ -334,4 +500,9 @@ export const addHardnessCommandTools = (tools: LLMTool[]): void => {
   }
   tools.push(runCommandTool);
   console.log("[HardnessCommand] Added runCommand tool.");
+
+  if (parseBoolEnv("HARDNESS_SKILL_TOOL_ENABLED", true)) {
+    tools.push(listSkillsTool, readSkillTool);
+    console.log("[HardnessCommand] Added skill tools.");
+  }
 };
