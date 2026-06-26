@@ -30,6 +30,7 @@ let scrollSyncFrom = 0;
 let lastFrameTime = 0;
 let maxScroll = 0;
 let lastText = "";
+let lastSourceText = "";
 let lastTerminalText = "";
 let lastImageRevision = -1;
 let isPressed = false;
@@ -96,6 +97,18 @@ function applyScrollSync(text, sync, viewportHeight) {
 }
 
 const TOOL_TAG_RE = /[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?/gi;
+const TOOL_PLACEHOLDER_RE = /\{tool:([A-Za-z0-9_-]+)\}/g;
+
+function applyToolPlaceholders(text, placeholders) {
+  const source = text || "";
+  if (!placeholders || typeof placeholders !== "object") {
+    return source.replace(TOOL_PLACEHOLDER_RE, "");
+  }
+  return source.replace(TOOL_PLACEHOLDER_RE, (_, key) => {
+    const value = placeholders[key];
+    return typeof value === "string" ? value : "";
+  });
+}
 
 function getSyncTextLength(text) {
   return text
@@ -249,9 +262,11 @@ function renderToolTaggedText(container, text) {
   container.replaceChildren(fragment);
 }
 
-function updateText(text, sync, speed) {
+function updateText(text, sync, speed, toolPlaceholders) {
   const viewportHeight = document.querySelector(".text-viewport").offsetHeight;
-  const nextText = text || "";
+  const sourceText = text || "";
+  const nextText = applyToolPlaceholders(sourceText, toolPlaceholders);
+  const sameSourceText = sourceText === lastSourceText;
   const isRegressive =
     nextText.length > 0 && nextText.length < lastText.length && lastText.startsWith(nextText);
 
@@ -265,7 +280,7 @@ function updateText(text, sync, speed) {
   if (nextText !== lastText) {
     const isContinuation = nextText.startsWith(lastText);
     renderToolTaggedText(textContent, nextText);
-    if (!isContinuation) {
+    if (!sameSourceText && !isContinuation) {
       scrollTop = 0;
       scrollTarget = null;
       scrollSyncStart = null;
@@ -273,6 +288,7 @@ function updateText(text, sync, speed) {
       scrollSyncFrom = 0;
     }
     lastText = nextText;
+    lastSourceText = sourceText;
   }
 
   scrollSpeed = Math.max(0, parseInt(speed || 0, 10));
@@ -336,7 +352,7 @@ function applyState(data) {
   statusText.textContent = status;
   emojiText.textContent = data.emoji || "";
   approvalBar.classList.toggle("visible", Boolean(data.approval_mode));
-  updateText(data.text || "", data.scroll_sync, data.scroll_speed);
+  updateText(data.text || "", data.scroll_sync, data.scroll_speed, data.tool_placeholders);
   updateTerminalText(data.terminal_text || "");
   updateTextInputState(data.text_input_enabled, status);
 

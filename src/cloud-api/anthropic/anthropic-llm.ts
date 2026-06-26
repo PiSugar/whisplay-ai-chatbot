@@ -329,10 +329,16 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         return;
       }
 
-      await chatWithLLMStream(newMessages, partialCallback, () => {
-        endResolve();
-        endCallback();
-      });
+      await chatWithLLMStream(
+        newMessages,
+        partialCallback,
+        () => {
+          endResolve();
+          endCallback();
+        },
+        partialThinkingCallback,
+        invokeFunctionCallback,
+      );
       return;
     } else {
       endResolve();

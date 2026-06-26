@@ -285,10 +285,16 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       tool_call_id: id as string,
     }));
 
-    await chatWithLLMStream(newMessages, partialCallback, () => {
-      endResolve();
-      endCallback();
-    }).catch((error) => {
+    await chatWithLLMStream(
+      newMessages,
+      partialCallback,
+      () => {
+        endResolve();
+        endCallback();
+      },
+      partialThinkingCallback,
+      invokeFunctionCallback,
+    ).catch((error) => {
       console.error(
         "Error during OpenAI follow-up chat completion:",
         error?.message || error,

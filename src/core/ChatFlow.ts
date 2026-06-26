@@ -62,12 +62,15 @@ class ChatFlow implements ChatFlowContext {
   toolDisplayText: string = "";
   answerDisplayText: string = "";
   private toolDisplayItems: {
+    id: string;
     name: string;
     anchorIndex: number;
     startedAt: number;
     elapsedSeconds?: number;
     timer?: ReturnType<typeof setInterval>;
+    backgroundJobId?: string;
   }[] = [];
+  private toolDisplaySeq = 0;
   private answerDisplayTimer?: ReturnType<typeof setTimeout>;
   private lastAnswerDisplayAt = 0;
 
@@ -269,7 +272,7 @@ class ChatFlow implements ChatFlowContext {
         result.length > 0 && !/[\s\n]$/.test(result);
       const needsSeparatorAfter =
         anchorIndex < answerText.length && !/^[\s\n]/.test(answerText.slice(anchorIndex));
-      result += `${needsSeparatorBefore ? " " : ""}${this.formatToolDisplayItem(item)}${needsSeparatorAfter ? " " : ""}`;
+      result += `${needsSeparatorBefore ? " " : ""}{tool:${item.id}}${needsSeparatorAfter ? " " : ""}`;
     });
     result += answerText.slice(cursor);
     return result;
@@ -289,6 +292,14 @@ class ChatFlow implements ChatFlowContext {
       .join("");
   };
 
+  private getToolPlaceholders = (): Record<string, string> =>
+    Object.fromEntries(
+      this.toolDisplayItems.map((item) => [
+        item.id,
+        this.formatToolDisplayItem(item),
+      ]),
+    );
+
   private updateAnswerDisplay = (immediate = false): void => {
     const render = () => {
       this.answerDisplayTimer = undefined;
@@ -297,6 +308,7 @@ class ChatFlow implements ChatFlowContext {
       display({
         status: "answering",
         text: this.composeAnswerDisplayText(),
+        tool_placeholders: this.getToolPlaceholders(),
         terminal_text: "",
         scroll_speed: 3,
       });
@@ -323,6 +335,7 @@ class ChatFlow implements ChatFlowContext {
 
   appendToolCallDisplay = (functionName: string): void => {
     const item = {
+      id: `t${++this.toolDisplaySeq}`,
       name: functionName,
       anchorIndex: this.answerDisplayText.length,
       startedAt: Date.now(),
@@ -336,7 +349,7 @@ class ChatFlow implements ChatFlowContext {
       }
       item.elapsedSeconds = elapsedSeconds;
       this.refreshToolDisplayText();
-      this.updateAnswerDisplay(true);
+      display({ tool_placeholders: this.getToolPlaceholders() });
     }, 1000);
     this.toolDisplayItems.push(item);
     this.refreshToolDisplayText();
@@ -347,6 +360,50 @@ class ChatFlow implements ChatFlowContext {
     const item = [...this.toolDisplayItems]
       .reverse()
       .find((candidate) => candidate.name === functionName && candidate.timer);
+    if (!item) {
+      this.toolDisplayItems.push({
+        id: `t${++this.toolDisplaySeq}`,
+        name: functionName,
+        anchorIndex: this.answerDisplayText.length,
+        startedAt: Date.now(),
+        elapsedSeconds: undefined,
+        timer: undefined,
+      });
+      this.refreshToolDisplayText();
+      this.updateAnswerDisplay(true);
+      return;
+    }
+    if (item.timer) {
+      clearInterval(item.timer);
+      item.timer = undefined;
+    }
+    const elapsedSeconds = Math.floor((Date.now() - item.startedAt) / 1000);
+    item.elapsedSeconds = elapsedSeconds >= 10 ? elapsedSeconds : undefined;
+    this.refreshToolDisplayText();
+    this.updateAnswerDisplay(true);
+  };
+
+  keepCommandToolDisplayRunning = (jobId: string): void => {
+    const item = [...this.toolDisplayItems]
+      .reverse()
+      .find((candidate) => candidate.name === "runCommand" && candidate.timer);
+    if (!item) {
+      return;
+    }
+    item.backgroundJobId = jobId;
+    this.refreshToolDisplayText();
+    this.updateAnswerDisplay(true);
+  };
+
+  finishCommandToolDisplay = (jobId: string): void => {
+    let item = [...this.toolDisplayItems]
+      .reverse()
+      .find((candidate) => candidate.backgroundJobId === jobId && candidate.timer);
+    if (!item) {
+      item = [...this.toolDisplayItems]
+        .reverse()
+        .find((candidate) => candidate.name === "runCommand" && candidate.timer);
+    }
     if (!item) {
       return;
     }
@@ -372,6 +429,7 @@ class ChatFlow implements ChatFlowContext {
     }
     this.toolDisplayItems = [];
     this.toolDisplayText = "";
+    this.toolDisplaySeq = 0;
     this.lastAnswerDisplayAt = 0;
   };
 

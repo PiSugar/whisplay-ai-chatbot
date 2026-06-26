@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -16,19 +16,47 @@ type CommandResult = {
   truncated: boolean;
 };
 
+type CommandJobStatus = "queued" | "running" | "completed";
+
+type CommandJob = {
+  id: string;
+  command: string;
+  status: CommandJobStatus;
+  createdAt: number;
+  startedAt?: number;
+  finishedAt?: number;
+  output: string;
+  child?: ChildProcess;
+  stopRequested?: boolean;
+  nextCheckAt?: number;
+  result?: CommandResult;
+  completion: Promise<CommandResult>;
+  resolve: (result: CommandResult) => void;
+};
+
 type SkillInfo = {
   name: string;
   description: string;
   filePath: string;
 };
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_FOREGROUND_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_COMMAND_CHARS = 3_000;
 const DEFAULT_SPILL_CHARS = 4_000;
 const DEFAULT_RETURN_CHARS = 1_200;
 const DEFAULT_TEMP_DIR = "/tmp/whisplay-hardness";
 const DEFAULT_SKILL_RETURN_CHARS = 8_000;
+const DEFAULT_MAX_CONCURRENT_COMMANDS = 2;
+const DEFAULT_COMMAND_CHECK_AFTER_SECONDS = 15;
 const MAX_SKILL_SCAN_DEPTH = 3;
+const SUPPRESSED_OUTPUT_LINES = new Set([
+  "SSH is enabled and the default password for the 'pi' user has not been changed.",
+  "This is a security risk - please login as the 'pi' user and type 'passwd' to set a new password.",
+]);
+const commandQueue: CommandJob[] = [];
+const commandJobs = new Map<string, CommandJob>();
+let activeCommandCount = 0;
+let commandJobSeq = 0;
 const SAFE_COMMANDS = new Set([
   "pwd",
   "ls",
@@ -120,6 +148,13 @@ const truncateText = (text: string, maxChars: number): string => {
   return `${text.slice(0, maxChars)}\n\n[truncated: ${text.length - maxChars} chars omitted]`;
 };
 
+const sanitizeCommandOutput = (output: string): string =>
+  output
+    .split(/\r?\n/)
+    .filter((line) => !SUPPRESSED_OUTPUT_LINES.has(line.trim()))
+    .join("\n")
+    .replace(/^\n+/, "");
+
 const getCommandHead = (segment: string): string => {
   const match = segment.trim().match(/^([A-Za-z0-9_./-]+)/);
   return match ? path.basename(match[1]) : "";
@@ -207,64 +242,160 @@ const spillOutputIfNeeded = (
   return { outputFile: filePath, truncated: true };
 };
 
-const runShellCommand = async (command: string): Promise<CommandResult> => {
-  const timeoutMs = parseIntEnv("HARDNESS_COMMAND_TIMEOUT_MS", DEFAULT_TIMEOUT_MS);
+const getForegroundTimeoutMs = (): number =>
+  parseIntEnv("HARDNESS_COMMAND_FOREGROUND_TIMEOUT_MS", DEFAULT_FOREGROUND_TIMEOUT_MS);
+
+const getMaxConcurrentCommands = (): number =>
+  parseIntEnv("HARDNESS_COMMAND_MAX_CONCURRENT", DEFAULT_MAX_CONCURRENT_COMMANDS);
+
+const getCheckAfterSeconds = (): number =>
+  parseIntEnv(
+    "HARDNESS_COMMAND_CHECK_AFTER_SECONDS",
+    DEFAULT_COMMAND_CHECK_AFTER_SECONDS,
+  );
+
+const createCommandJob = (command: string): CommandJob => {
+  let resolveJob!: (result: CommandResult) => void;
+  const completion = new Promise<CommandResult>((resolve) => {
+    resolveJob = resolve;
+  });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const job: CommandJob = {
+    id: `cmd-${stamp}-${process.pid}-${++commandJobSeq}`,
+    command,
+    status: "queued",
+    createdAt: Date.now(),
+    output: "",
+    completion,
+    resolve: resolveJob,
+  };
+  commandJobs.set(job.id, job);
+  return job;
+};
+
+const finishCommandJob = (job: CommandJob, result: CommandResult): void => {
+  job.status = "completed";
+  job.finishedAt = Date.now();
+  job.child = undefined;
+  job.result = result;
+  job.output = result.output;
+  job.resolve(result);
+};
+
+const terminateCommandJob = (job: CommandJob, signal: NodeJS.Signals = "SIGTERM"): boolean => {
+  job.stopRequested = true;
+  if (job.status === "queued") {
+    const index = commandQueue.findIndex((candidate) => candidate.id === job.id);
+    if (index >= 0) commandQueue.splice(index, 1);
+    finishCommandJob(job, {
+      exitCode: null,
+      durationMs: Date.now() - job.createdAt,
+      timedOut: false,
+      output: "Command was stopped before it started.",
+      truncated: false,
+    });
+    return true;
+  }
+
+  if (!job.child?.pid || job.status !== "running") return false;
+  try {
+    process.kill(-job.child.pid, signal);
+  } catch {
+    try {
+      process.kill(job.child.pid, signal);
+    } catch {
+      return false;
+    }
+  }
+  return true;
+};
+
+const cleanupCommandPool = (): void => {
+  for (const job of commandJobs.values()) {
+    if (job.status === "running" || job.status === "queued") {
+      terminateCommandJob(job, "SIGTERM");
+    }
+  }
+  commandQueue.length = 0;
+  commandJobs.clear();
+  activeCommandCount = 0;
+};
+
+process.once("exit", cleanupCommandPool);
+
+const startQueuedCommands = (): void => {
+  const maxConcurrent = getMaxConcurrentCommands();
+  while (activeCommandCount < maxConcurrent && commandQueue.length > 0) {
+    const job = commandQueue.shift()!;
+    startCommandJob(job);
+  }
+};
+
+const enqueueCommandJob = (job: CommandJob): void => {
+  commandQueue.push(job);
+  startQueuedCommands();
+};
+
+const startCommandJob = (job: CommandJob): void => {
   const spillChars = parseIntEnv("HARDNESS_COMMAND_SPILL_CHARS", DEFAULT_SPILL_CHARS);
   const tempDir = process.env.HARDNESS_COMMAND_TEMP_DIR || DEFAULT_TEMP_DIR;
   const startedAt = Date.now();
   let output = "";
-  let timedOut = false;
+  let completed = false;
 
-  return await new Promise<CommandResult>((resolve) => {
-    const child = spawn("bash", ["-lc", command], {
-      detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
+  job.status = "running";
+  job.startedAt = startedAt;
+  activeCommandCount += 1;
+
+  const child = spawn("bash", ["-lc", job.command], {
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  job.child = child;
+
+  const append = (chunk: Buffer): void => {
+    output += chunk.toString("utf8");
+    job.output = output;
+  };
+
+  child.stdout.on("data", append);
+  child.stderr.on("data", append);
+
+  const complete = (exitCode: number | null, extraOutput = ""): void => {
+    if (completed) return;
+    completed = true;
+    if (extraOutput) output += extraOutput;
+    output = sanitizeCommandOutput(output);
+    job.output = output;
+    activeCommandCount = Math.max(0, activeCommandCount - 1);
+    const durationMs = Date.now() - startedAt;
+    const spill = spillOutputIfNeeded(job.command, output, spillChars, tempDir);
+    finishCommandJob(job, {
+      exitCode,
+      durationMs,
+      timedOut: false,
+      output,
+      ...spill,
     });
+    startQueuedCommands();
+  };
 
-    const append = (chunk: Buffer): void => {
-      output += chunk.toString("utf8");
-    };
+  child.on("error", (error) => {
+    complete(null, `\n${error.message}`);
+  });
 
-    child.stdout.on("data", append);
-    child.stderr.on("data", append);
+  child.on("close", (code) => {
+    complete(code);
+  });
+};
 
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      try {
-        process.kill(-child.pid!, "SIGTERM");
-      } catch {}
-      setTimeout(() => {
-        try {
-          process.kill(-child.pid!, "SIGKILL");
-        } catch {}
-      }, 1000);
-    }, timeoutMs);
-
-    child.on("error", (error) => {
+const waitForCommandForeground = async (job: CommandJob): Promise<CommandResult | null> => {
+  const foregroundTimeoutMs = getForegroundTimeoutMs();
+  return await new Promise<CommandResult | null>((resolve) => {
+    const timeout = setTimeout(() => resolve(null), foregroundTimeoutMs);
+    job.completion.then((result) => {
       clearTimeout(timeout);
-      output += `\n${error.message}`;
-      const durationMs = Date.now() - startedAt;
-      const spill = spillOutputIfNeeded(command, output, spillChars, tempDir);
-      resolve({
-        exitCode: null,
-        durationMs,
-        timedOut,
-        output,
-        ...spill,
-      });
-    });
-
-    child.on("close", (code) => {
-      clearTimeout(timeout);
-      const durationMs = Date.now() - startedAt;
-      const spill = spillOutputIfNeeded(command, output, spillChars, tempDir);
-      resolve({
-        exitCode: code,
-        durationMs,
-        timedOut,
-        output,
-        ...spill,
-      });
+      resolve(result);
     });
   });
 };
@@ -273,12 +404,61 @@ const formatResult = (result: CommandResult): string => {
   const returnChars = parseIntEnv("HARDNESS_COMMAND_RETURN_CHARS", DEFAULT_RETURN_CHARS);
   const tag =
     result.exitCode === 0 && !result.timedOut ? ToolReturnTag.Success : ToolReturnTag.Error;
-  const tail = tailText(result.output.trim(), returnChars);
+  const tail = tailText(sanitizeCommandOutput(result.output).trim(), returnChars);
   return [
     `${tag} exit_code=${result.exitCode ?? "null"} duration_ms=${result.durationMs} timed_out=${result.timedOut} truncated=${result.truncated}${result.outputFile ? ` output_file=${result.outputFile}` : ""}`,
     "tail:",
     tail || "(no output)",
   ].join("\n");
+};
+
+const formatJobResult = (job: CommandJob): string => {
+  if (!job.result) return formatBackgroundStatus(job);
+  return [
+    `${ToolReturnTag.Success} status=completed job_id=${job.id}`,
+    formatResult(job.result),
+  ].join("\n");
+};
+
+const formatBackgroundStatus = (job: CommandJob): string => {
+  if (job.result) return formatJobResult(job);
+
+  const returnChars = parseIntEnv("HARDNESS_COMMAND_RETURN_CHARS", DEFAULT_RETURN_CHARS);
+  const now = Date.now();
+  const elapsedMs = job.startedAt ? now - job.startedAt : 0;
+  const queuedMs = job.startedAt ? job.startedAt - job.createdAt : now - job.createdAt;
+  const checkAfterSeconds = getCheckAfterSeconds();
+  job.nextCheckAt = now + checkAfterSeconds * 1000;
+  const tail = tailText(sanitizeCommandOutput(job.output).trim(), returnChars);
+  return [
+    `${ToolReturnTag.Success} status=${job.status} job_id=${job.id} elapsed_ms=${elapsedMs} queued_ms=${queuedMs} stop_requested=${job.stopRequested === true} check_after_seconds=${checkAfterSeconds}`,
+    "message:",
+    `Command is ${job.status === "queued" ? "waiting in the command pool" : "still running in the background"}. Continue reasoning and call checkCommand with this job_id after the suggested delay.`,
+    "tail:",
+    tail || "(no output yet)",
+  ].join("\n");
+};
+
+const waitForCheckWindow = async (job: CommandJob): Promise<void> => {
+  if (job.result || !job.nextCheckAt) return;
+
+  const waitMs = job.nextCheckAt - Date.now();
+  if (waitMs <= 0) return;
+
+  await new Promise<void>((resolve) => {
+    const timeout = setTimeout(resolve, waitMs);
+    job.completion.then(() => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
+};
+
+const runShellCommand = async (command: string): Promise<string> => {
+  const job = createCommandJob(command);
+  enqueueCommandJob(job);
+  const result = await waitForCommandForeground(job);
+  return result ? formatResult(result) : formatBackgroundStatus(job);
 };
 
 const parseSkillRoots = (): string[] => {
@@ -404,8 +584,84 @@ const runCommandTool: LLMTool = {
       return `${ToolReturnTag.Error} exit_code=null duration_ms=0 timed_out=false truncated=false\nreason:\n${validationError}`;
     }
 
-    const result = await runShellCommand(command);
-    return formatResult(result);
+    return await runShellCommand(command);
+  },
+};
+
+const checkCommandTool: LLMTool = {
+  type: "function",
+  function: {
+    name: "checkCommand",
+    description:
+      "Check the progress or final result of a background command returned by runCommand. If called before the job's check_after_seconds has elapsed, this tool waits until the check window instead of returning early. This status check never enters the command execution pool.",
+    parameters: {
+      type: "object",
+      properties: {
+        job_id: {
+          type: "string",
+          description:
+            "The job_id returned by runCommand, such as cmd-2026-01-01T00-00-00-000Z-1234-1.",
+        },
+      },
+      required: ["job_id"],
+    },
+  },
+  func: async (params: any): Promise<string> => {
+    const jobId = `${params?.job_id ?? params?.jobId ?? ""}`.trim();
+    const job = commandJobs.get(jobId);
+    if (!job) {
+      return `${ToolReturnTag.Error} Command job not found: ${jobId || "(empty)"}`;
+    }
+
+    await waitForCheckWindow(job);
+
+    return formatBackgroundStatus(job);
+  },
+};
+
+const stopCommandTool: LLMTool = {
+  type: "function",
+  function: {
+    name: "stopCommand",
+    description:
+      "Stop a queued or running background command when you decide it is no longer needed, stuck, or unsafe to keep running. Prefer SIGTERM first; use SIGKILL only if SIGTERM does not stop it.",
+    parameters: {
+      type: "object",
+      properties: {
+        job_id: {
+          type: "string",
+          description: "The job_id returned by runCommand.",
+        },
+        signal: {
+          type: "string",
+          description: "Signal to send to the process group. Use SIGTERM by default; SIGKILL is the force option.",
+          enum: ["SIGTERM", "SIGKILL"],
+        },
+      },
+      required: ["job_id"],
+    },
+  },
+  func: async (params: any): Promise<string> => {
+    const jobId = `${params?.job_id ?? params?.jobId ?? ""}`.trim();
+    const requestedSignal = `${params?.signal ?? "SIGTERM"}`.trim();
+    const signal: NodeJS.Signals = requestedSignal === "SIGKILL" ? "SIGKILL" : "SIGTERM";
+    const job = commandJobs.get(jobId);
+    if (!job) {
+      return `${ToolReturnTag.Error} Command job not found: ${jobId || "(empty)"}`;
+    }
+    if (job.status === "completed") {
+      return `${ToolReturnTag.Success} status=completed job_id=${job.id}\nmessage:\nCommand already completed.`;
+    }
+
+    const stopped = terminateCommandJob(job, signal);
+    return [
+      stopped ? ToolReturnTag.Success : ToolReturnTag.Error,
+      `status=${job.status} job_id=${job.id} signal=${signal} stop_requested=${job.stopRequested === true}`,
+      "message:",
+      stopped
+        ? "Stop signal sent. Call checkCommand to confirm the final process result."
+        : "Unable to signal this command process.",
+    ].join("\n");
   },
 };
 
@@ -469,8 +725,8 @@ export const addHardnessCommandTools = (tools: LLMTool[]): void => {
     console.log("[HardnessCommand] Command tool disabled.");
     return;
   }
-  tools.push(runCommandTool);
-  console.log("[HardnessCommand] Added runCommand tool.");
+  tools.push(runCommandTool, checkCommandTool, stopCommandTool);
+  console.log("[HardnessCommand] Added runCommand, checkCommand and stopCommand tools.");
 
   if (parseBoolEnv("HARDNESS_SKILL_TOOL_ENABLED", true)) {
     tools.push(listSkillsTool, readSkillTool);

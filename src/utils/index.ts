@@ -138,7 +138,7 @@ export function splitSentences(text: string): {
   sentences: string[];
   remaining: string;
 } {
-  const regex = /.*?([。！？!?，,]|\.)(?=\s|$)/gs;
+  const regex = /.*?([。！？!?，,]|(?<!\d)\.)(?=\s|$)/gs;
 
   const sentences: string[] = [];
   let lastIndex = 0;

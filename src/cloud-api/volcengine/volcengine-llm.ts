@@ -197,10 +197,16 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           tool_call_id: id as string,
         }));
 
-        await chatWithLLMStream(newMessages, partialCallback, () => {
-          endResolve();
-          endCallback();
-        });
+        await chatWithLLMStream(
+          newMessages,
+          partialCallback,
+          () => {
+            endResolve();
+            endCallback();
+          },
+          partialThinkingCallback,
+          invokeFunctionCallback,
+        );
         return;
       } else {
         endResolve();

@@ -39,12 +39,20 @@ TOOL_TAG_BG = (8, 42, 112, 255)
 TOOL_TAG_FG = (255, 255, 255, 255)
 TOOL_TAG_COUNT_FG = (122, 205, 255, 255)
 TOOL_TAG_MARGIN_Y = 2
+TOOL_PLACEHOLDER_RE = re.compile(r"\{tool:([A-Za-z0-9_-]+)\}")
+
+def apply_tool_placeholders(text):
+    def replace(match):
+        value = current_tool_placeholders.get(match.group(1), "")
+        return value or ""
+    return TOOL_PLACEHOLDER_RE.sub(replace, text or "")
 
 # Global variables
 current_status = "Hello"
 current_emoji = "😄"
 current_text = "Waiting for message..."
 current_terminal_text = ""
+current_tool_placeholders = {}
 current_battery_level = 100
 current_battery_color = ColorUtils.get_rgb255_from_any("#55FF00")
 current_scroll_top = 0
@@ -203,7 +211,7 @@ class RenderThread(threading.Thread):
             if current_terminal_text:
                 animation_active = self.render_terminal_text(text_bg_image, text_area_height, text_draw, current_terminal_text)
             else:
-                animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
+                animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, apply_tool_placeholders(text), current_scroll_speed)
             self.whisplay.draw_image(0, header_height + progress_bar_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
             if current_approval_mode:
                 approval_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, approval_bar_height), (0, 0, 0, 255))
@@ -672,10 +680,11 @@ def update_display_data(status=None, emoji=None, text=None,
                   text_delta=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
                   network_connected=None, vpn_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None,
-                  wifi_signal_level=None,
+                  wifi_signal_level=None, tool_placeholders=None,
                   music_progress=None, music_duration_ms=None, approval_mode=None, terminal_text=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_terminal_text
+    global current_tool_placeholders
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
     global current_scroll_sync_target_top, current_scroll_sync_speed
@@ -761,6 +770,14 @@ def update_display_data(status=None, emoji=None, text=None,
     current_status = status if status is not None else current_status
     current_emoji = emoji if emoji is not None else current_emoji
     current_text = next_text if (text is not None or text_delta is not None) else current_text
+    if tool_placeholders is not None:
+        if isinstance(tool_placeholders, dict):
+            current_tool_placeholders = {
+                str(key): str(value)
+                for key, value in tool_placeholders.items()
+            }
+        else:
+            current_tool_placeholders = {}
     if terminal_text is not None:
         next_terminal_text = terminal_text or ""
         if next_terminal_text != current_terminal_text:
@@ -867,6 +884,7 @@ def handle_client(client_socket, addr, whisplay):
                     emoji = content.get("emoji", None)
                     text = content.get("text", None)
                     text_delta = content.get("text_delta", None)
+                    tool_placeholders = content.get("tool_placeholders", None)
                     terminal_text = content.get("terminal_text", None)
                     rgbled = content.get("RGB", None)
                     brightness = content.get("brightness", None)
@@ -932,6 +950,7 @@ def handle_client(client_socket, addr, whisplay):
                             (wifi_signal_level is not None) or \
                             (vpn_connected is not None) or \
                             (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None) or \
+                            (tool_placeholders is not None) or \
                             (music_progress is not None) or (music_duration_ms is not None) or (approval_mode is not None) or \
                             (terminal_text is not None):
                         update_display_data(status=status, emoji=emoji,
@@ -939,6 +958,7 @@ def handle_client(client_socket, addr, whisplay):
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
                                                  wifi_signal_level=wifi_signal_level,
+                                     tool_placeholders=tool_placeholders,
                                      vpn_connected=vpn_connected,
                                                  rag_icon_visible=rag_icon_visible,
                                          image_icon_visible=image_icon_visible,

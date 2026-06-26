@@ -338,13 +338,18 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       stop: stopPlaying,
     } = ctx.streamResponser;
     let llmResponseText = "";
+    const isCurrentAnswer = (): boolean =>
+      currentAnswerId === ctx.answerId && ctx.currentFlowName === "answer";
     const trackingPartial = (text: string): void => {
+      if (!isCurrentAnswer()) return;
       llmResponseText += text;
-      if (currentAnswerId === ctx.answerId) {
-        partial(text);
-        ctx.updateAnswerDisplayText(llmResponseText);
-      }
+      partial(text);
+      ctx.updateAnswerDisplayText(llmResponseText);
     };
+    let resolveLlmDone: () => void = () => {};
+    const llmDonePromise = new Promise<void>((resolve) => {
+      resolveLlmDone = resolve;
+    });
     ctx.partialThinking = "";
     ctx.thinkingSentences = [];
     Promise.all([
@@ -392,12 +397,18 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         ]);
         chatWithLLMStream(
           prompt,
-          (text) => { if (currentAnswerId === ctx.answerId) trackingPartial(text); },
-          () => currentAnswerId === ctx.answerId && endPartial(),
+          trackingPartial,
+          () => {
+            if (isCurrentAnswer()) {
+              endPartial();
+            }
+            resolveLlmDone();
+          },
           (partialThinking) =>
-            currentAnswerId === ctx.answerId &&
+            isCurrentAnswer() &&
             ctx.partialThinkingCallback(partialThinking),
           (functionName: string, result?: string) => {
+            if (!isCurrentAnswer()) return;
             if (
               functionName === "endConversation" &&
               result?.startsWith("[success]")
@@ -422,24 +433,44 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
             }
             if (!result) {
               ctx.appendToolCallDisplay(functionName);
+            } else if (
+              functionName === "runCommand" &&
+              result.startsWith("[success] status=running")
+            ) {
+              const jobId = result.match(/\bjob_id=([^\s]+)/)?.[1];
+              if (jobId) {
+                ctx.keepCommandToolDisplayRunning(jobId);
+              } else {
+                ctx.finishToolCallDisplay(functionName);
+              }
+            } else if (
+              result.includes("status=completed")
+            ) {
+              const jobId = result.match(/\bjob_id=([^\s]+)/)?.[1];
+              if (jobId) {
+                ctx.finishCommandToolDisplay(jobId);
+              }
+              ctx.finishToolCallDisplay(functionName);
             } else {
               ctx.finishToolCallDisplay(functionName);
             }
           },
         ).catch((error) => {
           console.error("[answer] LLM stream failed:", error);
-          if (currentAnswerId !== ctx.answerId) return;
-          endPartial();
-          ctx.transitionTo("sleep");
+          if (isCurrentAnswer()) {
+            endPartial();
+          }
+          resolveLlmDone();
         });
       })
       .catch((error) => {
         console.error("[answer] Failed to prepare prompt:", error);
         if (currentAnswerId === ctx.answerId) {
+          resolveLlmDone();
           ctx.transitionTo("sleep");
         }
       });
-    getPlayEndPromise().then(() => {
+    llmDonePromise.then(() => getPlayEndPromise()).then(() => {
       if (ctx.currentFlowName === "answer") {
         autoSaveExchange(ctx.asrText, llmResponseText, summaryTextWithLLM);
         clearPendingCapturedImgForChat();

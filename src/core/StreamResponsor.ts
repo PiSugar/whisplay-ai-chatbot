@@ -104,6 +104,13 @@ export class StreamResponser {
     );
   };
 
+  private isPlaybackIdle = (): boolean =>
+    !this.isPlaying &&
+    this.speakQueue.length === 0 &&
+    !this.partialContent &&
+    this.activeTTSCount === 0 &&
+    this.pendingTTSQueue.length === 0;
+
   private playAudioInOrder = async (): Promise<void> => {
     // Prevent multiple concurrent calls
     if (this.isPlaying) {
@@ -262,6 +269,10 @@ export class StreamResponser {
 
   getPlayEndPromise = (): Promise<void> => {
     return new Promise((resolve) => {
+      if (this.isPlaybackIdle()) {
+        resolve();
+        return;
+      }
       this.playEndResolve = resolve;
     });
   };
