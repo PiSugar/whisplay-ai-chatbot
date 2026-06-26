@@ -21,6 +21,7 @@ import {
   extractToolResponse,
   stimulateStreamResponse,
 } from "../../config/common";
+import { compactMessagesForContextWindow } from "../context-window";
 dotenv.config();
 
 // Alibaba Cloud Qwen (通义千问) LLM via DashScope OpenAI-compatible API
@@ -65,6 +66,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "qwen",
+    model: qwenLLMModel,
+    messages,
+    tools: llmTools,
+    invokeFunctionCallback,
+  });
 
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {

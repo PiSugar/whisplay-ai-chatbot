@@ -21,6 +21,7 @@ import {
   stimulateStreamResponse,
 } from "../../config/common";
 import { proxyFetch } from "../proxy-fetch";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -159,6 +160,14 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "anthropic",
+    model: anthropicModel,
+    messages,
+    tools: anthropicEnableTools ? llmTools : undefined,
+    outputReserveTokens: anthropicMaxTokens,
+    invokeFunctionCallback,
+  });
 
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {

@@ -21,6 +21,7 @@ import {
   extractToolResponse,
   stimulateStreamResponse,
 } from "../../config/common";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -63,6 +64,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "grok",
+    model: grokLLMModel,
+    messages,
+    tools: llmTools,
+    invokeFunctionCallback,
+  });
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;

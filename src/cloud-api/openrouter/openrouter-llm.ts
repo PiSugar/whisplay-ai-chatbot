@@ -27,6 +27,7 @@ import {
   extractToolResponse,
   stimulateStreamResponse,
 } from "../../config/common";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -53,6 +54,27 @@ const openrouterOptions: ClientOptions = {
 const openrouter = openrouterApiKey
   ? new OpenAI(openrouterOptions)
   : null;
+
+let openrouterModelContextCache: Record<string, number> | null = null;
+
+const resolveOpenRouterContextWindow = async (): Promise<number | undefined> => {
+  if (!openrouterModelContextCache) {
+    const response = await proxyFetch("https://openrouter.ai/api/v1/models", {
+      headers: openrouterApiKey
+        ? { Authorization: `Bearer ${openrouterApiKey}` }
+        : undefined,
+    } as any);
+    const payload = await response.json();
+    openrouterModelContextCache = {};
+    for (const modelInfo of payload?.data || []) {
+      const contextLength = Number(modelInfo?.context_length);
+      if (modelInfo?.id && Number.isFinite(contextLength) && contextLength > 0) {
+        openrouterModelContextCache[modelInfo.id] = contextLength;
+      }
+    }
+  }
+  return openrouterModelContextCache[openrouterModel];
+};
 
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
@@ -116,6 +138,14 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     messages.length = 0;
     messages.push(firstSystemMessage, ...trimmed);
   }
+  await compactMessagesForContextWindow({
+    provider: "openrouter",
+    model: openrouterModel,
+    messages,
+    tools: openrouterEnableTools ? llmTools : undefined,
+    contextWindowResolver: resolveOpenRouterContextWindow,
+    invokeFunctionCallback,
+  });
 
   const lastUserMessage = [...inputMessages]
     .reverse()

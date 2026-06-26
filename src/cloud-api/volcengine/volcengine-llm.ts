@@ -17,6 +17,7 @@ import {
   SummaryTextWithLLMFunction,
 } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -61,6 +62,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "volcengine",
+    model: doubaoLLMModel,
+    messages,
+    tools: llmTools,
+    invokeFunctionCallback,
+  });
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;

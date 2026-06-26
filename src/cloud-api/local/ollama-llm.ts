@@ -27,6 +27,7 @@ import {
   consumePendingCapturedImgForChat,
   hasPendingCapturedImgForChat,
 } from "../../utils/image";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -44,6 +45,36 @@ const useCapturedImageInChat =
   "true";
 
 const llmServer = process.env.LLM_SERVER || "";
+
+let ollamaContextWindowCache: number | undefined;
+
+const findContextWindowValue = (value: unknown): number | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (
+      /(context_length|num_ctx|context.*length)$/i.test(key) &&
+      Number.isFinite(Number(child)) &&
+      Number(child) > 0
+    ) {
+      return Number(child);
+    }
+    const nested = findContextWindowValue(child);
+    if (nested) return nested;
+  }
+  return undefined;
+};
+
+const resolveOllamaContextWindow = async (): Promise<number | undefined> => {
+  if (ollamaContextWindowCache) return ollamaContextWindowCache;
+  const response = await axios.post(`${ollamaEndpoint}/api/show`, {
+    model: ollamaModel,
+  });
+  ollamaContextWindowCache =
+    findContextWindowValue(response.data?.model_info) ||
+    findContextWindowValue(response.data?.details) ||
+    findContextWindowValue(response.data);
+  return ollamaContextWindowCache;
+};
 
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss",
@@ -108,6 +139,15 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...(inputMessages as OllamaMessage[]));
+  await compactMessagesForContextWindow({
+    provider: "ollama",
+    model: ollamaModel,
+    messages,
+    tools: ollamaEnableTools ? llmTools : undefined,
+    outputReserveTokens: ollamaPredictNum,
+    contextWindowResolver: resolveOllamaContextWindow,
+    invokeFunctionCallback,
+  });
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;

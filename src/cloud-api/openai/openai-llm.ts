@@ -22,6 +22,7 @@ import {
   hasPendingCapturedImgForChat,
   getImageMimeType,
 } from "../../utils/image";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 // OpenAI LLM
@@ -122,6 +123,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     messages.length = 0;
     messages.push(firstSystemMessage, ...trimmed);
   }
+  await compactMessagesForContextWindow({
+    provider: "openai",
+    model: openaiLLMModel,
+    messages,
+    tools: shouldIncludeTools ? openaiTools : undefined,
+    invokeFunctionCallback,
+  });
   const lastUserMessage = [...inputMessages]
     .reverse()
     .find((msg) => msg.role === "user");

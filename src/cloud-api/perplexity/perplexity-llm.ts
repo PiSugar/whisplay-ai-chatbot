@@ -21,6 +21,7 @@ import {
   extractToolResponse,
   stimulateStreamResponse,
 } from "../../config/common";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -67,6 +68,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "perplexity",
+    model: perplexityModel,
+    messages,
+    tools: perplexityEnableTools ? llmTools : undefined,
+    invokeFunctionCallback,
+  });
 
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {

@@ -23,6 +23,7 @@ import {
   hasPendingCapturedImgForChat,
   getImageMimeType,
 } from "../../utils/image";
+import { compactMessagesForContextWindow } from "../context-window";
 
 const useCapturedImageInChat =
   (process.env.USE_CAPTURED_IMAGE_IN_CHAT || "false").toLowerCase() === "true";
@@ -162,6 +163,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "aws",
+    model: awsBedrockModel,
+    messages,
+    tools: llmTools,
+    invokeFunctionCallback,
+  });
 
   let endResolve: () => void = () => { };
   const promise = new Promise<void>((resolve) => { endResolve = resolve; }).finally(() => {

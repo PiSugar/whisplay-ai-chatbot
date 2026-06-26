@@ -12,6 +12,7 @@ import { ChatWithLLMStreamFunction } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
 import moment from "moment";
 import { defaultPortMap } from "./common";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -82,6 +83,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   // }
   updateLastMessageTime();
   messages.push(...(inputMessages as OllamaMessage[]));
+  await compactMessagesForContextWindow({
+    provider: "llm8850",
+    model: process.env.LLM8850_LLM_MODEL || "llm8850",
+    messages,
+    invokeFunctionCallback,
+  });
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
