@@ -4,6 +4,7 @@ import { transformToGeminiType } from "../utils";
 import { addImageGenerationTools } from "./image-generation";
 import { addVisionTools } from "./vision";
 import { addWebSearchTools } from "./web-search";
+import { addLocalMemoryTools } from "./local-memory";
 import { addMemPalaceTools } from "./mempalace";
 import { addHardnessCommandTools } from "./hardness-command";
 import { pluginRegistry } from "../plugin";
@@ -46,6 +47,7 @@ for (const { name, provider } of activated) {
 addImageGenerationTools(pluginTools);
 addVisionTools(pluginTools);
 addWebSearchTools(pluginTools);
+addLocalMemoryTools(pluginTools);
 addMemPalaceTools(pluginTools);
 addHardnessCommandTools(pluginTools);
 

@@ -17,7 +17,7 @@ import {
   getDynamicVoiceDetectLevel,
 } from "../../device/audio";
 import { chatWithLLMStream } from "../../cloud-api/server";
-import { isImMode } from "../../cloud-api/llm";
+import { isImMode, summaryTextWithLLM } from "../../cloud-api/llm";
 import { getSystemPromptWithKnowledge } from "../Knowledge";
 import { enableRAG } from "../../cloud-api/knowledge";
 import { cameraDir } from "../../utils/dir";
@@ -39,7 +39,7 @@ import {
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
 import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback, onMusicTrackChange, onMusicPlaybackEnd } from "../../device/music-player";
-import { autoSaveExchange } from "../../config/mempalace";
+import { autoSaveExchange, prepareMemoryPrompt } from "../../config/local-memory";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -347,9 +347,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     };
     ctx.partialThinking = "";
     ctx.thinkingSentences = [];
-    [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
-    [enableRAG ? 1 : 0](ctx.asrText)
-      .then((res: string) => {
+    Promise.all([
+      [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
+      [enableRAG ? 1 : 0](ctx.asrText),
+      Promise.resolve().then(() => prepareMemoryPrompt(ctx.asrText)),
+    ])
+      .then(([res, memoryPrompt]: [string, string]) => {
         let knowledgePrompt = res;
         if (res) {
           console.log("Retrieved knowledge for RAG:\n", res);
@@ -370,6 +373,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           role: "system" | "user";
           content: string;
         }[] = compact([
+          memoryPrompt
+            ? {
+              role: "system",
+              content: memoryPrompt,
+            }
+            : null,
           knowledgePrompt
             ? {
               role: "system",
@@ -432,7 +441,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       });
     getPlayEndPromise().then(() => {
       if (ctx.currentFlowName === "answer") {
-        autoSaveExchange(ctx.asrText, llmResponseText);
+        autoSaveExchange(ctx.asrText, llmResponseText, summaryTextWithLLM);
         clearPendingCapturedImgForChat();
         display({ image_icon_visible: false });
         if (ctx.wakeSessionActive || ctx.endAfterAnswer) {

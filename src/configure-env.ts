@@ -127,6 +127,7 @@ const topLevelGroups: TopLevelGroup[] = [
         "Bing Search API",
         "Google Custom Search API",
         "Local Music Tool (LLM function calling)",
+        "Local Memory",
         "MemPalace (Long-term AI Memory)",
         "AI Behavior",
       ].includes(section.title),
