@@ -1,4 +1,4 @@
-import { fetch as UndiciFetch, ProxyAgent } from "undici";
+import { fetch as UndiciFetch, install, ProxyAgent } from "undici";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import dotenv from "dotenv";
@@ -17,13 +17,16 @@ function createProxyFetch() {
   const proxy = httpsProxy || httpProxy || allProxy;
 
   if (proxy) {
-    // Use undici fetch with proxy
+    // OpenAI file uploads build multipart bodies with global FormData. Keep
+    // fetch/FormData from the same undici implementation when a custom fetch
+    // is used, otherwise the SDK rejects ASR uploads before sending them.
+    install();
     const dispatcher = new ProxyAgent(proxy);
     return async function proxyFetch(
       url: string | URL | Request,
       options: RequestInit = {}
     ): Promise<Response> {
-      return UndiciFetch(url as string, { dispatcher, ...options } as any) as unknown as Promise<Response>;
+      return fetch(url, { dispatcher, ...options } as any);
     };
   }
 
