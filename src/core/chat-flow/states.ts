@@ -170,10 +170,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       return;
     }
     const { result, stop } = recordAudioManually(ctx.currentRecordFilePath);
+    let shouldIgnoreRecordingResult = false;
     const handleRelease = () => {
       if (Date.now() - listeningStartedAt < 500) {
         // Too short to be meaningful — stop recording and return to sleep
         console.log("[listening] Button released too quickly, returning to sleep");
+        shouldIgnoreRecordingResult = true;
         stop();
         ctx.transitionTo("sleep");
         return;
@@ -187,6 +189,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     onButtonReleased(handleRelease);
     result
       .then(() => {
+        if (shouldIgnoreRecordingResult) return;
         ctx.transitionTo("asr");
       })
       .catch((err) => {
@@ -414,7 +417,18 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
               ctx.finishToolCallDisplay(functionName);
             }
           },
-        );
+        ).catch((error) => {
+          console.error("[answer] LLM stream failed:", error);
+          if (currentAnswerId !== ctx.answerId) return;
+          endPartial();
+          ctx.transitionTo("sleep");
+        });
+      })
+      .catch((error) => {
+        console.error("[answer] Failed to prepare prompt:", error);
+        if (currentAnswerId === ctx.answerId) {
+          ctx.transitionTo("sleep");
+        }
       });
     getPlayEndPromise().then(() => {
       if (ctx.currentFlowName === "answer") {

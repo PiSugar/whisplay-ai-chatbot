@@ -242,13 +242,8 @@ export class StreamResponser {
       this.parsedSentences.push(this.partialContent);
       this.displaySentences.push(this.partialContent);
       this.sentencesCallback?.(this.displaySentences);
-      // remove emoji
-      this.partialContent = this.partialContent.replace(
-        /[\u{1F600}-\u{1F64F}]/gu,
-        ""
-      );
-      if (this.partialContent.trim() !== "") {
-        const text = purifyTextForTTS(this.partialContent);
+      const text = purifyTextForTTS(this.partialContent);
+      if (text) {
         const length = this.speakQueue.length;
         this.speakQueue.push({
           sentenceIndex: this.displaySentences.length - 1,

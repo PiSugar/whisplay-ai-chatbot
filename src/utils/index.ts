@@ -264,9 +264,20 @@ export const transformToGeminiType = (parameters: Object) => {
 };
 
 export const purifyTextForTTS = (text: string): string => {
-  // Remove emojis and special characters
   return text
-    .replace(/[*#~]|[\p{Emoji_Presentation}\u200d\ufe0f]/gu, "")
+    .replace(/https?:\/\/\S+/giu, " link ")
+    .replace(/www\.\S+/giu, " link ")
+    .replace(/[`*_#~^=+|\\/<>$@•·●○◆◇■□▪▫✓✔✕✖→←↑↓⇒⇐⇧⇩]/gu, " ")
+    .replace(/[{}\u200b-\u200f\u202a-\u202e\ufe0e\ufe0f]/gu, "")
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
+    .replace(/[—–-]+/g, "，")
+    .replace(/[，,、]{2,}/g, "，")
+    .replace(/[。.!?！？]{2,}/g, "。")
+    .replace(/[^\p{L}\p{N}\p{M}\s.,!?;:'"()[\]，。！？；：、（）《》“”‘’]/gu, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([，。！？；：、,.!?;:])/g, "$1")
+    .replace(/([（([])\s+/g, "$1")
+    .replace(/\s+([）)\]])/g, "$1")
     .trim();
 };
 

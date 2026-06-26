@@ -9,6 +9,9 @@ import dotEnv from "dotenv";
 
 dotEnv.config();
 
+const DOUBLE_CLICK_WINDOW_MS = 800;
+const DOUBLE_CLICK_MAX_PRESS_MS = 350;
+
 export interface Status {
   status: string;
   emoji: string;
@@ -73,7 +76,6 @@ export class WhisplayDisplay {
   private pythonProcess: any; // Placeholder for Python process if needed
   private buttonPressTimeArray: number[] = [];
   private buttonReleaseTimeArray: number[] = [];
-  private buttonDetectInterval: NodeJS.Timeout | null = null;
   private webDisplay: WebDisplayServer | null = null;
   private deviceEnabled: boolean;
   private cameraEnabled: boolean;
@@ -121,37 +123,46 @@ export class WhisplayDisplay {
     }
   }
 
-  startMonitoringDoubleClick(): void {
-    if (this.buttonDetectInterval || !this.buttonDoubleClickCallback) return;
-    // check if there are two presses and two releases
-    this.buttonDetectInterval = setTimeout(() => {
-      // clean old click arrays >= 1500ms
-      const now = Date.now();
-      this.buttonPressTimeArray = this.buttonPressTimeArray.filter(
-        (time) => now - time <= 1000,
-      );
-      this.buttonReleaseTimeArray = this.buttonReleaseTimeArray.filter(
-        (time) => now - time <= 1000,
-      );
-      const doubleClickDetected =
-        this.buttonPressTimeArray.length >= 2 &&
-        this.buttonReleaseTimeArray.length >= 2;
+  private maybeEmitDoubleClick(): void {
+    if (!this.buttonDoubleClickCallback) return;
 
-      if (doubleClickDetected) {
-        this.buttonDoubleClickCallback?.();
-      } else {
-        const lastReleaseTime = this.buttonReleaseTimeArray.pop() || 0;
-        const lastPressTime = this.buttonPressTimeArray.pop() || 0;
-        if (!lastReleaseTime || lastReleaseTime < lastPressTime) {
-          this.buttonPressedCallback();
-        }
-      }
+    const now = Date.now();
+    this.buttonPressTimeArray = this.buttonPressTimeArray.filter(
+      (time) => now - time <= DOUBLE_CLICK_WINDOW_MS,
+    );
+    this.buttonReleaseTimeArray = this.buttonReleaseTimeArray.filter(
+      (time) => now - time <= DOUBLE_CLICK_WINDOW_MS,
+    );
+    if (
+      this.buttonPressTimeArray.length < 2 ||
+      this.buttonReleaseTimeArray.length < 2
+    ) {
+      return;
+    }
 
-      // reset arrays and interval
+    const firstPress =
+      this.buttonPressTimeArray[this.buttonPressTimeArray.length - 2];
+    const secondPress =
+      this.buttonPressTimeArray[this.buttonPressTimeArray.length - 1];
+    const firstRelease =
+      this.buttonReleaseTimeArray[this.buttonReleaseTimeArray.length - 2];
+    const secondRelease =
+      this.buttonReleaseTimeArray[this.buttonReleaseTimeArray.length - 1];
+    const firstPressDuration = firstRelease - firstPress;
+    const secondPressDuration = secondRelease - secondPress;
+    const doubleClickDetected =
+      firstPress <= firstRelease &&
+      firstRelease <= secondPress &&
+      secondPress <= secondRelease &&
+      secondRelease - firstPress <= DOUBLE_CLICK_WINDOW_MS &&
+      firstPressDuration <= DOUBLE_CLICK_MAX_PRESS_MS &&
+      secondPressDuration <= DOUBLE_CLICK_MAX_PRESS_MS;
+
+    if (doubleClickDetected) {
       this.buttonPressTimeArray = [];
       this.buttonReleaseTimeArray = [];
-      this.buttonDetectInterval = null;
-    }, 800);
+      this.buttonDoubleClickCallback();
+    }
   }
 
   startPythonProcess(): void {
@@ -185,8 +196,18 @@ export class WhisplayDisplay {
     }
     if (this.pythonProcess) {
       console.log("Killing Python process...", this.pythonProcess.pid);
-      this.pythonProcess.kill();
-      process.kill(this.pythonProcess.pid, "SIGKILL");
+      try {
+        this.pythonProcess.kill();
+      } catch (error) {
+        console.warn("Failed to terminate Python process:", error);
+      }
+      try {
+        process.kill(this.pythonProcess.pid, "SIGKILL");
+      } catch (error: any) {
+        if (error?.code !== "ESRCH") {
+          console.warn("Failed to force-kill Python process:", error);
+        }
+      }
       this.pythonProcess = null;
     }
   }
@@ -289,12 +310,6 @@ export class WhisplayDisplay {
   }
 
   onButtonDoubleClick(callback: (() => void) | null): void {
-    if (this.buttonDetectInterval) {
-      clearTimeout(this.buttonDetectInterval);
-      this.buttonDetectInterval = null;
-    }
-    this.buttonPressTimeArray = [];
-    this.buttonReleaseTimeArray = [];
     this.buttonDoubleClickCallback = callback || null;
   }
 
@@ -472,20 +487,16 @@ export class WhisplayDisplay {
   private handleButtonPressedEvent(): void {
     this.buttonDown = true;
     this.buttonPressTimeArray.push(Date.now());
-    this.startMonitoringDoubleClick();
-    if (!this.buttonDetectInterval) {
-      console.log("emit pressed");
-      this.buttonPressedCallback();
-    }
+    console.log("emit pressed");
+    this.buttonPressedCallback();
   }
 
   private handleButtonReleasedEvent(): void {
     this.buttonDown = false;
     this.buttonReleaseTimeArray.push(Date.now());
-    if (!this.buttonDetectInterval) {
-      console.log("emit released");
-      this.buttonReleasedCallback();
-    }
+    console.log("emit released");
+    this.buttonReleasedCallback();
+    this.maybeEmitDoubleClick();
   }
 
   isButtonDown(): boolean {

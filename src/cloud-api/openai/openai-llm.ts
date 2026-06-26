@@ -198,14 +198,21 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     });
     let partialAnswer = "";
     const functionCallsPackages: any[] = [];
-    for await (const chunk of chatCompletion) {
-      if (chunk.choices[0].delta.content) {
-        partialCallback(chunk.choices[0].delta.content);
-        partialAnswer += chunk.choices[0].delta.content;
+    try {
+      for await (const chunk of chatCompletion) {
+        if (chunk.choices[0].delta.content) {
+          partialCallback(chunk.choices[0].delta.content);
+          partialAnswer += chunk.choices[0].delta.content;
+        }
+        if (chunk.choices[0].delta.tool_calls) {
+          functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
+        }
       }
-      if (chunk.choices[0].delta.tool_calls) {
-        functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
-      }
+    } catch (error: any) {
+      console.error(
+        "Error while reading OpenAI chat completion stream:",
+        error?.message || error,
+      );
     }
     answer = partialAnswer;
     functionCalls = combineFunction(functionCallsPackages);
@@ -279,6 +286,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     }));
 
     await chatWithLLMStream(newMessages, partialCallback, () => {
+      endResolve();
+      endCallback();
+    }).catch((error) => {
+      console.error(
+        "Error during OpenAI follow-up chat completion:",
+        error?.message || error,
+      );
       endResolve();
       endCallback();
     });
