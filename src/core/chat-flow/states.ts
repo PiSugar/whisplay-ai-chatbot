@@ -17,7 +17,7 @@ import {
   getDynamicVoiceDetectLevel,
 } from "../../device/audio";
 import { chatWithLLMStream } from "../../cloud-api/server";
-import { isImMode } from "../../cloud-api/llm";
+import { isImMode, summaryTextWithLLM } from "../../cloud-api/llm";
 import { getSystemPromptWithKnowledge } from "../Knowledge";
 import { enableRAG } from "../../cloud-api/knowledge";
 import { cameraDir } from "../../utils/dir";
@@ -39,7 +39,7 @@ import {
 } from "./camera-mode";
 import { DEFAULT_EMOJI } from "../../utils";
 import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback, onMusicTrackChange, onMusicPlaybackEnd } from "../../device/music-player";
-import { autoSaveExchange } from "../../config/mempalace";
+import { autoSaveExchange, prepareMemoryPrompt } from "../../config/local-memory";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -170,10 +170,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       return;
     }
     const { result, stop } = recordAudioManually(ctx.currentRecordFilePath);
+    let shouldIgnoreRecordingResult = false;
     const handleRelease = () => {
       if (Date.now() - listeningStartedAt < 500) {
         // Too short to be meaningful — stop recording and return to sleep
         console.log("[listening] Button released too quickly, returning to sleep");
+        shouldIgnoreRecordingResult = true;
         stop();
         ctx.transitionTo("sleep");
         return;
@@ -187,6 +189,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     onButtonReleased(handleRelease);
     result
       .then(() => {
+        if (shouldIgnoreRecordingResult) return;
         ctx.transitionTo("asr");
       })
       .catch((err) => {
@@ -283,6 +286,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
   answer: (ctx: ChatFlowContext) => {
     ctx.enterMusicAfterAnswer = false;
     ctx.musicDisplayText = "";
+    ctx.resetToolCallDisplay();
+    ctx.answerDisplayText = "";
     display({
       status: "answering...",
       RGB: "#00c8a3",
@@ -333,15 +338,26 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       stop: stopPlaying,
     } = ctx.streamResponser;
     let llmResponseText = "";
+    const isCurrentAnswer = (): boolean =>
+      currentAnswerId === ctx.answerId && ctx.currentFlowName === "answer";
     const trackingPartial = (text: string): void => {
+      if (!isCurrentAnswer()) return;
       llmResponseText += text;
-      if (currentAnswerId === ctx.answerId) partial(text);
+      partial(text);
+      ctx.updateAnswerDisplayText(llmResponseText);
     };
+    let resolveLlmDone: () => void = () => {};
+    const llmDonePromise = new Promise<void>((resolve) => {
+      resolveLlmDone = resolve;
+    });
     ctx.partialThinking = "";
     ctx.thinkingSentences = [];
-    [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
-    [enableRAG ? 1 : 0](ctx.asrText)
-      .then((res: string) => {
+    Promise.all([
+      [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
+      [enableRAG ? 1 : 0](ctx.asrText),
+      Promise.resolve().then(() => prepareMemoryPrompt(ctx.asrText)),
+    ])
+      .then(([res, memoryPrompt]: [string, string]) => {
         let knowledgePrompt = res;
         if (res) {
           console.log("Retrieved knowledge for RAG:\n", res);
@@ -362,6 +378,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           role: "system" | "user";
           content: string;
         }[] = compact([
+          memoryPrompt
+            ? {
+              role: "system",
+              content: memoryPrompt,
+            }
+            : null,
           knowledgePrompt
             ? {
               role: "system",
@@ -375,12 +397,18 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         ]);
         chatWithLLMStream(
           prompt,
-          (text) => { if (currentAnswerId === ctx.answerId) trackingPartial(text); },
-          () => currentAnswerId === ctx.answerId && endPartial(),
+          trackingPartial,
+          () => {
+            if (isCurrentAnswer()) {
+              endPartial();
+            }
+            resolveLlmDone();
+          },
           (partialThinking) =>
-            currentAnswerId === ctx.answerId &&
+            isCurrentAnswer() &&
             ctx.partialThinkingCallback(partialThinking),
           (functionName: string, result?: string) => {
+            if (!isCurrentAnswer()) return;
             if (
               functionName === "endConversation" &&
               result?.startsWith("[success]")
@@ -403,21 +431,48 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
               ctx.enterMusicAfterAnswer = true;
               ctx.musicDisplayText = result.replace(/^\[success\]/, "").trim();
             }
-            if (result) {
-              display({
-                text: `[${functionName}]${result}`,
-              });
+            if (!result) {
+              ctx.appendToolCallDisplay(functionName);
+            } else if (
+              functionName === "runCommand" &&
+              result.startsWith("[success] status=running")
+            ) {
+              const jobId = result.match(/\bjob_id=([^\s]+)/)?.[1];
+              if (jobId) {
+                ctx.keepCommandToolDisplayRunning(jobId);
+              } else {
+                ctx.finishToolCallDisplay(functionName);
+              }
+            } else if (
+              result.includes("status=completed")
+            ) {
+              const jobId = result.match(/\bjob_id=([^\s]+)/)?.[1];
+              if (jobId) {
+                ctx.finishCommandToolDisplay(jobId);
+              }
+              ctx.finishToolCallDisplay(functionName);
             } else {
-              display({
-                text: `Invoking [${functionName}]... {count}s`,
-              });
+              ctx.finishToolCallDisplay(functionName);
             }
           },
-        );
+        ).catch((error) => {
+          console.error("[answer] LLM stream failed:", error);
+          if (isCurrentAnswer()) {
+            endPartial();
+          }
+          resolveLlmDone();
+        });
+      })
+      .catch((error) => {
+        console.error("[answer] Failed to prepare prompt:", error);
+        if (currentAnswerId === ctx.answerId) {
+          resolveLlmDone();
+          ctx.transitionTo("sleep");
+        }
       });
-    getPlayEndPromise().then(() => {
+    llmDonePromise.then(() => getPlayEndPromise()).then(() => {
       if (ctx.currentFlowName === "answer") {
-        autoSaveExchange(ctx.asrText, llmResponseText);
+        autoSaveExchange(ctx.asrText, llmResponseText, summaryTextWithLLM);
         clearPendingCapturedImgForChat();
         display({ image_icon_visible: false });
         if (ctx.wakeSessionActive || ctx.endAfterAnswer) {
@@ -527,6 +582,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       ctx.transitionTo("sleep");
       return;
     }
+    ctx.resetToolCallDisplay();
+    ctx.answerDisplayText = "";
     display({
       status: "answering...",
       RGB: "#00c8a3",

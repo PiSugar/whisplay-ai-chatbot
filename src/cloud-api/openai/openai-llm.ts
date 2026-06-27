@@ -9,7 +9,7 @@ import {
   updateLastMessageTime,
 } from "../../config/llm-config";
 import { FunctionCall, Message, ToolReturnTag } from "../../type";
-import { combineFunction } from "../../utils";
+import { combineFunction, formatToolResultsForLog } from "../../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../../config/llm-tools";
 import {
@@ -22,6 +22,7 @@ import {
   hasPendingCapturedImgForChat,
   getImageMimeType,
 } from "../../utils/image";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 // OpenAI LLM
@@ -39,6 +40,30 @@ const openaiMaxMessagesLength = parseInt(
   process.env.OPENAI_MAX_MESSAGES_LENGTH || "0",
   10,
 );
+
+const emptyObjectParameters = {
+  type: "object",
+  properties: {},
+};
+
+const normalizeToolParameters = (parameters: any) => {
+  if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) {
+    return emptyObjectParameters;
+  }
+  return {
+    ...parameters,
+    type: parameters.type || "object",
+    properties: parameters.properties || {},
+  };
+};
+
+const openaiTools = llmTools.map((tool) => ({
+  ...tool,
+  function: {
+    ...tool.function,
+    parameters: normalizeToolParameters(tool.function.parameters),
+  },
+}));
 
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
@@ -98,6 +123,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     messages.length = 0;
     messages.push(firstSystemMessage, ...trimmed);
   }
+  await compactMessagesForContextWindow({
+    provider: "openai",
+    model: openaiLLMModel,
+    messages,
+    tools: shouldIncludeTools ? openaiTools : undefined,
+    invokeFunctionCallback,
+  });
   const lastUserMessage = [...inputMessages]
     .reverse()
     .find((msg) => msg.role === "user");
@@ -157,7 +189,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       model: openaiLLMModel,
       messages: requestMessages as any,
       stream: true,
-      tools: shouldIncludeTools ? llmTools : undefined,
+      tools: shouldIncludeTools ? openaiTools : undefined,
     }).catch((error) => {
       console.log("Error during OpenAI chat completion request:", error.message);
       endResolve();
@@ -166,14 +198,21 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     });
     let partialAnswer = "";
     const functionCallsPackages: any[] = [];
-    for await (const chunk of chatCompletion) {
-      if (chunk.choices[0].delta.content) {
-        partialCallback(chunk.choices[0].delta.content);
-        partialAnswer += chunk.choices[0].delta.content;
+    try {
+      for await (const chunk of chatCompletion) {
+        if (chunk.choices[0].delta.content) {
+          partialCallback(chunk.choices[0].delta.content);
+          partialAnswer += chunk.choices[0].delta.content;
+        }
+        if (chunk.choices[0].delta.tool_calls) {
+          functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
+        }
       }
-      if (chunk.choices[0].delta.tool_calls) {
-        functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
-      }
+    } catch (error: any) {
+      console.error(
+        "Error while reading OpenAI chat completion stream:",
+        error?.message || error,
+      );
     }
     answer = partialAnswer;
     functionCalls = combineFunction(functionCallsPackages);
@@ -182,7 +221,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       model: openaiLLMModel,
       messages: requestMessages as any,
       stream: false,
-      tools: shouldIncludeTools ? llmTools : undefined,
+      tools: shouldIncludeTools ? openaiTools : undefined,
     }).catch((error) => {
       console.log("Error during OpenAI chat completion request:", error.message);
       endResolve();
@@ -239,14 +278,27 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       }),
     );
 
-    console.log("call results: ", results);
+    console.log("call results: ", formatToolResultsForLog(results, functionCalls));
     const newMessages: Message[] = results.map(([id, result]: any) => ({
       role: "tool",
       content: result as string,
       tool_call_id: id as string,
     }));
 
-    await chatWithLLMStream(newMessages, partialCallback, () => {
+    await chatWithLLMStream(
+      newMessages,
+      partialCallback,
+      () => {
+        endResolve();
+        endCallback();
+      },
+      partialThinkingCallback,
+      invokeFunctionCallback,
+    ).catch((error) => {
+      console.error(
+        "Error during OpenAI follow-up chat completion:",
+        error?.message || error,
+      );
       endResolve();
       endCallback();
     });

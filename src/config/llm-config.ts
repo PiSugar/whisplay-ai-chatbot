@@ -4,6 +4,9 @@ const baseSystemPrompt =
   process.env.SYSTEM_PROMPT ||
   "You are a young and cheerful girl who loves to talk, chat, help others, and learn new things. You enjoy using emoji expressions. Never answer longer than 200 words. Always keep your answers concise and to the point.";
 
+const speechFriendlyPrompt =
+  " Format your replies for spoken text-to-speech. Do not use Markdown formatting that sounds awkward when read aloud, such as tables, code blocks, headings, bullet lists, numbered lists, inline links, footnote markers, or decorative separators. Use natural conversational sentences and plain punctuation instead.";
+
 const wakeWordEnabled =
   (process.env.WAKE_WORD_ENABLED || "").toLowerCase() === "true";
 
@@ -24,5 +27,4 @@ export const shouldResetChatHistory = (): boolean => {
   return Date.now() - lastMessageTime > CHAT_HISTORY_RESET_TIME;
 }
 
-export const systemPrompt = `${baseSystemPrompt}${wakeWordConversationToolPrompt}`;
-
+export const systemPrompt = `${baseSystemPrompt}${speechFriendlyPrompt}${wakeWordConversationToolPrompt}`;

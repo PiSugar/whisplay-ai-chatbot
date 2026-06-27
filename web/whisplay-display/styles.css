@@ -243,15 +243,64 @@ body {
   overflow: hidden;
 }
 
-.text-content {
+.text-content,
+.terminal-content {
   position: absolute;
   left: 0;
   top: 0;
   right: 0;
+}
+
+.text-content {
   font-size: 16px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.tool-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  max-width: 100%;
+  margin: 2px 0;
+  padding: 1px 10px 2px;
+  border-radius: 6px;
+  background: #082a70;
+  color: #fff;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.tool-tag-name {
+  color: #fff;
+}
+
+.tool-tag-count,
+.tool-tag-elapsed {
+  color: #7ac9ff;
+}
+
+.text-content.hidden-by-terminal {
+  visibility: hidden;
+}
+
+.terminal-content {
+  visibility: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.25;
+  color: #d8ffe4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.terminal-content.visible {
+  visibility: visible;
 }
 
 .image-layer {

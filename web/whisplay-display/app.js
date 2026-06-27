@@ -1,6 +1,7 @@
 const statusText = document.getElementById("statusText");
 const emojiText = document.getElementById("emojiText");
 const textContent = document.getElementById("textContent");
+const terminalContent = document.getElementById("terminalContent");
 const batteryFill = document.getElementById("batteryFill");
 const batteryText = document.getElementById("batteryText");
 const wifiIcon = document.getElementById("wifiIcon");
@@ -29,6 +30,8 @@ let scrollSyncFrom = 0;
 let lastFrameTime = 0;
 let maxScroll = 0;
 let lastText = "";
+let lastSourceText = "";
+let lastTerminalText = "";
 let lastImageRevision = -1;
 let isPressed = false;
 let activePointerId = null;
@@ -84,7 +87,7 @@ function applyScrollSync(text, sync, viewportHeight) {
   }
   const charEnd = Math.max(0, parseInt(sync.char_end || 0, 10));
   const duration = Math.max(1, parseInt(sync.duration_ms || 1, 10));
-  const totalChars = text.length || 1;
+  const totalChars = getSyncTextLength(text) || 1;
   const ratio = Math.min(1, charEnd / totalChars);
   maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
   scrollTarget = Math.max(scrollTop, Math.round(maxScroll * ratio));
@@ -93,9 +96,177 @@ function applyScrollSync(text, sync, viewportHeight) {
   scrollSyncDuration = duration;
 }
 
-function updateText(text, sync, speed) {
+const TOOL_TAG_RE = /[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?/gi;
+const TOOL_PLACEHOLDER_RE = /\{tool:([A-Za-z0-9_-]+)\}/g;
+
+function applyToolPlaceholders(text, placeholders) {
+  const source = text || "";
+  if (!placeholders || typeof placeholders !== "object") {
+    return source.replace(TOOL_PLACEHOLDER_RE, "");
+  }
+  return source.replace(TOOL_PLACEHOLDER_RE, (_, key) => {
+    const value = placeholders[key];
+    return typeof value === "string" ? value : "";
+  });
+}
+
+function getSyncTextLength(text) {
+  return text
+    .replace(TOOL_TAG_RE, "")
+    .replace(/^[ \t:\-—,，.。…]+/gm, "")
+    .length;
+}
+
+function isToolArgToken(token, toolName = "") {
+  if (/^[A-Za-z0-9_./:=+-]+$/.test(token)) {
+    return true;
+  }
+  return false;
+}
+
+function consumeTailAfterMarker(value, toolName = "") {
+  let tail = value.replace(/^[ \t:\-—,，.。…]+/, "");
+  if (!tail) {
+    return { tail: "", extraCount: 0 };
+  }
+  let extraCount = 0;
+  let consumedCurrentArg = false;
+  while (tail) {
+    const parts = tail.split(/\s+/, 2);
+    const first = parts[0];
+    const firstLength = first.length;
+    const restRaw = tail.slice(firstLength).replace(/^[\s:\-—,，.。…]+/, "");
+
+    if (toolName && first.toLowerCase() === toolName.toLowerCase()) {
+      extraCount += 1;
+      tail = restRaw;
+      const nextParts = tail.split(/\s+/, 2);
+      if (nextParts[0] && isToolArgToken(nextParts[0], toolName)) {
+        tail = tail.slice(nextParts[0].length).replace(/^[\s:\-—,，.。…]+/, "");
+      }
+      continue;
+    }
+
+    if (!consumedCurrentArg && isToolArgToken(first, toolName)) {
+      consumedCurrentArg = true;
+      tail = restRaw;
+      continue;
+    }
+
+    return { tail, extraCount };
+  }
+  return { tail: "", extraCount };
+}
+
+function createToolTagNode(label, count, elapsed = "") {
+  const tag = document.createElement("span");
+  tag.className = "tool-tag";
+  const name = document.createElement("span");
+  name.className = "tool-tag-name";
+  name.textContent = label;
+  tag.appendChild(name);
+  if (count > 1) {
+    const countNode = document.createElement("span");
+    countNode.className = "tool-tag-count";
+    countNode.textContent = `x${count}`;
+    tag.appendChild(countNode);
+  }
+  if (elapsed) {
+    const elapsedNode = document.createElement("span");
+    elapsedNode.className = "tool-tag-elapsed";
+    elapsedNode.textContent = elapsed;
+    tag.appendChild(elapsedNode);
+  }
+  return tag;
+}
+
+function renderToolTaggedText(container, text) {
+  const fragment = document.createDocumentFragment();
+  let pendingToolName = "";
+  let pendingToolCount = 0;
+  let pendingToolElapsed = "";
+
+  const flushToolTag = () => {
+    if (!pendingToolName || pendingToolCount <= 0) {
+      return;
+    }
+    fragment.appendChild(createToolTagNode(pendingToolName, pendingToolCount, pendingToolElapsed));
+    pendingToolName = "";
+    pendingToolCount = 0;
+    pendingToolElapsed = "";
+  };
+
+  const appendToolTag = (name, elapsed = "") => {
+    if (pendingToolName && pendingToolName !== name) {
+      flushToolTag();
+    }
+    pendingToolName = name;
+    pendingToolCount += 1;
+    if (elapsed) {
+      pendingToolElapsed = elapsed;
+    }
+  };
+
+  const appendText = (value) => {
+    if (!value) {
+      return;
+    }
+    fragment.appendChild(document.createTextNode(value));
+  };
+
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  lines.forEach((rawLine, lineIndex) => {
+    TOOL_TAG_RE.lastIndex = 0;
+    const matches = [...rawLine.matchAll(TOOL_TAG_RE)];
+    if (lineIndex > 0) {
+      flushToolTag();
+      appendText("\n");
+    }
+    if (matches.length === 0) {
+      flushToolTag();
+      appendText(rawLine);
+      return;
+    }
+
+    const before = rawLine.slice(0, matches[0].index);
+    if (before.trim()) {
+      flushToolTag();
+      appendText(before);
+    }
+
+    let cursor = matches[0].index;
+    matches.forEach((match) => {
+      const between = rawLine.slice(cursor, match.index);
+      const consumed = consumeTailAfterMarker(between, pendingToolName || "");
+      for (let i = 0; i < consumed.extraCount; i += 1) {
+        appendToolTag(pendingToolName);
+      }
+      if (consumed.tail.trim()) {
+        flushToolTag();
+        appendText(consumed.tail);
+      }
+      appendToolTag(match[1], match[2] || "");
+      cursor = match.index + match[0].length;
+    });
+
+    const consumed = consumeTailAfterMarker(rawLine.slice(cursor), pendingToolName);
+    for (let i = 0; i < consumed.extraCount; i += 1) {
+      appendToolTag(pendingToolName);
+    }
+    if (consumed.tail.trim()) {
+      flushToolTag();
+      appendText(consumed.tail);
+    }
+  });
+  flushToolTag();
+  container.replaceChildren(fragment);
+}
+
+function updateText(text, sync, speed, toolPlaceholders) {
   const viewportHeight = document.querySelector(".text-viewport").offsetHeight;
-  const nextText = text || "";
+  const sourceText = text || "";
+  const nextText = applyToolPlaceholders(sourceText, toolPlaceholders);
+  const sameSourceText = sourceText === lastSourceText;
   const isRegressive =
     nextText.length > 0 && nextText.length < lastText.length && lastText.startsWith(nextText);
 
@@ -108,8 +279,8 @@ function updateText(text, sync, speed) {
 
   if (nextText !== lastText) {
     const isContinuation = nextText.startsWith(lastText);
-    textContent.textContent = nextText;
-    if (!isContinuation) {
+    renderToolTaggedText(textContent, nextText);
+    if (!sameSourceText && !isContinuation) {
       scrollTop = 0;
       scrollTarget = null;
       scrollSyncStart = null;
@@ -117,11 +288,26 @@ function updateText(text, sync, speed) {
       scrollSyncFrom = 0;
     }
     lastText = nextText;
+    lastSourceText = sourceText;
   }
 
   scrollSpeed = Math.max(0, parseInt(speed || 0, 10));
   applyScrollSync(lastText, sync, viewportHeight);
   maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
+}
+
+function updateTerminalText(text) {
+  const nextText = text || "";
+  const isVisible = nextText.length > 0;
+  terminalContent.classList.toggle("visible", isVisible);
+  textContent.classList.toggle("hidden-by-terminal", isVisible);
+  if (nextText !== lastTerminalText) {
+    terminalContent.textContent = nextText;
+    lastTerminalText = nextText;
+    const viewportHeight = document.querySelector(".text-viewport").offsetHeight;
+    const terminalMaxScroll = Math.max(0, terminalContent.offsetHeight - viewportHeight);
+    terminalContent.style.transform = `translateY(${-terminalMaxScroll}px)`;
+  }
 }
 
 function animateScroll(timestamp) {
@@ -166,7 +352,8 @@ function applyState(data) {
   statusText.textContent = status;
   emojiText.textContent = data.emoji || "";
   approvalBar.classList.toggle("visible", Boolean(data.approval_mode));
-  updateText(data.text || "", data.scroll_sync, data.scroll_speed);
+  updateText(data.text || "", data.scroll_sync, data.scroll_speed, data.tool_placeholders);
+  updateTerminalText(data.terminal_text || "");
   updateTextInputState(data.text_input_enabled, status);
 
   const ledColor = normalizeColor(data.RGB);

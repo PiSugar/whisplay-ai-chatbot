@@ -8,7 +8,7 @@ import {
   systemPrompt,
   updateLastMessageTime,
 } from "../../config/llm-config";
-import { combineFunction } from "../../utils";
+import { combineFunction, formatToolResultsForLog } from "../../utils";
 import { llmTools, llmFuncMap } from "../../config/llm-tools";
 import dotenv from "dotenv";
 import { FunctionCall, Message, ToolReturnTag } from "../../type";
@@ -21,6 +21,7 @@ import {
   extractToolResponse,
   stimulateStreamResponse,
 } from "../../config/common";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -63,6 +64,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "grok",
+    model: grokLLMModel,
+    messages,
+    tools: llmTools,
+    invokeFunctionCallback,
+  });
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
@@ -177,7 +185,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           }),
         );
 
-        console.log("call results: ", results);
+        console.log("call results: ", formatToolResultsForLog(results, functionCalls));
         const newMessages: Message[] = results.map(([id, result]: any) => ({
           role: "tool",
           content: result as string,
@@ -209,10 +217,16 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           return;
         }
 
-        await chatWithLLMStream(newMessages, partialCallback, () => {
-          endResolve();
-          endCallback();
-        });
+        await chatWithLLMStream(
+          newMessages,
+          partialCallback,
+          () => {
+            endResolve();
+            endCallback();
+          },
+          partialThinkingCallback,
+          invokeFunctionCallback,
+        );
         return;
       } else {
         endResolve();

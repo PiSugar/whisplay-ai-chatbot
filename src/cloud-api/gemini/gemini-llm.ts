@@ -23,6 +23,8 @@ import {
   hasPendingCapturedImgForChat,
   getImageMimeType,
 } from "../../utils/image";
+import { formatToolResultsForLog } from "../../utils";
+import { compactMessagesForContextWindow } from "../context-window";
 
 dotenv.config();
 
@@ -74,6 +76,62 @@ function createGeminiChatInstance(
 
 let chat = createGeminiChatInstance();
 
+const contentText = (content: Content): string => {
+  return (content.parts || [])
+    .map((part: any) => part.text || "")
+    .filter(Boolean)
+    .join("\n");
+};
+
+const compactGeminiHistory = async (
+  invokeFunctionCallback?: (functionName: string, result?: string) => void,
+): Promise<void> => {
+  const history = chat.getHistory();
+  if (history.length <= 1) return;
+
+  const compactableMessages: Message[] = [
+    { role: "system", content: systemPrompt },
+    ...history
+      .map((content): Message | null => {
+        const text = contentText(content);
+        if (!text) return null;
+        return {
+          role: content.role === "model" ? "assistant" : "user",
+          content: text,
+        };
+      })
+      .filter((message): message is Message => Boolean(message)),
+  ];
+
+  const beforeLength = compactableMessages.length;
+  await compactMessagesForContextWindow({
+    provider: "gemini",
+    model: geminiModel,
+    messages: compactableMessages,
+    tools: llmToolsForGemini,
+    invokeFunctionCallback,
+  });
+  if (compactableMessages.length === beforeLength) return;
+
+  const summaryMessages = compactableMessages.filter(
+    (message, index) =>
+      index > 0 &&
+      message.role === "system" &&
+      message.content.startsWith("[Earlier conversation summary]"),
+  );
+  const nextSystemPrompt = [systemPrompt, ...summaryMessages.map((message) => message.content)]
+    .filter(Boolean)
+    .join("\n\n");
+  const nextHistory: Content[] = compactableMessages
+    .slice(1)
+    .filter((message) => message.role !== "system")
+    .map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: message.content }],
+    }));
+  chat = createGeminiChatInstance(nextHistory, nextSystemPrompt);
+};
+
 const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
@@ -101,6 +159,7 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     // recreate chat instance to include system prompt
     chat = createGeminiChatInstance(chatHistory);
   }
+  await compactGeminiHistory(invokeFunctionCallback);
 
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
@@ -233,17 +292,23 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
         }),
       );
 
-      console.log("call results: ", results);
+      console.log("call results: ", formatToolResultsForLog(results, functionCalls));
       const newMessages: Message[] = results.map(([id, result]: any) => ({
         role: "tool",
         content: result as string,
         tool_call_id: id as string,
       }));
 
-      await chatWithLLMStream(newMessages, partialCallback, () => {
-        endResolve();
-        endCallback();
-      });
+      await chatWithLLMStream(
+        newMessages,
+        partialCallback,
+        () => {
+          endResolve();
+          endCallback();
+        },
+        partialThinkingCallback,
+        invokeFunctionCallback,
+      );
       return;
     } else {
       endResolve();

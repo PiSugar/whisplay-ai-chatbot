@@ -21,6 +21,7 @@ import {
   extractToolResponse,
   stimulateStreamResponse,
 } from "../../config/common";
+import { compactMessagesForContextWindow } from "../context-window";
 dotenv.config();
 
 // Kimi (Moonshot AI) LLM
@@ -65,6 +66,13 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   }
   updateLastMessageTime();
   messages.push(...inputMessages);
+  await compactMessagesForContextWindow({
+    provider: "kimi",
+    model: kimiLLMModel,
+    messages,
+    tools: llmTools,
+    invokeFunctionCallback,
+  });
 
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
@@ -210,10 +218,16 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           return;
         }
 
-        await chatWithLLMStream(newMessages, partialCallback, () => {
-          endResolve();
-          endCallback();
-        });
+        await chatWithLLMStream(
+          newMessages,
+          partialCallback,
+          () => {
+            endResolve();
+            endCallback();
+          },
+          partialThinkingCallback,
+          invokeFunctionCallback,
+        );
         return;
       } else {
         endResolve();
