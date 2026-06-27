@@ -1,7 +1,6 @@
 import { LLMTool, ToolReturnTag } from "../type";
 import dotenv from "dotenv";
 import { proxyFetch } from "../cloud-api/proxy-fetch";
-import { fetch as undiciFetch, ProxyAgent } from "undici";
 
 dotenv.config();
 
@@ -25,9 +24,7 @@ const maxResults = parseInt(process.env.WEB_SEARCH_MAX_RESULTS || "5", 10);
 const includeImages = process.env.WEB_SEARCH_INCLUDE_IMAGES === "true";
 const maxPageChars = parseInt(process.env.WEB_PAGE_TEXT_MAX_CHARS || "6000", 10);
 const maxPageLinks = parseInt(process.env.WEB_PAGE_LINK_MAX_RESULTS || "30", 10);
-const webToolProxy = process.env.WEB_TOOL_PROXY || "";
 const webToolTimeoutMs = parseInt(process.env.WEB_TOOL_TIMEOUT_MS || "30000", 10);
-const webToolDispatcher = webToolProxy ? new ProxyAgent(webToolProxy) : undefined;
 
 export const webSearchTools: LLMTool[] = [];
 
@@ -613,13 +610,7 @@ async function webToolFetch(
     signal: controller.signal,
   };
   try {
-    if (!webToolDispatcher) {
-      return await proxyFetch(url, requestOptions);
-    }
-    return await undiciFetch(url, {
-      ...requestOptions,
-      dispatcher: webToolDispatcher,
-    }) as unknown as Response;
+    return await proxyFetch(url, requestOptions);
   } catch (error: any) {
     if (error?.name === "AbortError") {
       throw new Error(`request timed out after ${webToolTimeoutMs}ms`);
