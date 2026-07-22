@@ -40,6 +40,9 @@ TOOL_TAG_FG = (255, 255, 255, 255)
 TOOL_TAG_COUNT_FG = (122, 205, 255, 255)
 TOOL_TAG_MARGIN_Y = 2
 TOOL_PLACEHOLDER_RE = re.compile(r"\{tool:([A-Za-z0-9_-]+)\}")
+TERMINAL_FG = (80, 255, 120, 255)
+TERMINAL_MARGIN_X = 8
+TERMINAL_MAX_LINES = 5
 
 def apply_tool_placeholders(text):
     def replace(match):
@@ -102,8 +105,7 @@ class RenderThread(threading.Thread):
         self.battery_font = ImageFont.truetype(self.font_path, battery_font_size)
         self.main_text_font = ImageFont.truetype(self.font_path, 20)
         self.tool_tag_font = ImageFont.truetype(self.font_path, 17)
-        self.terminal_text_font = ImageFont.truetype(self.font_path, 12)
-        self.terminal_text_line_height = self.terminal_text_font.getmetrics()[0] + self.terminal_text_font.getmetrics()[1]
+        self.terminal_text_font = ImageFont.truetype(self.font_path, 8)
         self.music_time_font = ImageFont.truetype(self.font_path, 10)
         self.main_text_line_height = self.main_text_font.getmetrics()[0] + self.main_text_font.getmetrics()[1]
         self.text_cache_image = None
@@ -208,10 +210,7 @@ class RenderThread(threading.Thread):
             text_area_height = self.whisplay.LCD_HEIGHT - header_height - progress_bar_height - approval_bar_height
             text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
             text_draw = ImageDraw.Draw(text_bg_image)
-            if current_terminal_text:
-                animation_active = self.render_terminal_text(text_bg_image, text_area_height, text_draw, current_terminal_text)
-            else:
-                animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, apply_tool_placeholders(text), current_scroll_speed)
+            animation_active = self.render_main_text(text_bg_image, text_area_height, text_draw, apply_tool_placeholders(text), current_scroll_speed)
             self.whisplay.draw_image(0, header_height + progress_bar_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
             if current_approval_mode:
                 approval_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, approval_bar_height), (0, 0, 0, 255))
@@ -509,51 +508,13 @@ class RenderThread(threading.Thread):
             suffix_x = text_x + text_w + suffix_gap
             draw.text((suffix_x, text_y), suffix_text, font=tag_font, fill=TOOL_TAG_COUNT_FG)
 
-    def render_terminal_text(self, main_text_image, area_height, draw, text):
-        global current_scroll_top, current_scroll_sync_speed, current_scroll_sync_target_top
-        self.pending_auto_scroll_after_hold = False
-        current_scroll_top = 0
-        current_scroll_sync_speed = None
-        current_scroll_sync_target_top = None
-        font = self.terminal_text_font
-        line_height = self.terminal_text_line_height
-        lines = self.wrap_terminal_text(draw, text, font, self.whisplay.LCD_WIDTH - 12)
-        visible_line_count = max(1, area_height // max(1, line_height))
-        display_lines = lines[-visible_line_count:]
-        render_text = "\n".join(display_lines)
-        if self.current_render_text != render_text:
-            self.current_render_text = render_text
-            show_text_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, len(display_lines) * line_height), (0, 0, 0, 255))
-            show_text_draw = ImageDraw.Draw(show_text_image)
-            render_y = 0
-            for line in display_lines:
-                show_text_draw.text((6, render_y), line, font=font, fill=(216, 255, 228, 255))
-                render_y += line_height
-            self.text_cache_image = show_text_image
-        main_text_image.paste(self.text_cache_image, (0, 0), self.text_cache_image)
-        return False
-
-    def wrap_terminal_text(self, draw, text, font, max_width):
-        lines = []
-        for raw_line in text.splitlines() or [""]:
-            current = ""
-            for char in raw_line:
-                candidate = current + char
-                bbox = draw.textbbox((0, 0), candidate, font=font)
-                if current and bbox[2] - bbox[0] > max_width:
-                    lines.append(current)
-                    current = char
-                else:
-                    current = candidate
-            lines.append(current)
-        return lines
-
     def request_render(self):
         self.render_event.set()
                 
 
     def render_header(self, image, draw, status, emoji, battery_level, battery_color):
         global current_status, current_emoji, current_battery_level, current_battery_color
+        global current_terminal_text
         global status_font_size, emoji_font_size, battery_font_size
         
         status_font = self.status_font
@@ -572,10 +533,24 @@ class RenderThread(threading.Thread):
         status_w = status_bbox[2] - status_bbox[0]
         TextUtils.draw_mixed_text(draw, image, current_status, status_font, (whisplay.CornerHeight, 0))
 
-        # Draw emoji centered
+        # Keep the emoji centered normally. While a command is running, use the
+        # XiaoZhi layout: emoji on the left and terminal output beside it.
         emoji_bbox = emoji_font.getbbox(current_emoji)
         emoji_w = emoji_bbox[2] - emoji_bbox[0]
-        TextUtils.draw_mixed_text(draw, image, current_emoji, emoji_font, ((image_width - emoji_w) // 2, status_font_size + 8))
+        emoji_x = (image_width - emoji_w) // 2
+        if current_terminal_text:
+            emoji_x = self.whisplay.CornerHeight
+        emoji_y = status_font_size + 8
+        TextUtils.draw_mixed_text(draw, image, current_emoji, emoji_font, (emoji_x, emoji_y))
+        if current_terminal_text:
+            terminal_x = emoji_x + emoji_w + TERMINAL_MARGIN_X
+            self.draw_terminal_output(
+                draw,
+                current_terminal_text,
+                terminal_x,
+                emoji_y + 1,
+                image_width - terminal_x - TERMINAL_MARGIN_X,
+            )
         
         # Draw battery icon
         status_icon_context = {
@@ -593,6 +568,38 @@ class RenderThread(threading.Thread):
         self.render_status_icons(draw, status_icons, image_width)
         
         return top_height
+
+    def draw_terminal_output(self, draw, text, x, y, max_width):
+        if max_width <= 4:
+            return
+        font = self.terminal_text_font
+        lines = [
+            line
+            for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            if line
+        ][-TERMINAL_MAX_LINES:]
+        bbox = font.getbbox("Ag")
+        line_height = max(8, bbox[3] - bbox[1] + 1)
+        for index, line in enumerate(lines):
+            clipped = self.clip_terminal_line(line, font, max_width)
+            draw.text(
+                (x, y + index * line_height),
+                clipped,
+                font=font,
+                fill=TERMINAL_FG,
+            )
+
+    def clip_terminal_line(self, text, font, max_width):
+        if font.getlength(text) <= max_width:
+            return text
+        ellipsis = "..."
+        available = max(0, max_width - int(font.getlength(ellipsis)))
+        clipped = ""
+        for char in text:
+            if font.getlength(clipped + char) > available:
+                break
+            clipped += char
+        return clipped + ellipsis
 
     def build_status_icons(self, context):
         icons = []

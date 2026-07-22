@@ -1,5 +1,6 @@
 const statusText = document.getElementById("statusText");
 const emojiText = document.getElementById("emojiText");
+const headerVisualRow = document.getElementById("headerVisualRow");
 const textContent = document.getElementById("textContent");
 const terminalContent = document.getElementById("terminalContent");
 const batteryFill = document.getElementById("batteryFill");
@@ -297,16 +298,26 @@ function updateText(text, sync, speed, toolPlaceholders) {
 }
 
 function updateTerminalText(text) {
-  const nextText = text || "";
+  const nextText = (text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .slice(-5)
+    .join("\n");
   const isVisible = nextText.length > 0;
   terminalContent.classList.toggle("visible", isVisible);
-  textContent.classList.toggle("hidden-by-terminal", isVisible);
+  headerVisualRow.classList.toggle("terminal-visible", isVisible);
   if (nextText !== lastTerminalText) {
-    terminalContent.textContent = nextText;
+    const fragment = document.createDocumentFragment();
+    nextText.split("\n").forEach((line) => {
+      const lineNode = document.createElement("div");
+      lineNode.className = "terminal-line";
+      lineNode.textContent = line;
+      fragment.appendChild(lineNode);
+    });
+    terminalContent.replaceChildren(fragment);
     lastTerminalText = nextText;
-    const viewportHeight = document.querySelector(".text-viewport").offsetHeight;
-    const terminalMaxScroll = Math.max(0, terminalContent.offsetHeight - viewportHeight);
-    terminalContent.style.transform = `translateY(${-terminalMaxScroll}px)`;
   }
 }
 
