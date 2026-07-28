@@ -154,7 +154,13 @@ sudo systemctl restart chatbot.service
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=PiSugar/whisplay-ai-chatbot&type=date&legend=bottom-right)](https://www.star-history.com/#PiSugar/whisplay-ai-chatbot&type=date&legend=bottom-right)
+<a href="https://www.star-history.com/?type=date&legend=bottom-right&repos=PiSugar%2Fwhisplay-ai-chatbot">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=PiSugar/whisplay-ai-chatbot&type=date&theme=dark&legend=bottom-right&sealed_token=qh8DsHclm3F5H5B-kVItLNLMfrQ7XvXz_FNeb-nkoWNum29wiXwfufXp9oMAOmAkM6rjclSHyqsq3VvQa3KoMw8r8UWcws67k8vP6s7eb7aBzD2g0TOThYI-OrqSd46oYQhE2jFJEntQpY9nM3sH95g1bLWeWeyUAjO3-T3uEc7cb1qfMzk_FKT7tD04" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=PiSugar/whisplay-ai-chatbot&type=date&legend=bottom-right&sealed_token=qh8DsHclm3F5H5B-kVItLNLMfrQ7XvXz_FNeb-nkoWNum29wiXwfufXp9oMAOmAkM6rjclSHyqsq3VvQa3KoMw8r8UWcws67k8vP6s7eb7aBzD2g0TOThYI-OrqSd46oYQhE2jFJEntQpY9nM3sH95g1bLWeWeyUAjO3-T3uEc7cb1qfMzk_FKT7tD04" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=PiSugar/whisplay-ai-chatbot&type=date&legend=bottom-right&sealed_token=qh8DsHclm3F5H5B-kVItLNLMfrQ7XvXz_FNeb-nkoWNum29wiXwfufXp9oMAOmAkM6rjclSHyqsq3VvQa3KoMw8r8UWcws67k8vP6s7eb7aBzD2g0TOThYI-OrqSd46oYQhE2jFJEntQpY9nM3sH95g1bLWeWeyUAjO3-T3uEc7cb1qfMzk_FKT7tD04" />
+ </picture>
+</a>
 
 ## License
 
