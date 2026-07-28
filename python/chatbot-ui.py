@@ -32,7 +32,7 @@ IDLE_RENDER_INTERVAL = 0.5
 MAX_MAIN_TEXT_CHARS = 2200
 TRUNCATION_PREFIX = "... "
 TOOL_TAG_RE = re.compile(
-    r"[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?",
+    r"(?<![A-Za-z0-9])[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?",
     re.IGNORECASE,
 )
 TOOL_TAG_BG = (8, 42, 112, 255)
