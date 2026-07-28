@@ -420,6 +420,12 @@ class RenderThread(threading.Thread):
             return False
 
         def consume_tail_after_marker(value, tool_name=""):
+            marker_tail = value.lstrip(" \t")
+            if marker_tail.startswith("..."):
+                return marker_tail[3:].lstrip(" \t:-—,，.。…"), 0
+            if marker_tail.startswith("…"):
+                return marker_tail[1:].lstrip(" \t:-—,，.。…"), 0
+
             tail = value.lstrip(" \t:-—,，.。…")
             if not tail:
                 return "", 0
