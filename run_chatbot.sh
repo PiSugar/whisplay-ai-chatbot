@@ -10,6 +10,17 @@ case "$os_name" in
   MINGW*|MSYS*|CYGWIN*) is_windows=true ;;
 esac
 
+if [ "$is_linux" = true ] &&
+   [ "${WHISPLAY_ALLOW_LEGACY_CHATBOT_SERVICE:-false}" != "true" ] &&
+   grep -q 'chatbot\.service' /proc/self/cgroup 2>/dev/null &&
+   { systemctl is-active --quiet whisplay-daemon.service 2>/dev/null || [ -S /tmp/whisplay-daemon.sock ]; }; then
+  echo "whisplay-daemon is active; legacy chatbot.service mode is disabled to avoid duplicate ASR/TTS ports."
+  echo "Use the Whisplay daemon launcher, or run: whisplay service restart"
+  while true; do
+    sleep 3600
+  done
+fi
+
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"

@@ -73,6 +73,11 @@ _service_ctl() {
   require_cmd sudo
   require_cmd systemctl
 
+  if _daemon_service_mode_available && [[ "$action" =~ ^(start|stop|restart)$ ]]; then
+    _service_ctl_daemon_app "$action"
+    return
+  fi
+
   _bold "${action^}ing ${SERVICE_NAME}..."
   sudo systemctl "$action" "$SERVICE_NAME"
 
@@ -88,7 +93,99 @@ _service_ctl() {
 _service_status() {
   require_cmd systemctl
 
+  if _daemon_service_mode_available; then
+    _service_daemon_app_status
+    return
+  fi
+
   systemctl status "$SERVICE_NAME" --no-pager
+}
+
+_daemon_service_mode_available() {
+  [ -S /tmp/whisplay-daemon.sock ] &&
+    command -v node &>/dev/null &&
+    systemctl is-active --quiet whisplay-daemon.service 2>/dev/null
+}
+
+_daemon_request() {
+  local cmd="$1"
+  local payload="${2:-}"
+  [ -n "$payload" ] || payload="{}"
+  DAEMON_CMD="$cmd" DAEMON_PAYLOAD="$payload" node -e '
+const net = require("net");
+const cmd = process.env.DAEMON_CMD;
+const payload = JSON.parse(process.env.DAEMON_PAYLOAD || "{}");
+const socketPath = "/tmp/whisplay-daemon.sock";
+const client = net.createConnection(socketPath);
+let buffer = "";
+client.setTimeout(3000);
+client.on("connect", () => {
+  client.write(JSON.stringify({ version: 1, cmd, payload }) + "\n");
+});
+client.on("data", (chunk) => {
+  buffer += chunk.toString("utf8");
+  const idx = buffer.indexOf("\n");
+  if (idx < 0) return;
+  const line = buffer.slice(0, idx).trim();
+  client.end();
+  const response = JSON.parse(line);
+  if (!response.ok) {
+    console.error(response.error || "daemon request failed");
+    process.exit(1);
+  }
+  console.log(JSON.stringify(response.payload || {}));
+});
+client.on("timeout", () => {
+  client.destroy();
+  console.error("daemon request timed out");
+  process.exit(1);
+});
+client.on("error", (error) => {
+  console.error(error.message);
+  process.exit(1);
+});
+'
+}
+
+_service_ctl_daemon_app() {
+  local action="$1"
+  local app_id="whisplay-ai-chatbot"
+
+  case "$action" in
+    start)
+      _bold "Starting ${app_id} via whisplay-daemon..."
+      _daemon_request app.launch "{\"app_id\":\"${app_id}\"}" >/dev/null
+      _green "✅ ${app_id} launch requested."
+      ;;
+    stop)
+      _bold "Stopping ${app_id} via whisplay-daemon..."
+      _daemon_request app.exit.request "{\"app_id\":\"${app_id}\"}" >/dev/null
+      _yellow "⚠️  ${app_id} exit requested."
+      ;;
+    restart)
+      _bold "Restarting ${app_id} via whisplay-daemon..."
+      _daemon_request app.exit.request "{\"app_id\":\"${app_id}\"}" >/dev/null || true
+      sleep 2
+      _daemon_request app.launch "{\"app_id\":\"${app_id}\"}" >/dev/null
+      _green "✅ ${app_id} restart requested."
+      ;;
+  esac
+}
+
+_service_daemon_app_status() {
+  _bold "whisplay-daemon is active. Showing daemon app status for AI Chatbot:"
+  _daemon_request app.list '{}' | node -e '
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8").trim();
+const payload = input ? JSON.parse(input) : {};
+const apps = payload.apps || [];
+const app = apps.find((item) => item.app_id === "whisplay-ai-chatbot");
+if (!app) {
+  console.log("AI Chatbot is not registered with whisplay-daemon.");
+  process.exit(1);
+}
+console.log(`running=${app.running} foreground=${app.foreground} selected=${app.selected}`);
+'
 }
 
 _service_help() {
@@ -105,4 +202,3 @@ _service_help() {
   echo "  status    Show current service status"
   echo ""
 }
-
