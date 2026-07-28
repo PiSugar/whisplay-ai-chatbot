@@ -79,9 +79,14 @@ use_npm() {
 
 pkg_run() {
   if use_npm; then
+    require_cmd npm
     npm run "$@"
-  else
+  elif command -v yarn &>/dev/null; then
     yarn run "$@"
+  else
+    require_cmd npm
+    _yellow "Warning: yarn not found. Falling back to npm."
+    npm run "$@"
   fi
 }
 

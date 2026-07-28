@@ -28,6 +28,7 @@ type CommandJob = {
   output: string;
   child?: ChildProcess;
   stopRequested?: boolean;
+  backgrounded?: boolean;
   nextCheckAt?: number;
   result?: CommandResult;
   completion: Promise<CommandResult>;
@@ -48,6 +49,8 @@ const DEFAULT_TEMP_DIR = "/tmp/whisplay-hardness";
 const DEFAULT_SKILL_RETURN_CHARS = 8_000;
 const DEFAULT_MAX_CONCURRENT_COMMANDS = 2;
 const DEFAULT_COMMAND_CHECK_AFTER_SECONDS = 15;
+const TERMINAL_MAX_LINES = 5;
+const TERMINAL_MIN_VISIBLE_MS = 1_000;
 const MAX_SKILL_SCAN_DEPTH = 3;
 const SUPPRESSED_OUTPUT_LINES = new Set([
   "SSH is enabled and the default password for the 'pi' user has not been changed.",
@@ -57,6 +60,9 @@ const commandQueue: CommandJob[] = [];
 const commandJobs = new Map<string, CommandJob>();
 let activeCommandCount = 0;
 let commandJobSeq = 0;
+let terminalClearTimer: NodeJS.Timeout | null = null;
+let terminalShownAt: number | null = null;
+let terminalDisplayUpdates: Promise<void> = Promise.resolve();
 const SAFE_COMMANDS = new Set([
   "pwd",
   "ls",
@@ -154,6 +160,74 @@ const sanitizeCommandOutput = (output: string): string =>
     .filter((line) => !SUPPRESSED_OUTPUT_LINES.has(line.trim()))
     .join("\n")
     .replace(/^\n+/, "");
+
+const writeTerminalDisplay = (text: string): void => {
+  terminalDisplayUpdates = terminalDisplayUpdates
+    .then(async () => {
+      const { display } = await import("../device/display");
+      await display({ terminal_text: text });
+    })
+    .catch((error: any) => {
+      console.error(
+        "[HardnessCommand] Failed to update terminal display:",
+        error?.message || error,
+      );
+    });
+};
+
+const scheduleTerminalClear = (): void => {
+  if (terminalClearTimer) return;
+  if (terminalShownAt === null) {
+    writeTerminalDisplay("");
+    return;
+  }
+
+  const elapsedMs = Date.now() - terminalShownAt;
+  const delayMs = Math.max(0, TERMINAL_MIN_VISIBLE_MS - elapsedMs);
+  terminalClearTimer = setTimeout(() => {
+    terminalClearTimer = null;
+    terminalShownAt = null;
+    writeTerminalDisplay("");
+  }, delayMs);
+};
+
+const updateTerminalProgress = (text: string | null): void => {
+  if (text === null) {
+    scheduleTerminalClear();
+    return;
+  }
+  if (terminalClearTimer) {
+    clearTimeout(terminalClearTimer);
+    terminalClearTimer = null;
+  }
+  if (terminalShownAt === null) {
+    terminalShownAt = Date.now();
+  }
+  writeTerminalDisplay(text);
+};
+
+const getTerminalOutputTail = (output: string, command: string): string => {
+  const lines = sanitizeCommandOutput(output)
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => line.length > 0);
+  if (lines.length === 0) return `$ ${command}`;
+  return lines.slice(-TERMINAL_MAX_LINES).join("\n");
+};
+
+const showCommandJobStatus = (
+  job: CommandJob,
+  status: string = job.status,
+  clearAfter = true,
+): void => {
+  updateTerminalProgress(
+    `${status} ${job.id}\n${getTerminalOutputTail(job.output, job.command)}`,
+  );
+  if (clearAfter) {
+    scheduleTerminalClear();
+  }
+};
 
 const getCommandHead = (segment: string): string => {
   const match = segment.trim().match(/^([A-Za-z0-9_./-]+)/);
@@ -311,6 +385,10 @@ const terminateCommandJob = (job: CommandJob, signal: NodeJS.Signals = "SIGTERM"
 };
 
 const cleanupCommandPool = (): void => {
+  if (terminalClearTimer) {
+    clearTimeout(terminalClearTimer);
+    terminalClearTimer = null;
+  }
   for (const job of commandJobs.values()) {
     if (job.status === "running" || job.status === "queued") {
       terminateCommandJob(job, "SIGTERM");
@@ -346,6 +424,7 @@ const startCommandJob = (job: CommandJob): void => {
   job.status = "running";
   job.startedAt = startedAt;
   activeCommandCount += 1;
+  updateTerminalProgress(`$ ${job.command}`);
 
   const child = spawn("bash", ["-lc", job.command], {
     detached: true,
@@ -356,6 +435,7 @@ const startCommandJob = (job: CommandJob): void => {
   const append = (chunk: Buffer): void => {
     output += chunk.toString("utf8");
     job.output = output;
+    updateTerminalProgress(getTerminalOutputTail(output, job.command));
   };
 
   child.stdout.on("data", append);
@@ -377,6 +457,13 @@ const startCommandJob = (job: CommandJob): void => {
       output,
       ...spill,
     });
+    if (job.backgrounded) {
+      const finalStatus = job.stopRequested ? "job stopped" : "job completed";
+      updateTerminalProgress(
+        `${finalStatus}\n${getTerminalOutputTail(output, job.command)}`,
+      );
+    }
+    scheduleTerminalClear();
     startQueuedCommands();
   };
 
@@ -392,7 +479,10 @@ const startCommandJob = (job: CommandJob): void => {
 const waitForCommandForeground = async (job: CommandJob): Promise<CommandResult | null> => {
   const foregroundTimeoutMs = getForegroundTimeoutMs();
   return await new Promise<CommandResult | null>((resolve) => {
-    const timeout = setTimeout(() => resolve(null), foregroundTimeoutMs);
+    const timeout = setTimeout(() => {
+      job.backgrounded = true;
+      resolve(null);
+    }, foregroundTimeoutMs);
     job.completion.then((result) => {
       clearTimeout(timeout);
       resolve(result);
@@ -458,7 +548,9 @@ const runShellCommand = async (command: string): Promise<string> => {
   const job = createCommandJob(command);
   enqueueCommandJob(job);
   const result = await waitForCommandForeground(job);
-  return result ? formatResult(result) : formatBackgroundStatus(job);
+  if (result) return formatResult(result);
+  showCommandJobStatus(job, `${job.status} job`, false);
+  return formatBackgroundStatus(job);
 };
 
 const parseSkillRoots = (): string[] => {
@@ -614,7 +706,7 @@ const checkCommandTool: LLMTool = {
     }
 
     await waitForCheckWindow(job);
-
+    showCommandJobStatus(job);
     return formatBackgroundStatus(job);
   },
 };
@@ -654,6 +746,7 @@ const stopCommandTool: LLMTool = {
     }
 
     const stopped = terminateCommandJob(job, signal);
+    showCommandJobStatus(job, stopped ? "stopping job" : "signal failed");
     return [
       stopped ? ToolReturnTag.Success : ToolReturnTag.Error,
       `status=${job.status} job_id=${job.id} signal=${signal} stop_requested=${job.stopRequested === true}`,

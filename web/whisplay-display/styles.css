@@ -89,6 +89,19 @@ body {
   font-size: 40px;
   text-align: center;
   line-height: 1;
+  flex: 0 0 auto;
+}
+
+.header-visual-row {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.header-visual-row.terminal-visible {
+  justify-content: flex-start;
+  padding-left: 8px;
 }
 
 .status-icons {
@@ -243,8 +256,7 @@ body {
   overflow: hidden;
 }
 
-.text-content,
-.terminal-content {
+.text-content {
   position: absolute;
   left: 0;
   top: 0;
@@ -284,23 +296,29 @@ body {
   color: #7ac9ff;
 }
 
-.text-content.hidden-by-terminal {
-  visibility: hidden;
-}
-
 .terminal-content {
-  visibility: hidden;
+  display: none;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 1px 0 0 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
+  font-size: 8px;
   font-weight: 400;
-  line-height: 1.25;
-  color: #d8ffe4;
-  white-space: pre-wrap;
-  word-break: break-all;
+  line-height: 9px;
+  color: #50ff78;
+  overflow: hidden;
 }
 
 .terminal-content.visible {
-  visibility: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .image-layer {

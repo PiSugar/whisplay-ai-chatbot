@@ -36,6 +36,10 @@ const ollamaEndpoint =
   process.env.OLLAMA_ENDPOINT || `http://localhost:${defaultPortMap.ollama}`;
 const ollamaModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 const ollamaEnableTools = process.env.OLLAMA_ENABLE_TOOLS === "true";
+const ollamaMaxToolRounds = Math.max(
+  0,
+  parseInt(process.env.OLLAMA_MAX_TOOL_ROUNDS || "4", 10) || 0,
+);
 const ollamaPredictNum = process.env.OLLAMA_PREDICT_NUM
   ? parseInt(process.env.OLLAMA_PREDICT_NUM)
   : undefined;
@@ -127,12 +131,134 @@ const resetChatHistory = (): void => {
   });
 };
 
-const chatWithLLMStream: ChatWithLLMStreamFunction = async (
+type ToolLoopState = {
+  round: number;
+  signatures: Set<string>;
+};
+
+const stableStringify = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const toolCallSignature = (call: OllamaFunctionCall): string =>
+  `${call.function?.name || ""}:${stableStringify(call.function?.arguments || {})}`;
+
+const previousToolResultFor = (toolName: string): string => {
+  const previous = [...messages]
+    .reverse()
+    .find((message) => message.role === "tool" && message.tool_name === toolName);
+  return previous?.content || "";
+};
+
+const answerFromAvailableToolResults = async ({
+  instruction,
+  partialCallback,
+  endResolve,
+  endCallback,
+  partialThinkingCallback,
+}: {
+  instruction: string;
+  partialCallback: (partialAnswer: string) => void;
+  endResolve: () => void;
+  endCallback: () => void;
+  partialThinkingCallback?: (partialThinking: string) => void;
+}): Promise<void> => {
+  let finalAnswer = "";
+  let finalThinking = "";
+  try {
+    const response = await axios.post(
+      `${ollamaEndpoint}/api/chat`,
+      {
+        model: ollamaModel,
+        messages: [
+          ...messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          {
+            role: "user",
+            content: instruction,
+          },
+        ],
+        think: enableThinking,
+        stream: true,
+        options: {
+          temperature: 0.7,
+          num_predict: ollamaPredictNum,
+        },
+        keep_alive: -1,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        responseType: "stream",
+      },
+    );
+
+    await new Promise<void>((resolve) => {
+      response.data.on("data", (chunk: Buffer) => {
+        const dataLines = chunk
+          .toString()
+          .split("\n")
+          .filter((line) => line.trim() !== "");
+
+        for (const line of dataLines) {
+          try {
+            const parsedData = JSON.parse(line);
+            if (parsedData.message?.content) {
+              const content = parsedData.message.content;
+              partialCallback(content);
+              finalAnswer += content;
+            }
+            if (parsedData.message?.thinking) {
+              const thinking = parsedData.message.thinking;
+              partialThinkingCallback?.(thinking);
+              finalThinking += thinking;
+            }
+          } catch (error) {
+            console.error("Error parsing final answer data:", error, line);
+          }
+        }
+      });
+      response.data.on("end", resolve);
+      response.data.on("error", (error: Error) => {
+        console.error("Error streaming final answer:", error.message);
+        resolve();
+      });
+    });
+
+    if (finalThinking.trim()) {
+      console.log(`[Ollama] Final no-tools thinking length: ${finalThinking.length}`);
+    }
+    messages.push({
+      role: "assistant",
+      content: finalAnswer,
+    });
+  } catch (error: any) {
+    console.error("Error generating final answer from tool results:", error.message);
+  } finally {
+    endResolve();
+    endCallback();
+  }
+};
+
+const chatWithLLMStreamInternal = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
   invokeFunctionCallback?: (functionName: string, result?: string) => void,
+  toolLoopState: ToolLoopState = { round: 0, signatures: new Set<string>() },
 ): Promise<void> => {
   if (shouldResetChatHistory()) {
     resetChatHistory();
@@ -262,6 +388,48 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       });
 
       if (!isEmpty(functionCalls)) {
+        if (toolLoopState.round >= ollamaMaxToolRounds) {
+          console.warn(`[ToolLoop] Reached OLLAMA_MAX_TOOL_ROUNDS=${ollamaMaxToolRounds}.`);
+          await answerFromAvailableToolResults({
+            instruction:
+              "You have already checked enough tool results for this request. Answer the user's latest request now using the available conversation and tool results. Do not call or ask for another tool. Do not mention internal tool instructions, raw status markers such as [success], exit_code, duration_ms, timed_out, truncated, or phrases like previous tool result.",
+            partialCallback,
+            endResolve,
+            endCallback,
+            partialThinkingCallback,
+          });
+          return;
+        }
+
+        const duplicateCall = functionCalls.find((call) =>
+          toolLoopState.signatures.has(toolCallSignature(call)),
+        );
+        if (duplicateCall) {
+          const signature = toolCallSignature(duplicateCall);
+          const name = duplicateCall.function?.name || "tool";
+          const previous = previousToolResultFor(name);
+          console.warn(`[ToolLoop] Repeated tool call blocked: ${signature}`);
+          await answerFromAvailableToolResults({
+            instruction: [
+              `The ${name} tool was already called for this request, so do not call it again.`,
+              "Answer the user's latest request now using the available result below.",
+              "Do not mention internal tool instructions, raw status markers such as [success], exit_code, duration_ms, timed_out, truncated, or phrases like previous tool result.",
+              previous ? `\nAvailable ${name} result:\n${previous}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            partialCallback,
+            endResolve,
+            endCallback,
+            partialThinkingCallback,
+          });
+          return;
+        }
+
+        for (const call of functionCalls) {
+          toolLoopState.signatures.add(toolCallSignature(call));
+        }
+
         const results = await Promise.all(
           functionCalls.map(async (call: OllamaFunctionCall) => {
             const {
@@ -322,12 +490,18 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
           return;
         }
 
-        await chatWithLLMStream(
+        await chatWithLLMStreamInternal(
           newMessages as Message[],
           partialCallback,
           () => {
             endResolve();
             endCallback();
+          },
+          partialThinkingCallback,
+          invokeFunctionCallback,
+          {
+            round: toolLoopState.round + 1,
+            signatures: toolLoopState.signatures,
           },
         );
         return;
@@ -344,6 +518,21 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
 
   return promise;
 };
+
+const chatWithLLMStream: ChatWithLLMStreamFunction = async (
+  inputMessages: Message[] = [],
+  partialCallback: (partialAnswer: string) => void,
+  endCallback: () => void,
+  partialThinkingCallback?: (partialThinking: string) => void,
+  invokeFunctionCallback?: (functionName: string, result?: string) => void,
+): Promise<void> =>
+  chatWithLLMStreamInternal(
+    inputMessages,
+    partialCallback,
+    endCallback,
+    partialThinkingCallback,
+    invokeFunctionCallback,
+  );
 
 const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
   text: string, promptPrefix: string
