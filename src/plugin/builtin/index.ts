@@ -5,6 +5,7 @@ import { registerImageGenerationPlugins } from "./image-generation";
 import { registerVisionPlugins } from "./vision";
 import { registerLLMToolsPlugins } from "./llm-tools";
 import { registerMusicToolsPlugins } from "./music-tools";
+import { registerDnDToolsPlugins } from "./dnd-tools";
 
 export function registerBuiltinPlugins(): void {
   registerASRPlugins();
@@ -14,4 +15,5 @@ export function registerBuiltinPlugins(): void {
   registerVisionPlugins();
   registerLLMToolsPlugins();
   registerMusicToolsPlugins();
+  registerDnDToolsPlugins();
 }
