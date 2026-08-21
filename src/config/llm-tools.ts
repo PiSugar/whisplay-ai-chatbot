@@ -6,7 +6,7 @@ import { addVisionTools } from "./vision";
 import { addWebSearchTools } from "./web-search";
 import { addLocalMemoryTools } from "./local-memory";
 import { addMemPalaceTools } from "./mempalace";
-import { addHardnessCommandTools } from "./hardness-command";
+import { addHarnessCommandTools } from "./harness-command";
 import { pluginRegistry } from "../plugin";
 
 // ── Collect tools from all llm-tools plugins ────────────────
@@ -49,7 +49,7 @@ addVisionTools(pluginTools);
 addWebSearchTools(pluginTools);
 addLocalMemoryTools(pluginTools);
 addMemPalaceTools(pluginTools);
-addHardnessCommandTools(pluginTools);
+addHarnessCommandTools(pluginTools);
 
 // ── Exported aggregated tool lists ──────────────────────────
 export const llmTools: LLMTool[] = [...pluginTools];
