@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 # if graphical interface is enabled, ask user whether to disable graphical interface
 if [ "$(systemctl get-default)" == "graphical.target" ]; then
     echo "Graphical interface is currently enabled."
@@ -45,12 +47,24 @@ echo "Found Node at: $NODE_FOLDER"
 echo "----------------------------------------"
 
 if command -v systemctl >/dev/null 2>&1; then
-    if systemctl list-unit-files | grep -q '^whisplay-daemon\.service'; then
+    if systemctl is-active --quiet whisplay-daemon.service 2>/dev/null && [ -S /tmp/whisplay-daemon.sock ]; then
         echo "Detected whisplay-daemon.service on this system."
-        echo "When whisplay-daemon is present, whisplay-ai-chatbot should be managed by the daemon instead of installing chatbot.service."
-        echo "Please stop/disable the daemon service first if you really want the legacy standalone chatbot.service mode:"
-        echo "  sudo systemctl stop whisplay-daemon.service"
-        echo "  sudo systemctl disable whisplay-daemon.service"
+        echo "Registering whisplay-ai-chatbot and enabling daemon-managed boot autostart..."
+        if ! (
+            cd "$SCRIPT_DIR"
+            "$NODE_BIN" scripts/register-whisplay-daemon-app.js --autostart
+        ); then
+            echo "Error: Failed to configure whisplay-daemon autostart."
+            echo "Make sure whisplay-daemon includes app.autostart.set support."
+            exit 1
+        fi
+        echo "Done! whisplay-ai-chatbot will be launched by whisplay-daemon on every boot."
+        exit 0
+    fi
+    if systemctl list-unit-files | grep -q '^whisplay-daemon\.service'; then
+        echo "Detected whisplay-daemon.service, but it is not currently available."
+        echo "Start the daemon and run this script again:"
+        echo "  sudo systemctl start whisplay-daemon.service"
         exit 1
     fi
 fi

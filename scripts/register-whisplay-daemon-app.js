@@ -48,6 +48,7 @@ async function main() {
   }
 
   const repoRoot = process.cwd();
+  const enableAutostart = process.argv.includes("--autostart");
   const launchScript = path.join(repoRoot, "run_chatbot.sh");
   const logFile = path.join(repoRoot, "chatbot.log");
   const request = {
@@ -71,8 +72,35 @@ async function main() {
       return;
     }
     console.log("[DaemonRegister] app registered to whisplay-daemon");
+    if (!enableAutostart) {
+      return;
+    }
+
+    const autostartRes = await sendRequest(SOCKET_PATH, {
+      version: 1,
+      cmd: "app.autostart.set",
+      payload: { app_id: APP_ID },
+    });
+    if (!autostartRes || !autostartRes.ok) {
+      const reason = (autostartRes && autostartRes.error) || "unknown error";
+      throw new Error(`could not enable daemon autostart: ${reason}`);
+    }
+    console.log("[DaemonRegister] daemon autostart enabled for whisplay-ai-chatbot");
+
+    const launchRes = await sendRequest(SOCKET_PATH, {
+      version: 1,
+      cmd: "app.launch",
+      payload: { app_id: APP_ID },
+    });
+    if (!launchRes || !launchRes.ok) {
+      const reason = (launchRes && launchRes.error) || "unknown error";
+      console.log(`[DaemonRegister] autostart saved; immediate launch skipped: ${reason}`);
+      return;
+    }
+    console.log("[DaemonRegister] app launch requested");
   } catch (err) {
-    console.log(`[DaemonRegister] skip register: ${err.message}`);
+    console.error(`[DaemonRegister] setup failed: ${err.message}`);
+    process.exitCode = 1;
   }
 }
 

@@ -77,6 +77,10 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    ```bash
    bash startup.sh
    ```
+
+   If `whisplay-daemon` is running, this registers the chatbot with the daemon,
+   configures it as the daemon's boot autostart app, and launches it immediately.
+   Otherwise, the script installs the legacy standalone `chatbot.service`.
    Please note that this will disable the graphical interface and set the system to multi-user mode, which is suitable for headless operation.
    You can find the output logs at `chatbot.log`. Running `tail -f chatbot.log` will also display the logs in real-time.
 

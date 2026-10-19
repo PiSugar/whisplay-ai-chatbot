@@ -351,8 +351,9 @@ bash startup.sh
 whisplay service install
 
 # Service file location: /etc/systemd/system/chatbot.service
-# If whisplay-daemon.service exists, startup.sh refuses to install chatbot.service.
-# In that case the chatbot should be launched and managed by whisplay-daemon instead.
+# If whisplay-daemon.service is running, startup.sh registers the chatbot,
+# enables daemon-managed boot autostart, and requests an immediate launch.
+# If the daemon unit exists but is unavailable, startup.sh asks the user to start it.
 # Logs: ~/whisplay-ai-chatbot/chatbot.log
 
 # View logs
