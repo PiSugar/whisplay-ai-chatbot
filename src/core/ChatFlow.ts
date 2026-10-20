@@ -124,7 +124,7 @@ class ChatFlow implements ChatFlowContext {
       this.wakeWordListener = new WakeWordListener();
       this.wakeWordListener.on("wake", () => {
         if (this.currentFlowName === "sleep") {
-          this.startWakeSession();
+          void this.startWakeSession();
         }
       });
       this.wakeWordListener.start();
@@ -236,8 +236,14 @@ class ChatFlow implements ChatFlowContext {
     if (flowName !== "music" && isMusicPlaying()) {
       stopMusicPlayback();
     }
+    if (flowName !== "sleep") {
+      void this.wakeWordListener?.stop();
+    }
     console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
     this.stateMachine.transitionTo(flowName);
+    if (flowName === "sleep") {
+      this.wakeWordListener?.start();
+    }
     display({ text_input_enabled: flowName === "sleep" });
   };
 
@@ -456,13 +462,19 @@ class ChatFlow implements ChatFlowContext {
     this.streamResponser.endPartial();
   };
 
-  startWakeSession = (): void => {
+  startWakeSession = async (): Promise<void> => {
     this.wakeSessionActive = true;
     this.wakeSessionStartAt = Date.now();
     this.wakeSessionLastSpeechAt = this.wakeSessionStartAt;
     this.endAfterAnswer = false;
-    playWakeupChime();
-    this.transitionTo("wake_listening");
+    await playWakeupChime();
+    if (this.currentFlowName === "sleep" && this.wakeSessionActive) {
+      this.transitionTo("wake_listening");
+    }
+  };
+
+  pauseWakeWordListener = async (): Promise<void> => {
+    await this.wakeWordListener?.stop();
   };
 
   endWakeSession = (): void => {

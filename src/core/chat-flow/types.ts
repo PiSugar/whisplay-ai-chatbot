@@ -54,7 +54,8 @@ export interface ChatFlowContext {
   resetToolCallDisplay: () => void;
   recognizeAudio: (path: string, isFromAutoListening?: boolean) => Promise<string>;
   partialThinkingCallback: (partialThinking: string) => void;
-  startWakeSession: () => void;
+  startWakeSession: () => Promise<void>;
+  pauseWakeWordListener: () => Promise<void>;
   endWakeSession: () => void;
   shouldContinueWakeSession: () => boolean;
   shouldEndAfterAnswer: (text: string) => boolean;
