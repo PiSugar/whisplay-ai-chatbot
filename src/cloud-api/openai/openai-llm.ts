@@ -13,7 +13,6 @@ import { combineFunction, formatToolResultsForLog } from "../../utils";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import { llmFuncMap, llmTools } from "../../config/llm-tools";
 import {
-  ChatWithLLMStreamFunction,
   SummaryTextWithLLMFunction,
 } from "../interface";
 import { chatHistoryDir } from "../../utils/dir";
@@ -36,6 +35,25 @@ const openaiUseStream =
   (process.env.OPENAI_USE_STREAM || "true").toLowerCase() === "true";
 const openaiUseImagePath =
   (process.env.OPENAI_USE_IMAGE_PATH || "false").toLowerCase() === "true";
+const configuredOpenaiApiMode = (
+  process.env.OPENAI_API_MODE || "auto"
+).toLowerCase();
+const openaiBaseUrl = process.env.OPENAI_API_BASE_URL;
+const isOfficialOpenaiEndpoint = (() => {
+  if (!openaiBaseUrl) return true;
+  try {
+    return new URL(openaiBaseUrl).hostname === "api.openai.com";
+  } catch {
+    return false;
+  }
+})();
+const openaiApiMode =
+  configuredOpenaiApiMode === "responses" ||
+  configuredOpenaiApiMode === "chat-completions"
+    ? configuredOpenaiApiMode
+    : isOfficialOpenaiEndpoint
+      ? "responses"
+      : "chat-completions";
 const openaiMaxMessagesLength = parseInt(
   process.env.OPENAI_MAX_MESSAGES_LENGTH || "0",
   10,
@@ -65,6 +83,21 @@ const openaiTools = llmTools.map((tool) => ({
   },
 }));
 
+const openaiResponseTools = openaiTools.map((tool) => ({
+  type: "function" as const,
+  name: tool.function.name,
+  description: tool.function.description,
+  parameters: tool.function.parameters,
+  strict: false,
+}));
+
+if (!["auto", "responses", "chat-completions"].includes(configuredOpenaiApiMode)) {
+  console.warn(
+    `[OpenAI] Unknown OPENAI_API_MODE=${configuredOpenaiApiMode}; using ${openaiApiMode}.`,
+  );
+}
+console.log(`[OpenAI] model=${openaiLLMModel} api_mode=${openaiApiMode}`);
+
 const buildImageDataUrl = (imagePath: string): string => {
   const mimeType = getImageMimeType(imagePath) || "image/jpeg";
   const base64 = fs.readFileSync(imagePath).toString("base64");
@@ -90,16 +123,92 @@ const resetChatHistory = (): void => {
   });
 };
 
-const chatWithLLMStream: ChatWithLLMStreamFunction = async (
+const buildResponsesInput = (
+  sourceMessages: Message[],
+  capturedImagePath: string,
+  lastUserMessageIndex: number | undefined,
+): any[] => {
+  const input: any[] = [];
+
+  sourceMessages.forEach((message, index) => {
+    if (message.role === "tool") {
+      if (message.tool_call_id) {
+        input.push({
+          type: "function_call_output",
+          call_id: message.tool_call_id,
+          output: message.content,
+        });
+      }
+      return;
+    }
+
+    if (message.content) {
+      const isCapturedImageMessage =
+        capturedImagePath &&
+        message.role === "user" &&
+        lastUserMessageIndex !== undefined &&
+        index === lastUserMessageIndex;
+      input.push({
+        type: "message",
+        role: message.role,
+        content: isCapturedImageMessage
+          ? [
+              { type: "input_text", text: message.content },
+              {
+                type: "input_image",
+                image_url: openaiUseImagePath
+                  ? capturedImagePath
+                  : buildImageDataUrl(capturedImagePath),
+              },
+            ]
+          : message.content,
+      });
+    }
+
+    message.tool_calls?.forEach((call) => {
+      if (!call.id || !call.function.name) return;
+      input.push({
+        type: "function_call",
+        call_id: call.id,
+        name: call.function.name,
+        arguments: call.function.arguments || "{}",
+      });
+    });
+  });
+
+  return input;
+};
+
+const responseFunctionCall = (item: any, index: number): FunctionCall => ({
+  id: item.call_id,
+  index,
+  type: "function",
+  function: {
+    name: item.name,
+    arguments: item.arguments || "{}",
+  },
+});
+
+const describeOpenaiError = (error: any): string => {
+  const details = [
+    error?.message || String(error),
+    error?.status ? `status=${error.status}` : "",
+    error?.code ? `code=${error.code}` : "",
+    error?.param ? `param=${error.param}` : "",
+  ].filter(Boolean);
+  return details.join("; ");
+};
+
+const chatWithLLMStream = async (
   inputMessages: Message[] = [],
   partialCallback: (partial: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
   invokeFunctionCallback?: (functionName: string, result?: string) => void,
+  previousResponseId?: string,
 ): Promise<void> => {
   if (!openai) {
-    console.error("OpenAI API key is not set.");
-    return;
+    throw new Error("OpenAI API key is not set.");
   }
   if (shouldResetChatHistory()) {
     resetChatHistory();
@@ -184,56 +293,101 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   });
   let answer = "";
   let functionCalls: FunctionCall[] = [];
-  if (openaiUseStream) {
-    const chatCompletion = await openai.chat.completions.create({
-      model: openaiLLMModel,
-      messages: requestMessages as any,
-      stream: true,
-      tools: shouldIncludeTools ? openaiTools : undefined,
-    }).catch((error) => {
-      console.log("Error during OpenAI chat completion request:", error.message);
-      endResolve();
-      endCallback();
-      return [];
-    });
-    let partialAnswer = "";
-    const functionCallsPackages: any[] = [];
-    try {
-      for await (const chunk of chatCompletion) {
-        if (chunk.choices[0].delta.content) {
-          partialCallback(chunk.choices[0].delta.content);
-          partialAnswer += chunk.choices[0].delta.content;
+  let responseApiResponseId: string | undefined;
+  try {
+    if (openaiApiMode === "responses") {
+      const responseInput = buildResponsesInput(
+        previousResponseId ? inputMessages : messages,
+        capturedImagePath,
+        previousResponseId ? undefined : lastUserMessageIndex,
+      );
+      if (openaiUseStream) {
+        const responseStream = await openai.responses.create({
+          model: openaiLLMModel,
+          input: responseInput,
+          previous_response_id: previousResponseId,
+          stream: true,
+          tools: shouldIncludeTools ? openaiResponseTools : undefined,
+        });
+        for await (const event of responseStream) {
+          if (event.type === "response.created") {
+            responseApiResponseId = event.response.id;
+          } else if (event.type === "response.output_text.delta") {
+            partialCallback(event.delta);
+            answer += event.delta;
+          } else if (event.type === "response.reasoning_text.delta") {
+            partialThinkingCallback?.(event.delta);
+          } else if (
+            event.type === "response.output_item.done" &&
+            event.item.type === "function_call"
+          ) {
+            functionCalls.push(
+              responseFunctionCall(event.item, functionCalls.length),
+            );
+          } else if (event.type === "response.completed") {
+            responseApiResponseId = event.response.id;
+          } else if (event.type === "error") {
+            throw new Error(event.message);
+          } else if (event.type === "response.failed") {
+            throw new Error(
+              event.response.error?.message || "OpenAI response failed.",
+            );
+          }
         }
-        if (chunk.choices[0].delta.tool_calls) {
-          functionCallsPackages.push(...chunk.choices[0].delta.tool_calls);
+      } else {
+        const response = await openai.responses.create({
+          model: openaiLLMModel,
+          input: responseInput,
+          previous_response_id: previousResponseId,
+          stream: false,
+          tools: shouldIncludeTools ? openaiResponseTools : undefined,
+        });
+        responseApiResponseId = response.id;
+        answer = response.output_text || "";
+        if (answer) partialCallback(answer);
+        functionCalls = response.output
+          .filter((item) => item.type === "function_call")
+          .map((item, index) => responseFunctionCall(item, index));
+      }
+    } else if (openaiUseStream) {
+      const chatCompletion = await openai.chat.completions.create({
+        model: openaiLLMModel,
+        messages: requestMessages as any,
+        stream: true,
+        tools: shouldIncludeTools ? openaiTools : undefined,
+      });
+      const functionCallsPackages: any[] = [];
+      for await (const chunk of chatCompletion) {
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
+          partialCallback(delta.content);
+          answer += delta.content;
+        }
+        if (delta?.tool_calls) {
+          functionCallsPackages.push(...delta.tool_calls);
         }
       }
-    } catch (error: any) {
-      console.error(
-        "Error while reading OpenAI chat completion stream:",
-        error?.message || error,
-      );
+      functionCalls = combineFunction(functionCallsPackages);
+    } else {
+      const chatCompletion = await openai.chat.completions.create({
+        model: openaiLLMModel,
+        messages: requestMessages as any,
+        stream: false,
+        tools: shouldIncludeTools ? openaiTools : undefined,
+      });
+      if (chatCompletion.choices.length > 0) {
+        const msg = chatCompletion.choices[0].message;
+        answer = msg?.content || "";
+        if (answer) partialCallback(answer);
+        functionCalls = combineFunction((msg?.tool_calls as any) || []);
+      }
     }
-    answer = partialAnswer;
-    functionCalls = combineFunction(functionCallsPackages);
-  } else {
-    const chatCompletion = await openai.chat.completions.create({
-      model: openaiLLMModel,
-      messages: requestMessages as any,
-      stream: false,
-      tools: shouldIncludeTools ? openaiTools : undefined,
-    }).catch((error) => {
-      console.log("Error during OpenAI chat completion request:", error.message);
-      endResolve();
-      endCallback();
-      return null;
-    });
-    if (chatCompletion && chatCompletion.choices && chatCompletion.choices.length > 0) {
-      const msg = chatCompletion.choices[0].message;
-      answer = msg?.content || "";
-      partialCallback(answer);
-      functionCalls = combineFunction((msg?.tool_calls as any) || []);
-    }
+  } catch (error: any) {
+    const description = describeOpenaiError(error);
+    console.error(
+      `[OpenAI] request failed model=${openaiLLMModel} api_mode=${openaiApiMode}: ${description}`,
+    );
+    throw error;
   }
   messages.push({
     role: "assistant",
@@ -294,14 +448,8 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
       },
       partialThinkingCallback,
       invokeFunctionCallback,
-    ).catch((error) => {
-      console.error(
-        "Error during OpenAI follow-up chat completion:",
-        error?.message || error,
-      );
-      endResolve();
-      endCallback();
-    });
+      responseApiResponseId,
+    );
     return;
   } else {
     endResolve();
@@ -318,25 +466,41 @@ const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
     console.error("OpenAI API key is not set. Using original text.");
     return text;
   }
-  const chatCompletion = await openai.chat.completions
-    .create({
-      model: openaiLLMModel,
-      messages: [
-        {
-          role: "system",
-          content: promptPrefix,
-        },
-        {
-          role: "user",
-          content: text,
-        },
-      ],
-      stream: false,
-    })
-    .catch((error) => {
-      console.log("Error during OpenAI summary request:", error.message);
-      return null;
-    });
+  if (openaiApiMode === "responses") {
+    const response = await openai.responses
+      .create({
+        model: openaiLLMModel,
+        instructions: promptPrefix,
+        input: text,
+        stream: false,
+      })
+      .catch((error) => {
+        console.log("Error during OpenAI summary request:", describeOpenaiError(error));
+        return null;
+      });
+    if (!response) return text;
+    const summary = response.output_text || "";
+    console.log("OpenAI summary:", summary);
+    return summary || text;
+  }
+
+  const chatCompletion = await openai.chat.completions.create({
+    model: openaiLLMModel,
+    messages: [
+      {
+        role: "system",
+        content: promptPrefix,
+      },
+      {
+        role: "user",
+        content: text,
+      },
+    ],
+    stream: false,
+  }).catch((error) => {
+    console.log("Error during OpenAI summary request:", describeOpenaiError(error));
+    return null;
+  });
   if (!chatCompletion) {
     return text;
   }
