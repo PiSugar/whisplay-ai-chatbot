@@ -1,46 +1,17 @@
 import { spawn, ChildProcess } from "child_process";
-import { readFileSync } from "fs";
 import { isEmpty, noop, set } from "lodash";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
 import { pluginRegistry } from "../plugin";
 import type { ASRPlugin, TTSPlugin, AudioFormat } from "../plugin";
 import { ASRServer, TTSResult, TTSServer } from "../type";
+import { alsaInputDevice, alsaOutputDevice } from "./audio-device";
 import { webAudioBridge } from "./web-audio-bridge";
 
 export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
 dotenv.config();
 
-const detectWhisplaySoundCardRef = (): string | undefined => {
-  try {
-    const cards = readFileSync("/proc/asound/cards", "utf8");
-    const line = cards
-      .split("\n")
-      .find((item) => /whisplaysound|wm8960soundcard|es8389soundcard/i.test(item));
-    const nameMatch = line?.match(/\[([^\]]+)\]/);
-    if (nameMatch?.[1]) {
-      return nameMatch[1].trim();
-    }
-    const indexMatch = line?.match(/^\s*(\d+)\s+\[/);
-    return indexMatch?.[1];
-  } catch (e) {
-    return undefined;
-  }
-};
-
-const soundCardRef =
-  process.env.SOUND_CARD_NAME ||
-  process.env.SOUND_CARD_INDEX ||
-  detectWhisplaySoundCardRef();
-const defaultAlsaInputDevice = soundCardRef ? `hw:${soundCardRef},0` : "default";
-const defaultAlsaOutputDevice = soundCardRef === "whisplaysound"
-  ? "playback"
-  : soundCardRef
-    ? `plughw:${soundCardRef},0`
-    : "default";
-const alsaInputDevice = process.env.ALSA_INPUT_DEVICE || defaultAlsaInputDevice;
-const alsaOutputDevice = process.env.ALSA_OUTPUT_DEVICE || defaultAlsaOutputDevice;
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
   const normalized = (value || "").toLowerCase();
   return normalized === "wav" || normalized === "mp3" ? normalized : fallback;
@@ -58,6 +29,20 @@ const ttsAudioFormat: AudioFormat = normalizeAudioFormat(
 
 const useWavPlayer = ttsAudioFormat === "wav";
 const MP3_SOX_GAIN_DB = "2";
+const voiceDetectEndSilenceSecRaw = parseFloat(
+  process.env.VOICE_DETECT_END_SILENCE_SEC || "1.5",
+);
+const voiceDetectEndSilenceSec =
+  Number.isFinite(voiceDetectEndSilenceSecRaw) && voiceDetectEndSilenceSecRaw > 0
+    ? voiceDetectEndSilenceSecRaw
+    : 1.5;
+const voiceDetectEndLevelRatioRaw = parseFloat(
+  process.env.VOICE_DETECT_END_LEVEL_RATIO || "0.5",
+);
+const voiceDetectEndLevelRatio =
+  Number.isFinite(voiceDetectEndLevelRatioRaw) && voiceDetectEndLevelRatioRaw > 0
+    ? voiceDetectEndLevelRatioRaw
+    : 0.5;
 
 const defaultAsrAudioFormat: AudioFormat = [
   ASRServer.vosk,
@@ -173,6 +158,10 @@ const recordAudio = async (
   }
 
   return new Promise((resolve, reject) => {
+    const voiceDetectEndLevel = Math.max(
+      1,
+      voiceDetectLevel * voiceDetectEndLevelRatio,
+    );
     const args = [
       "-t",
       "alsa",
@@ -189,10 +178,12 @@ const recordAudio = async (
       "0.1",
       `${voiceDetectLevel}%`,
       "1",
-      "0.7",
-      `${voiceDetectLevel}%`,
+      `${voiceDetectEndSilenceSec}`,
+      `${voiceDetectEndLevel}%`,
     ];
-    console.log(`Starting recording, maximum ${duration} seconds...`);
+    console.log(
+      `Starting recording, maximum ${duration} seconds (start=${voiceDetectLevel}%, stop=${voiceDetectEndLevel}% for ${voiceDetectEndSilenceSec}s)...`,
+    );
     currentRecordingReject = reject;
     const recordingProcess = spawn("sox", args);
 
