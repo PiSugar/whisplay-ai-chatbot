@@ -82,11 +82,12 @@ const topLevelGroups: TopLevelGroup[] = [
         "Gemini Image Generation",
         "OpenAI",
         "OpenAI TTS",
+        "AWS (Amazon Web Services)",
         "Grok",
         "Anthropic",
         "MiniMax",
         "Kimi (Moonshot AI)",
-        "Alibaba Cloud Qwen (通义千问)",
+        "Alibaba Cloud Qwen",
         "OpenRouter",
         "Perplexity",
       ].includes(section.title),
@@ -128,6 +129,7 @@ const topLevelGroups: TopLevelGroup[] = [
         "Google Custom Search API",
         "Local Music Tool (LLM function calling)",
         "Harness Command Tool (LLM function calling)",
+        "Context Auto Compaction",
         "Local Memory",
         "MemPalace (Long-term AI Memory)",
         "AI Behavior",
@@ -174,7 +176,7 @@ function getEntryDisplayName(key: string): string {
 
 function maskValue(key: string, value: string): string {
   if (!value) return "(empty)";
-  if (/(KEY|TOKEN|SECRET|PASSWORD)/i.test(key)) {
+  if (/(^|_)(KEY|TOKEN|SECRET|PASSWORD)(_|$)/i.test(key)) {
     if (value.length <= 4) return "*".repeat(value.length);
     return `${value.slice(0, 2)}${"*".repeat(Math.max(4, value.length - 4))}${value.slice(-2)}`;
   }
