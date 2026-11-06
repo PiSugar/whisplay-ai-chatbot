@@ -31,14 +31,14 @@ card_name=""
 card_control="Speaker"
 audio_supported=false
 if [ "$is_linux" = true ] && [ -r "/proc/asound/cards" ] && command -v amixer >/dev/null 2>&1; then
-  card_info=$(awk '/whisplaysound|wm8960soundcard|es8388|es8389soundcard/ {print $1 " " $2; exit}' /proc/asound/cards)
+  card_info=$(awk '/whisplaysound|wm8960soundcard|es8389soundcard/ {print $1 " " $2; exit}' /proc/asound/cards)
   if [ -n "$card_info" ]; then
     card_index=$(echo "$card_info" | awk '{print $1}')
     card_name=$(echo "$card_info" | awk '{print $2}' | tr -d '[]:')
     audio_supported=true
-    if echo "$card_name" | grep -Eqi 'es8388|es8389'; then
+    if echo "$card_name" | grep -qi 'es8389'; then
       card_control="Output 1"
-      echo "Detected ES8388 sound card (Hat Plus)"
+      echo "Detected ES8389 sound card (Hat Plus)"
     fi
     echo "Using sound card: ${card_name:-unknown} (index ${card_index})"
   else
@@ -83,7 +83,7 @@ get_env_value() {
 # check if .env file exists
 initial_volume_percent=""
 default_initial_volume_percent=80
-es8388_mic_pga_level=8
+es8389_mic_pga_level=8
 serve_ollama=false
 if [ -f ".env" ]; then
   # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
@@ -100,8 +100,8 @@ if [ -f ".env" ]; then
     echo "[Volume] INITIAL_VOLUME_LEVEL is deprecated and ignored. Please use INITIAL_VOLUME_PERCENT (0-100) instead."
   fi
 
-  ES8388_MIC_PGA_LEVEL=$(get_env_value "ES8388_MIC_PGA_LEVEL")
-  [ -n "$ES8388_MIC_PGA_LEVEL" ] && export ES8388_MIC_PGA_LEVEL
+  ES8389_MIC_PGA_LEVEL=$(get_env_value "ES8389_MIC_PGA_LEVEL")
+  [ -n "$ES8389_MIC_PGA_LEVEL" ] && export ES8389_MIC_PGA_LEVEL
 
   WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
   [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
@@ -126,8 +126,8 @@ if [ -f ".env" ]; then
     initial_volume_percent=$INITIAL_VOLUME_PERCENT
   fi
 
-  if [ -n "$ES8388_MIC_PGA_LEVEL" ]; then
-    es8388_mic_pga_level=$ES8388_MIC_PGA_LEVEL
+  if [ -n "$ES8389_MIC_PGA_LEVEL" ]; then
+    es8389_mic_pga_level=$ES8389_MIC_PGA_LEVEL
   fi
 else
   echo ".env file not found, please create one based on .env.template."
@@ -148,7 +148,7 @@ if [ "$audio_supported" = true ]; then
     amixer -c "$card_index" set "$card_control" "${initial_volume_percent}%" >/dev/null 2>&1 || true
   fi
 
-  # ES8388: apply a deterministic capture route and input gain.
+  # ES8389: apply a deterministic capture route and input gain.
   if [ "$card_control" = "Output 1" ]; then
     # Route ADC from Line 1 path, select stereo input, maximize digital capture,
     # and apply the configured analogue PGA gain.
@@ -156,8 +156,8 @@ if [ "$audio_supported" = true ]; then
     amixer -c "$card_index" cset numid=16 0 >/dev/null 2>&1 || true
     amixer -c "$card_index" cset numid=14 0 >/dev/null 2>&1 || true
     amixer -c "$card_index" cset numid=1 192,192 >/dev/null 2>&1 || true
-    amixer -c "$card_index" cset numid=12 "$es8388_mic_pga_level,$es8388_mic_pga_level" >/dev/null 2>&1 || true
-    echo "ES8388 capture route initialized (PGA=$es8388_mic_pga_level)"
+    amixer -c "$card_index" cset numid=12 "$es8389_mic_pga_level,$es8389_mic_pga_level" >/dev/null 2>&1 || true
+    echo "ES8389 capture route initialized (PGA=$es8389_mic_pga_level)"
   fi
 fi
 
@@ -182,7 +182,7 @@ if [ "$serve_ollama" = true ]; then
   OLLAMA_HOST=0.0.0.0:11434 ollama serve &
 fi
 
-# Auto-launch Hat Plus UI browser when ES8388 sound card is detected (Hat Plus model)
+# Auto-launch Hat Plus UI browser when ES8389 sound card is detected (Hat Plus model)
 is_hat_plus=false
 if [ "$audio_supported" = true ] && echo "$card_control" | grep -qi 'Output 1'; then
   is_hat_plus=true

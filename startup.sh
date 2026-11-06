@@ -108,10 +108,10 @@ WantedBy=multi-user.target
 EOF
 
 # ── Hat Plus kiosk service (DSI display) ─────────────────────────────────
-# Check if this is a Hat Plus device (ES8388 sound card present)
-if grep -qi 'es8388' /proc/asound/cards 2>/dev/null; then
+# Check if this is a Hat Plus device (ES8389 sound card present)
+if grep -qi 'es8389' /proc/asound/cards 2>/dev/null; then
     echo ""
-    echo "Detected Hat Plus hardware (ES8388). Setting up kiosk UI service..."
+    echo "Detected Hat Plus hardware (ES8389). Setting up kiosk UI service..."
 
     # Ensure graphical target for Chromium kiosk
     if [ "$(systemctl get-default)" != "graphical.target" ]; then

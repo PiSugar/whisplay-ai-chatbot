@@ -5,7 +5,7 @@ export type HatModel = "hat" | "hat-plus";
 
 /**
  * Detect the Whisplay hat model by checking the ALSA sound cards.
- * - If an ES8388 card is found → "hat-plus"
+ * - If an ES8389 card is found → "hat-plus"
  * - Otherwise → "hat" (wm8960)
  */
 export function detectHatModel(): HatModel {
@@ -17,7 +17,7 @@ export function detectHatModel(): HatModel {
   // Auto-detect by checking /proc/asound/cards
   try {
     const cards = fs.readFileSync("/proc/asound/cards", "utf-8");
-    if (/es8388|es8389/i.test(cards)) {
+    if (/es8389/i.test(cards)) {
       return "hat-plus";
     }
   } catch {
@@ -27,20 +27,20 @@ export function detectHatModel(): HatModel {
   return "hat";
 }
 
-export type SoundCardType = "wm8960" | "es8388";
+export type SoundCardType = "wm8960" | "es8389";
 
 /**
  * Detect the sound card type, respecting SOUND_CARD_TYPE env var.
  */
 export function detectSoundCardType(): SoundCardType {
   const explicit = (process.env.SOUND_CARD_TYPE || "").toLowerCase().trim();
-  if (explicit === "wm8960" || explicit === "es8388") {
+  if (explicit === "wm8960" || explicit === "es8389") {
     return explicit as SoundCardType;
   }
 
   // Auto-detect from hat model
   const model = detectHatModel();
-  return model === "hat-plus" ? "es8388" : "wm8960";
+  return model === "hat-plus" ? "es8389" : "wm8960";
 }
 
 /**
@@ -54,7 +54,7 @@ export function getSoundCardIndex(): string {
   try {
     const cards = fs.readFileSync("/proc/asound/cards", "utf-8");
     const cardType = detectSoundCardType();
-    const pattern = cardType === "es8388" ? /es8388|es8389/i : /wm8960/i;
+    const pattern = cardType === "es8389" ? /es8389/i : /wm8960/i;
     for (const line of cards.split("\n")) {
       if (pattern.test(line)) {
         const match = line.match(/^\s*(\d+)\s/);

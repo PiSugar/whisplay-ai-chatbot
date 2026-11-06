@@ -7,7 +7,7 @@ const detectWhisplaySoundCardRef = (): string => {
     const cards = readFileSync("/proc/asound/cards", "utf8");
     const line = cards
       .split("\n")
-      .find((item) => /whisplaysound|wm8960soundcard|es8388|es8389soundcard/i.test(item));
+      .find((item) => /whisplaysound|wm8960soundcard|es8389soundcard/i.test(item));
     const nameMatch = line?.match(/\[([^\]]+)\]/);
     if (nameMatch?.[1]) {
       return nameMatch[1].trim();
@@ -21,9 +21,9 @@ const detectWhisplaySoundCardRef = (): string => {
 const soundCardIndex = process.env.SOUND_CARD_INDEX || detectWhisplaySoundCardRef();
 const soundCardRef = soundCardName || soundCardIndex;
 const isUnifiedWhisplay = soundCardName === "whisplaysound" || soundCardRef === "whisplaysound";
-const isEs8388 = /es8388|es8389/i.test(soundCardName) ||
-  (!isUnifiedWhisplay && process.env.SOUND_CARD_TYPE?.toLowerCase() === "es8388");
-const speakerControl = isUnifiedWhisplay ? "speaker" : isEs8388 ? "Output 1" : "Speaker";
+const isEs8389 = /es8389/i.test(soundCardName) ||
+  (!isUnifiedWhisplay && process.env.SOUND_CARD_TYPE?.toLowerCase() === "es8389");
+const speakerControl = isUnifiedWhisplay ? "speaker" : isEs8389 ? "Output 1" : "Speaker";
 console.log(`Using sound card: ${soundCardRef}`);
 
 type VolumePoint = [number, number];
@@ -59,7 +59,7 @@ const legacyWm8960PercentToAmixerValueMap: VolumePoint[] = [
   [100, 127],
 ];
 
-const es8388PercentToAmixerValueMap: VolumePoint[] = [
+const es8389PercentToAmixerValueMap: VolumePoint[] = [
   [0, 0],
   [10, 10],
   [20, 16],
@@ -75,8 +75,8 @@ const es8388PercentToAmixerValueMap: VolumePoint[] = [
 
 const percentToAmixerValueMap = isUnifiedWhisplay
   ? unifiedDriverPercentToControlValueMap
-  : isEs8388
-    ? es8388PercentToAmixerValueMap
+  : isEs8389
+    ? es8389PercentToAmixerValueMap
     : legacyWm8960PercentToAmixerValueMap;
 
 const getVolumeValueFromAmixer = (): number => {

@@ -14,7 +14,7 @@ export { getDynamicVoiceDetectLevel } from "./voice-detect";
 dotenv.config();
 
 const soundCardType = detectSoundCardType();
-const defaultRecordGainDb = soundCardType === "es8388" ? 18 : 0;
+const defaultRecordGainDb = soundCardType === "es8389" ? 18 : 0;
 const parsedRecordGainDb = parseFloat(process.env.RECORD_GAIN_DB || `${defaultRecordGainDb}`);
 const recordGainDb = Number.isFinite(parsedRecordGainDb) ? parsedRecordGainDb : defaultRecordGainDb;
 const normalizeAudioFormat = (value: string | undefined, fallback: AudioFormat): AudioFormat => {
@@ -72,7 +72,7 @@ function startPlayerProcess() {
 
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
-const needsInputWarmup = detectSoundCardType() === "es8388";
+const needsInputWarmup = detectSoundCardType() === "es8389";
 
 const warmUpAudioInput = async (): Promise<void> => {
   if (!needsInputWarmup) return;
