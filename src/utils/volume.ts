@@ -21,9 +21,7 @@ const detectWhisplaySoundCardRef = (): string => {
 const soundCardIndex = process.env.SOUND_CARD_INDEX || detectWhisplaySoundCardRef();
 const soundCardRef = soundCardName || soundCardIndex;
 const isUnifiedWhisplay = soundCardName === "whisplaysound" || soundCardRef === "whisplaysound";
-const isEs8389 = /es8389/i.test(soundCardName) ||
-  (!isUnifiedWhisplay && process.env.SOUND_CARD_TYPE?.toLowerCase() === "es8389");
-const speakerControl = isUnifiedWhisplay ? "speaker" : isEs8389 ? "Output 1" : "Speaker";
+const speakerControl = isUnifiedWhisplay ? "speaker" : "Speaker";
 console.log(`Using sound card: ${soundCardRef}`);
 
 type VolumePoint = [number, number];
@@ -59,30 +57,14 @@ const legacyWm8960PercentToAmixerValueMap: VolumePoint[] = [
   [100, 127],
 ];
 
-const es8389PercentToAmixerValueMap: VolumePoint[] = [
-  [0, 0],
-  [10, 10],
-  [20, 16],
-  [30, 20],
-  [40, 23],
-  [50, 26],
-  [60, 29],
-  [70, 31],
-  [80, 33],
-  [90, 35],
-  [100, 36],
-];
-
 const percentToAmixerValueMap = isUnifiedWhisplay
   ? unifiedDriverPercentToControlValueMap
-  : isEs8389
-    ? es8389PercentToAmixerValueMap
-    : legacyWm8960PercentToAmixerValueMap;
+  : legacyWm8960PercentToAmixerValueMap;
 
 const getVolumeValueFromAmixer = (): number => {
   const output = isUnifiedWhisplay
     ? execSync(`amixer -c ${soundCardRef} cget name='${speakerControl}'`).toString()
-    : execSync(`amixer -c ${soundCardRef} get '${speakerControl}'`).toString();
+    : execSync(`amixer -c ${soundCardRef} get ${speakerControl}`).toString();
   if (isUnifiedWhisplay) {
     const unifiedMatch = output.match(/: values=(\d+)/);
     if (unifiedMatch && unifiedMatch[1]) {
@@ -140,6 +122,6 @@ export const setVolumeByAmixer = (logPercent: number): void => {
   const value = Math.round(logPercentToAmixerValue(logPercent));
   const command = isUnifiedWhisplay
     ? `amixer -c ${soundCardRef} cset name='${speakerControl}' ${value}`
-    : `amixer -c ${soundCardRef} set '${speakerControl}' ${value}`;
+    : `amixer -c ${soundCardRef} set ${speakerControl} ${value}`;
   execSync(command);
 };

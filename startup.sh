@@ -2,8 +2,29 @@
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+configured_hat_model="${WHISPLAY_HAT_MODEL:-}"
+if [ -z "$configured_hat_model" ] && [ -f "$SCRIPT_DIR/.env" ]; then
+    configured_hat_model=$(grep -E '^[[:space:]]*WHISPLAY_HAT_MODEL[[:space:]]*=' "$SCRIPT_DIR/.env" | tail -n1 | cut -d'=' -f2- | tr -d '"' | xargs)
+fi
+
+hat_plus_detected=false
+case "${configured_hat_model:-auto}" in
+    hat-plus) hat_plus_detected=true ;;
+    hat) hat_plus_detected=false ;;
+    *)
+        for dsi_status in /sys/class/drm/*DSI*/status /sys/class/drm/*dsi*/status; do
+            if [ -r "$dsi_status" ] && grep -qi '^connected$' "$dsi_status"; then
+                hat_plus_detected=true
+                break
+            fi
+        done
+        ;;
+esac
+
 # if graphical interface is enabled, ask user whether to disable graphical interface
-if [ "$(systemctl get-default)" == "graphical.target" ]; then
+if [ "$hat_plus_detected" = true ]; then
+    echo "Detected Whisplay Hat Plus; keeping the graphical interface enabled for the DSI UI."
+elif [ "$(systemctl get-default)" == "graphical.target" ]; then
     echo "Graphical interface is currently enabled."
     read -p "Disabling graphical interface is recommended for a headless setup. Do you want to disable the graphical interface? (y/n) " disable_gui
     if [[ "$disable_gui" == "y" ]]; then
@@ -108,10 +129,10 @@ WantedBy=multi-user.target
 EOF
 
 # ── Hat Plus kiosk service (DSI display) ─────────────────────────────────
-# Check if this is a Hat Plus device (ES8389 sound card present)
-if grep -qi 'es8389' /proc/asound/cards 2>/dev/null; then
+# The sound card name is always whisplaysound, so identify Hat Plus by model/DSI.
+if [ "$hat_plus_detected" = true ]; then
     echo ""
-    echo "Detected Hat Plus hardware (ES8389). Setting up kiosk UI service..."
+    echo "Setting up the Whisplay Hat Plus kiosk UI service..."
 
     # Ensure graphical target for Chromium kiosk
     if [ "$(systemctl get-default)" != "graphical.target" ]; then

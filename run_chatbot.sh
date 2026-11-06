@@ -28,7 +28,6 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # Find the unified Whisplay sound card first; keep legacy names as fallback.
 card_index=""
 card_name=""
-card_control="Speaker"
 audio_supported=false
 if [ "$is_linux" = true ] && [ -r "/proc/asound/cards" ] && command -v amixer >/dev/null 2>&1; then
   card_info=$(awk '/whisplaysound|wm8960soundcard|es8389soundcard/ {print $1 " " $2; exit}' /proc/asound/cards)
@@ -36,10 +35,6 @@ if [ "$is_linux" = true ] && [ -r "/proc/asound/cards" ] && command -v amixer >/
     card_index=$(echo "$card_info" | awk '{print $1}')
     card_name=$(echo "$card_info" | awk '{print $2}' | tr -d '[]:')
     audio_supported=true
-    if echo "$card_name" | grep -qi 'es8389'; then
-      card_control="Output 1"
-      echo "Detected ES8389 sound card (Hat Plus)"
-    fi
     echo "Using sound card: ${card_name:-unknown} (index ${card_index})"
   else
     echo "Whisplay sound card not found; using default audio devices."
@@ -83,7 +78,6 @@ get_env_value() {
 # check if .env file exists
 initial_volume_percent=""
 default_initial_volume_percent=80
-es8389_mic_pga_level=8
 serve_ollama=false
 if [ -f ".env" ]; then
   # Load only SERVE_OLLAMA from .env (ignore comments/other vars)
@@ -100,9 +94,6 @@ if [ -f ".env" ]; then
     echo "[Volume] INITIAL_VOLUME_LEVEL is deprecated and ignored. Please use INITIAL_VOLUME_PERCENT (0-100) instead."
   fi
 
-  ES8389_MIC_PGA_LEVEL=$(get_env_value "ES8389_MIC_PGA_LEVEL")
-  [ -n "$ES8389_MIC_PGA_LEVEL" ] && export ES8389_MIC_PGA_LEVEL
-
   WHISPER_MODEL_SIZE=$(get_env_value "WHISPER_MODEL_SIZE")
   [ -n "$WHISPER_MODEL_SIZE" ] && export WHISPER_MODEL_SIZE
 
@@ -115,6 +106,9 @@ if [ -f ".env" ]; then
   ALSA_OUTPUT_DEVICE=$(get_env_value "ALSA_OUTPUT_DEVICE")
   [ -n "$ALSA_OUTPUT_DEVICE" ] && export ALSA_OUTPUT_DEVICE
 
+  WHISPLAY_HAT_MODEL=$(get_env_value "WHISPLAY_HAT_MODEL")
+  [ -n "$WHISPLAY_HAT_MODEL" ] && export WHISPLAY_HAT_MODEL
+
   echo ".env variables loaded."
 
   # check if SERVE_OLLAMA is set to true
@@ -124,10 +118,6 @@ if [ -f ".env" ]; then
 
   if [ -n "$INITIAL_VOLUME_PERCENT" ] && [ "$INITIAL_VOLUME_PERCENT" != "auto" ]; then
     initial_volume_percent=$INITIAL_VOLUME_PERCENT
-  fi
-
-  if [ -n "$ES8389_MIC_PGA_LEVEL" ]; then
-    es8389_mic_pga_level=$ES8389_MIC_PGA_LEVEL
   fi
 else
   echo ".env file not found, please create one based on .env.template."
@@ -145,19 +135,7 @@ if [ "$audio_supported" = true ]; then
   if [ "$card_name" = "whisplaysound" ]; then
     amixer -c "$card_name" cset name='speaker' "$initial_volume_percent" >/dev/null 2>&1 || true
   else
-    amixer -c "$card_index" set "$card_control" "${initial_volume_percent}%" >/dev/null 2>&1 || true
-  fi
-
-  # ES8389: apply a deterministic capture route and input gain.
-  if [ "$card_control" = "Output 1" ]; then
-    # Route ADC from Line 1 path, select stereo input, maximize digital capture,
-    # and apply the configured analogue PGA gain.
-    amixer -c "$card_index" cset numid=15 0 >/dev/null 2>&1 || true
-    amixer -c "$card_index" cset numid=16 0 >/dev/null 2>&1 || true
-    amixer -c "$card_index" cset numid=14 0 >/dev/null 2>&1 || true
-    amixer -c "$card_index" cset numid=1 192,192 >/dev/null 2>&1 || true
-    amixer -c "$card_index" cset numid=12 "$es8389_mic_pga_level,$es8389_mic_pga_level" >/dev/null 2>&1 || true
-    echo "ES8389 capture route initialized (PGA=$es8389_mic_pga_level)"
+    amixer -c "$card_index" set Speaker "${initial_volume_percent}%" >/dev/null 2>&1 || true
   fi
 fi
 
@@ -182,11 +160,20 @@ if [ "$serve_ollama" = true ]; then
   OLLAMA_HOST=0.0.0.0:11434 ollama serve &
 fi
 
-# Auto-launch Hat Plus UI browser when ES8389 sound card is detected (Hat Plus model)
+# Auto-launch the Hat Plus UI based on the explicit model or a connected DSI display.
 is_hat_plus=false
-if [ "$audio_supported" = true ] && echo "$card_control" | grep -qi 'Output 1'; then
-  is_hat_plus=true
-fi
+case "${WHISPLAY_HAT_MODEL:-auto}" in
+  hat-plus) is_hat_plus=true ;;
+  hat) is_hat_plus=false ;;
+  *)
+    for dsi_status in /sys/class/drm/*DSI*/status /sys/class/drm/*dsi*/status; do
+      if [ -r "$dsi_status" ] && grep -qi '^connected$' "$dsi_status"; then
+        is_hat_plus=true
+        break
+      fi
+    done
+    ;;
+esac
 if [ "$is_hat_plus" = true ] && [ -f "scripts/start-hat-plus-ui.sh" ]; then
   echo "Hat Plus detected, launching Hat Plus UI in background..."
   bash scripts/start-hat-plus-ui.sh &
