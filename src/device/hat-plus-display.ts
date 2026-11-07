@@ -25,6 +25,7 @@ interface HatPlusDisplayOptions {
   port: number;
   onButtonPress: ButtonHandler;
   onButtonRelease: ButtonHandler;
+  onExitApp: () => void;
 }
 
 export class HatPlusDisplayServer implements WebAudioBridgeServer {
@@ -37,6 +38,8 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
   private port: number;
   private onButtonPress: ButtonHandler;
   private onButtonRelease: ButtonHandler;
+  private onExitApp: () => void;
+  private exitRequested = false;
   private server: http.Server | null = null;
   private wsServer: WebSocketServer | null = null;
   private wsClients = new Set<WebSocket>();
@@ -46,6 +49,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
     this.port = options.port;
     this.onButtonPress = options.onButtonPress;
     this.onButtonRelease = options.onButtonRelease;
+    this.onExitApp = options.onExitApp;
     this.app = new Koa();
     this.router = new Router();
     this.cameraFramePath = this.resolveCameraFramePath();
@@ -290,6 +294,14 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       }
       // Echo back updated volume
       this.sendVolumeToClient(socket);
+      return;
+    }
+    if (data?.type === "exit_app") {
+      socket.send(JSON.stringify({ type: "exit_app_ack" }));
+      if (!this.exitRequested) {
+        this.exitRequested = true;
+        setTimeout(() => this.onExitApp(), 100);
+      }
       return;
     }
     if (data?.type === "ping") {

@@ -18,6 +18,10 @@ const menuOverlay = document.getElementById("menuOverlay");
 const menuClose = document.getElementById("menuClose");
 const volumeSlider = document.getElementById("volumeSlider");
 const volumeValue = document.getElementById("volumeValue");
+const exitAppBtn = document.getElementById("exitAppBtn");
+const exitConfirm = document.getElementById("exitConfirm");
+const exitCancelBtn = document.getElementById("exitCancelBtn");
+const exitConfirmBtn = document.getElementById("exitConfirmBtn");
 const musicBar = document.getElementById("musicBar");
 const musicElapsed = document.getElementById("musicElapsed");
 const musicTotal = document.getElementById("musicTotal");
@@ -329,6 +333,8 @@ function connectWebSocket() {
       const pct = Math.round(message.percent || 0);
       volumeSlider.value = pct;
       volumeValue.textContent = `${pct}%`;
+    } else if (message.type === "exit_app_ack") {
+      exitConfirmBtn.textContent = "Exiting…";
     } else if (message.type === "start_record") {
       startWebAudioRecording();
     } else if (message.type === "stop_record") {
@@ -401,11 +407,36 @@ function openMenu() {
 function closeMenu() {
   menuOverlay.classList.remove("open");
   menuOverlay.setAttribute("aria-hidden", "true");
+  hideExitConfirmation();
+}
+
+function showExitConfirmation() {
+  exitAppBtn.hidden = true;
+  exitConfirm.classList.add("visible");
+  exitConfirm.setAttribute("aria-hidden", "false");
+}
+
+function hideExitConfirmation() {
+  exitAppBtn.hidden = false;
+  exitConfirm.classList.remove("visible");
+  exitConfirm.setAttribute("aria-hidden", "true");
+  exitConfirmBtn.disabled = false;
+  exitCancelBtn.disabled = false;
+  exitConfirmBtn.textContent = "Exit";
 }
 
 menuBtn.addEventListener("click", openMenu);
 
 menuClose.addEventListener("click", closeMenu);
+
+exitAppBtn.addEventListener("click", showExitConfirmation);
+exitCancelBtn.addEventListener("click", hideExitConfirmation);
+exitConfirmBtn.addEventListener("click", () => {
+  exitConfirmBtn.disabled = true;
+  exitCancelBtn.disabled = true;
+  exitConfirmBtn.textContent = "Exiting…";
+  sendJson({ type: "exit_app" });
+});
 
 menuOverlay.addEventListener("click", (e) => {
   if (e.target === menuOverlay) {

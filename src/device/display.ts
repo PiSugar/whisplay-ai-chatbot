@@ -132,6 +132,10 @@ export class WhisplayDisplay {
         port,
         onButtonPress: () => this.handleButtonPressedEvent(),
         onButtonRelease: () => this.handleButtonReleasedEvent(),
+        onExitApp: () => {
+          console.log("[HatPlusDisplay] Exit requested from settings.");
+          process.kill(process.pid, "SIGTERM");
+        },
       });
       this.hatPlusDisplay.updateStatus(this.currentStatus);
     }

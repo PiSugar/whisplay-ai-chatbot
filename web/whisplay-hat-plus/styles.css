@@ -466,6 +466,97 @@ body {
   text-align: right;
 }
 
+.app-actions {
+  padding-top: 4px;
+}
+
+.exit-app-btn,
+.exit-cancel-btn,
+.exit-confirm-btn {
+  min-height: 48px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.exit-app-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255,85,85,.08);
+  color: #ff8b8b;
+}
+
+.exit-app-btn[hidden] {
+  display: none;
+}
+
+.exit-app-btn:active,
+.exit-confirm-btn:active {
+  background: rgba(255,85,85,.2);
+}
+
+.exit-app-btn svg {
+  width: 21px;
+  height: 21px;
+}
+
+.exit-confirm {
+  display: none;
+  padding: 14px;
+  border: 1px solid rgba(255,85,85,.24);
+  border-radius: 12px;
+  background: rgba(255,85,85,.07);
+}
+
+.exit-confirm.visible {
+  display: block;
+}
+
+.exit-confirm-text {
+  margin-bottom: 14px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.exit-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.exit-cancel-btn {
+  background: rgba(255,255,255,.08);
+  color: var(--text);
+}
+
+.exit-confirm-btn {
+  background: rgba(255,85,85,.14);
+  color: #ff9a9a;
+  border-color: rgba(255,85,85,.35);
+}
+
+.exit-cancel-btn:disabled,
+.exit-confirm-btn:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+/* Chromium keeps a 500px minimum content width even on the 480px DSI panel.
+ * Cap the portrait surface to the actual panel width so the rightmost 20px
+ * are not clipped. Landscape continues to use its full logical width. */
+@media (orientation: portrait) and (max-width: 520px) {
+  .screen,
+  .menu-overlay {
+    width: min(480px, 100vw);
+  }
+}
+
 /* Landscape DSI panels: place the Python-style emoji beside the response. */
 @media (orientation: landscape) and (max-height: 600px) {
   :root {
