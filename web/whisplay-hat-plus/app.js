@@ -27,16 +27,9 @@ const musicElapsed = document.getElementById("musicElapsed");
 const musicTotal = document.getElementById("musicTotal");
 const musicFill = document.getElementById("musicFill");
 
-// ── Scroll state ────────────────────────────────────────────────────────────
-let scrollTop = 0;
-let scrollSpeed = 0;
-let scrollTarget = null;
-let scrollSyncStart = null;
-let scrollSyncDuration = 0;
-let scrollSyncFrom = 0;
-let lastFrameTime = 0;
-let maxScroll = 0;
+// ── Text state ──────────────────────────────────────────────────────────────
 let lastText = "";
+let lastSourceText = "";
 let lastImageRevision = -1;
 let isPressed = false;
 
@@ -74,9 +67,8 @@ function emojiToSvgUrl(emoji) {
   return `/emoji-svg/${codepoints}.svg`;
 }
 
-// Render text with emojis replaced by SVG images (same set as the emoji-area)
-function renderTextWithEmoji(text, container) {
-  container.innerHTML = '';
+// Append text with emojis replaced by SVG images (same set as the emoji-area).
+function appendTextWithEmoji(text, container) {
   if (!text) return;
   // Match regional flag pairs OR extended pictographic with optional modifiers/ZWJ chains
   const emojiRe = /(?:\p{RI}{2}|\p{ExtPict}(?:\p{EMod}|\uFE0F|\u200D(?:\p{ExtPict}|\p{RI}{2}))*)/gu;
@@ -146,73 +138,183 @@ function updateEmoji(emoji) {
   emojiText.appendChild(img);
 }
 
-// ── Scroll sync ─────────────────────────────────────────────────────────────
-function applyScrollSync(text, sync, viewportHeight) {
-  if (!sync || !text) return;
-  const charEnd = Math.max(0, parseInt(sync.char_end || 0, 10));
-  const duration = Math.max(1, parseInt(sync.duration_ms || 1, 10));
-  const totalChars = text.length || 1;
-  const ratio = Math.min(1, charEnd / totalChars);
-  maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
-  scrollTarget = Math.max(scrollTop, Math.round(maxScroll * ratio));
-  scrollSyncFrom = scrollTop;
-  scrollSyncStart = performance.now();
-  scrollSyncDuration = duration;
+// ── Tool tags and native text scrolling ─────────────────────────────────────
+const TOOL_TAG_RE = /[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?/gi;
+const TOOL_PLACEHOLDER_RE = /\{tool:([A-Za-z0-9_-]+)\}/g;
+
+function applyToolPlaceholders(text, placeholders) {
+  const source = text || "";
+  if (!placeholders || typeof placeholders !== "object") {
+    return source.replace(TOOL_PLACEHOLDER_RE, "");
+  }
+  return source.replace(TOOL_PLACEHOLDER_RE, (_, key) => {
+    const value = placeholders[key];
+    return typeof value === "string" ? value : "";
+  });
 }
 
-function updateText(text, sync, speed) {
+function isToolArgToken(token) {
+  return /^[A-Za-z0-9_./:=+-]+$/.test(token);
+}
+
+function consumeTailAfterMarker(value, toolName = "") {
+  const markerTail = value.replace(/^[ \t]+/, "");
+  if (markerTail.startsWith("...")) {
+    return { tail: markerTail.slice(3).replace(/^[ \t:\-—,，.。…]+/, ""), extraCount: 0 };
+  }
+  if (markerTail.startsWith("…")) {
+    return { tail: markerTail.slice(1).replace(/^[ \t:\-—,，.。…]+/, ""), extraCount: 0 };
+  }
+
+  let tail = value.replace(/^[ \t:\-—,，.。…]+/, "");
+  if (!tail) return { tail: "", extraCount: 0 };
+
+  let extraCount = 0;
+  let consumedCurrentArg = false;
+  while (tail) {
+    const parts = tail.split(/\s+/, 2);
+    const first = parts[0];
+    const rest = tail.slice(first.length).replace(/^[\s:\-—,，.。…]+/, "");
+    if (toolName && first.toLowerCase() === toolName.toLowerCase()) {
+      extraCount += 1;
+      tail = rest;
+      const nextParts = tail.split(/\s+/, 2);
+      if (nextParts[0] && isToolArgToken(nextParts[0])) {
+        tail = tail.slice(nextParts[0].length).replace(/^[\s:\-—,，.。…]+/, "");
+      }
+      continue;
+    }
+    if (!consumedCurrentArg && isToolArgToken(first)) {
+      consumedCurrentArg = true;
+      tail = rest;
+      continue;
+    }
+    return { tail, extraCount };
+  }
+  return { tail: "", extraCount };
+}
+
+function createToolTagNode(label, count, elapsed = "") {
+  const tag = document.createElement("span");
+  tag.className = "tool-tag";
+
+  const name = document.createElement("span");
+  name.className = "tool-tag-name";
+  name.textContent = label;
+  tag.appendChild(name);
+
+  if (count > 1) {
+    const countNode = document.createElement("span");
+    countNode.className = "tool-tag-count";
+    countNode.textContent = `x${count}`;
+    tag.appendChild(countNode);
+  }
+  if (elapsed) {
+    const elapsedNode = document.createElement("span");
+    elapsedNode.className = "tool-tag-elapsed";
+    elapsedNode.textContent = elapsed;
+    tag.appendChild(elapsedNode);
+  }
+  return tag;
+}
+
+function renderToolTaggedText(container, text) {
+  const fragment = document.createDocumentFragment();
+  let pendingToolName = "";
+  let pendingToolCount = 0;
+  let pendingToolElapsed = "";
+
+  const flushToolTag = () => {
+    if (!pendingToolName || pendingToolCount <= 0) return;
+    fragment.appendChild(
+      createToolTagNode(pendingToolName, pendingToolCount, pendingToolElapsed),
+    );
+    pendingToolName = "";
+    pendingToolCount = 0;
+    pendingToolElapsed = "";
+  };
+
+  const appendToolTag = (name, elapsed = "") => {
+    if (pendingToolName && pendingToolName !== name) flushToolTag();
+    pendingToolName = name;
+    pendingToolCount += 1;
+    if (elapsed) pendingToolElapsed = elapsed;
+  };
+
+  const appendText = (value) => appendTextWithEmoji(value, fragment);
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+
+  lines.forEach((rawLine, lineIndex) => {
+    TOOL_TAG_RE.lastIndex = 0;
+    const matches = [...rawLine.matchAll(TOOL_TAG_RE)];
+    if (lineIndex > 0) {
+      flushToolTag();
+      appendText("\n");
+    }
+    if (matches.length === 0) {
+      flushToolTag();
+      appendText(rawLine);
+      return;
+    }
+
+    const before = rawLine.slice(0, matches[0].index);
+    if (before.trim()) {
+      flushToolTag();
+      appendText(before);
+    }
+
+    let cursor = matches[0].index;
+    matches.forEach((match) => {
+      const between = rawLine.slice(cursor, match.index);
+      const consumed = consumeTailAfterMarker(between, pendingToolName);
+      for (let i = 0; i < consumed.extraCount; i += 1) appendToolTag(pendingToolName);
+      if (consumed.tail.trim()) {
+        flushToolTag();
+        appendText(consumed.tail);
+      }
+      appendToolTag(match[1], match[2] || "");
+      cursor = match.index + match[0].length;
+    });
+
+    const consumed = consumeTailAfterMarker(rawLine.slice(cursor), pendingToolName);
+    for (let i = 0; i < consumed.extraCount; i += 1) appendToolTag(pendingToolName);
+    if (consumed.tail.trim()) {
+      flushToolTag();
+      appendText(consumed.tail);
+    }
+  });
+
+  flushToolTag();
+  container.replaceChildren(fragment);
+}
+
+function isNearTextBottom(viewport) {
+  return viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 4;
+}
+
+function jumpTextToBottom(viewport) {
+  viewport.scrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+}
+
+function updateText(text, toolPlaceholders) {
   const viewport = document.querySelector(".text-viewport");
   if (!viewport) return;
-  const viewportHeight = viewport.offsetHeight;
-  const nextText = text || "";
-  const isRegressive =
-    nextText.length > 0 && nextText.length < lastText.length && lastText.startsWith(nextText);
 
-  if (isRegressive) {
-    scrollSpeed = Math.max(0, parseInt(speed || 0, 10));
-    applyScrollSync(lastText, sync, viewportHeight);
-    maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
-    return;
+  const sourceText = text || "";
+  const nextText = applyToolPlaceholders(sourceText, toolPlaceholders);
+  if (nextText === lastText && sourceText === lastSourceText) return;
+
+  const sourceIsContinuation = sourceText.startsWith(lastSourceText);
+  const isNewText = sourceText !== lastSourceText && !sourceIsContinuation;
+  const shouldFollowBottom = isNearTextBottom(viewport) || isNewText;
+  renderToolTaggedText(textContent, nextText);
+  lastText = nextText;
+  lastSourceText = sourceText;
+
+  if (shouldFollowBottom) {
+    // Layout is synchronous here; assigning scrollTop jumps without animation.
+    jumpTextToBottom(viewport);
   }
-
-  if (nextText !== lastText) {
-    const isContinuation = nextText.startsWith(lastText);
-    renderTextWithEmoji(nextText, textContent);
-    if (!isContinuation) {
-      scrollTop = 0;
-      scrollTarget = null;
-      scrollSyncStart = null;
-      scrollSyncDuration = 0;
-      scrollSyncFrom = 0;
-    }
-    lastText = nextText;
-  }
-
-  scrollSpeed = Math.max(0, parseInt(speed || 0, 10));
-  applyScrollSync(lastText, sync, viewportHeight);
-  maxScroll = Math.max(0, textContent.offsetHeight - viewportHeight);
-}
-
-function animateScroll(timestamp) {
-  if (!lastFrameTime) lastFrameTime = timestamp;
-  const deltaMs = timestamp - lastFrameTime;
-  lastFrameTime = timestamp;
-
-  if (scrollTarget !== null && scrollSyncStart !== null) {
-    const elapsed = timestamp - scrollSyncStart;
-    const progress = Math.min(1, elapsed / scrollSyncDuration);
-    scrollTop = scrollSyncFrom + (scrollTarget - scrollSyncFrom) * progress;
-    if (progress >= 1) {
-      scrollTarget = null;
-      scrollSyncStart = null;
-    }
-  } else if (scrollSpeed > 0 && scrollTop < maxScroll) {
-    const speedPerSec = scrollSpeed * 5;
-    scrollTop = Math.min(maxScroll, scrollTop + (speedPerSec * deltaMs) / 1000);
-  }
-
-  textContent.style.transform = `translateY(${-scrollTop}px)`;
-  requestAnimationFrame(animateScroll);
 }
 
 // ── WebSocket ───────────────────────────────────────────────────────────────
@@ -244,7 +346,7 @@ function applyState(data) {
 
   statusText.textContent = data.status || "";
   updateEmoji(data.emoji || "");
-  updateText(data.text || "", data.scroll_sync, data.scroll_speed);
+  updateText(data.text || "", data.tool_placeholders);
 
   // LED dot
   const ledColor = normalizeColor(data.RGB);
@@ -463,7 +565,6 @@ volumeSlider.addEventListener("input", () => {
 
 // ── Start ───────────────────────────────────────────────────────────────────
 connectWebSocket();
-requestAnimationFrame(animateScroll);
 
 // ── Web Audio Recording ─────────────────────────────────────────────────────
 const FRAME_AUDIO = 0x01;

@@ -204,6 +204,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       status: this.currentStatus.status,
       emoji: this.currentStatus.emoji,
       text: this.currentStatus.text,
+      tool_placeholders: this.currentStatus.tool_placeholders,
       scroll_speed: this.currentStatus.scroll_speed,
       scroll_sync: this.currentStatus.scroll_sync,
       brightness: this.currentStatus.brightness,

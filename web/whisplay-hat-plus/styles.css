@@ -165,12 +165,22 @@ body {
 .text-viewport {
   position: relative;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.text-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 .text-content {
-  position: absolute;
-  left: 0; top: 0; right: 0;
+  position: relative;
+  width: 100%;
+  min-height: 100%;
   font-size: var(--body-font);
   line-height: 1.55;
   white-space: pre-wrap;
@@ -183,6 +193,28 @@ body {
   vertical-align: -0.2em;
   object-fit: contain;
   margin: 0 1px;
+}
+
+.tool-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .5em;
+  max-width: 100%;
+  margin: .12em 0;
+  padding: .08em .65em .14em;
+  border-radius: .4em;
+  background: #082a70;
+  color: #fff;
+  font-size: .72em;
+  line-height: 1.45;
+  font-weight: 600;
+  vertical-align: .08em;
+  white-space: nowrap;
+}
+
+.tool-tag-count,
+.tool-tag-elapsed {
+  color: #7ac9ff;
 }
 
 /* ── LED dot indicator ──────────────────────────────────────────────────── */
