@@ -302,6 +302,7 @@ body {
 }
 
 .menu-btn svg {
+  transform: rotate(90deg);
   transition: transform .15s ease;
 }
 
@@ -603,9 +604,6 @@ body {
     padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
   }
 
-  .menu-btn svg {
-    transform: rotate(90deg);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
