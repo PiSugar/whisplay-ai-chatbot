@@ -144,7 +144,7 @@ if [ -n "$card_name" ]; then
   export SOUND_CARD_INDEX="$card_index"
   export ALSA_INPUT_DEVICE="${ALSA_INPUT_DEVICE:-hw:${card_name},0}"
   if [ -z "$ALSA_OUTPUT_DEVICE" ]; then
-    if [ "$card_name" = "whisplaysound" ]; then
+    if [ "$card_name" = "whisplaysound" ] && command -v aplay >/dev/null 2>&1 && aplay -L 2>/dev/null | grep -Fxq playback; then
       export ALSA_OUTPUT_DEVICE="playback"
     else
       export ALSA_OUTPUT_DEVICE="plughw:${card_name},0"
