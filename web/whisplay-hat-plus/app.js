@@ -392,19 +392,30 @@ recordBtn.addEventListener("touchend", (e) => { e.preventDefault(); release(); }
 window.addEventListener("touchend", release);
 
 // ── Menu ────────────────────────────────────────────────────────────────────
-menuBtn.addEventListener("click", () => {
+function openMenu() {
+  menuOverlay.setAttribute("aria-hidden", "false");
   menuOverlay.classList.add("open");
-  // Fetch fresh volume
   sendJson({ type: "get_volume" });
-});
+}
 
-menuClose.addEventListener("click", () => {
+function closeMenu() {
   menuOverlay.classList.remove("open");
-});
+  menuOverlay.setAttribute("aria-hidden", "true");
+}
+
+menuBtn.addEventListener("click", openMenu);
+
+menuClose.addEventListener("click", closeMenu);
 
 menuOverlay.addEventListener("click", (e) => {
   if (e.target === menuOverlay) {
-    menuOverlay.classList.remove("open");
+    closeMenu();
+  }
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && menuOverlay.classList.contains("open")) {
+    closeMenu();
   }
 });
 

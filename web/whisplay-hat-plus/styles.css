@@ -336,15 +336,26 @@ body {
 .menu-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.7);
+  background: rgba(0,0,0,0);
   z-index: 50;
-  display: none;
+  display: flex;
   align-items: flex-end;
   justify-content: center;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    background-color .24s ease,
+    opacity .24s ease,
+    visibility 0s linear .28s;
 }
 
 .menu-overlay.open {
-  display: flex;
+  background: rgba(0,0,0,.7);
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .menu-panel {
@@ -355,6 +366,17 @@ body {
   background: #131c2a;
   padding: clamp(14px, 3vmin, 24px) var(--edge-x) max(20px, env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -10px 40px rgba(0,0,0,.6);
+  opacity: .96;
+  transform: translate3d(0, 105%, 0);
+  will-change: transform, opacity;
+  transition:
+    transform .3s cubic-bezier(.22, 1, .36, 1),
+    opacity .22s ease;
+}
+
+.menu-overlay.open .menu-panel {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
 }
 
 .menu-header {
@@ -492,5 +514,12 @@ body {
 
   .menu-btn svg {
     transform: rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-overlay,
+  .menu-panel {
+    transition-duration: .01ms;
   }
 }
