@@ -124,10 +124,27 @@ else
   exit 1
 fi
 
-# Adjust initial volume (Linux only). INITIAL_VOLUME_PERCENT is the percentage
-# users see in alsamixer. The unified driver exposes a 0-100 speaker control;
-# legacy WM8960 accepts percentages through amixer set Speaker.
-if [ "$audio_supported" = true ]; then
+# Detect Hat Plus before any startup volume write. Both HAT models use the same
+# sound-card name, so use the explicit model setting or the connected DSI panel.
+is_hat_plus=false
+case "${WHISPLAY_HAT_MODEL:-auto}" in
+  hat-plus) is_hat_plus=true ;;
+  hat) is_hat_plus=false ;;
+  *)
+    for dsi_status in /sys/class/drm/*DSI*/status /sys/class/drm/*dsi*/status; do
+      if [ -r "$dsi_status" ] && grep -qi '^connected$' "$dsi_status"; then
+        is_hat_plus=true
+        break
+      fi
+    done
+    ;;
+esac
+
+# Startup volume initialization is for Whisplay HAT only. Hat Plus retains its
+# current hardware volume because it is controlled from the on-screen UI.
+if [ "$is_hat_plus" = true ]; then
+  echo "[Volume] Hat Plus detected; keeping the current speaker volume."
+elif [ "$audio_supported" = true ]; then
   if [ -z "$initial_volume_percent" ]; then
     initial_volume_percent=$default_initial_volume_percent
   fi
@@ -160,20 +177,7 @@ if [ "$serve_ollama" = true ]; then
   OLLAMA_HOST=0.0.0.0:11434 ollama serve &
 fi
 
-# Auto-launch the Hat Plus UI based on the explicit model or a connected DSI display.
-is_hat_plus=false
-case "${WHISPLAY_HAT_MODEL:-auto}" in
-  hat-plus) is_hat_plus=true ;;
-  hat) is_hat_plus=false ;;
-  *)
-    for dsi_status in /sys/class/drm/*DSI*/status /sys/class/drm/*dsi*/status; do
-      if [ -r "$dsi_status" ] && grep -qi '^connected$' "$dsi_status"; then
-        is_hat_plus=true
-        break
-      fi
-    done
-    ;;
-esac
+# Auto-launch the Hat Plus UI using the model detected above.
 if [ "$is_hat_plus" = true ] && [ -f "scripts/start-hat-plus-ui.sh" ]; then
   echo "Hat Plus detected, launching Hat Plus UI in background..."
   bash scripts/start-hat-plus-ui.sh &
