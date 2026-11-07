@@ -11,6 +11,7 @@
   --emoji-size: clamp(56px, 18vmin, 112px);
   --record-size: clamp(64px, 17vmin, 96px);
   --menu-size: clamp(46px, 12vmin, 64px);
+  --corner-control-inset: clamp(8px, 2vmin, 12px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -257,6 +258,7 @@ body {
   justify-content: center;
   box-shadow: 0 8px 24px rgba(0,0,0,.5);
   transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
+  border-radius: clamp(10px, 3vmin, 18px);
 }
 
 .record-btn:active,
@@ -279,8 +281,8 @@ body {
 /* ── Menu button (bottom-left) ──────────────────────────────────────────── */
 .menu-btn {
   position: absolute;
-  left: max(6px, env(safe-area-inset-left, 0px));
-  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  left: max(var(--corner-control-inset), env(safe-area-inset-left, 0px));
+  bottom: max(var(--corner-control-inset), env(safe-area-inset-bottom, 0px));
   width: var(--menu-size);
   height: var(--menu-size);
   border: none;
@@ -473,11 +475,10 @@ body {
   }
 
   .button-area {
-    grid-column: 2;
-    grid-row: 3;
-    justify-self: end;
-    align-self: end;
-    padding: 4px var(--edge-x) max(8px, env(safe-area-inset-bottom, 0px));
+    position: absolute;
+    right: max(var(--corner-control-inset), env(safe-area-inset-right, 0px));
+    bottom: max(var(--corner-control-inset), env(safe-area-inset-bottom, 0px));
+    padding: 0;
   }
 
   .music-bar {
