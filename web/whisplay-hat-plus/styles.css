@@ -4,16 +4,26 @@
   --text: #e4ecf4;
   --muted: #7f8a99;
   --danger: #f55;
+  --edge-x: clamp(10px, 3vw, 24px);
+  --edge-y: clamp(6px, 2vh, 18px);
+  --status-font: clamp(15px, 3.8vmin, 22px);
+  --body-font: clamp(16px, 4.2vmin, 28px);
+  --emoji-size: clamp(56px, 18vmin, 112px);
+  --record-size: clamp(64px, 17vmin, 96px);
+  --menu-size: clamp(46px, 12vmin, 64px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html,
 body {
   font-family: "Space Grotesk", sans-serif;
   background: #000;
   color: var(--text);
-  width: 480px;
-  height: 640px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   -webkit-user-select: none;
   user-select: none;
@@ -22,17 +32,25 @@ body {
 
 /* ── Full-screen layout ─────────────────────────────────────────────────── */
 .screen {
-  width: 480px;
-  height: 640px;
+  width: 100vw;
+  height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
   display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   position: relative;
   background: var(--bg);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
 }
 
 /* ── Status bar ─────────────────────────────────────────────────────────── */
 .header {
-  padding: 10px 16px 6px;
+  padding: var(--edge-y) var(--edge-x) clamp(4px, 1vh, 8px);
   background: var(--bg);
   z-index: 2;
 }
@@ -47,10 +65,11 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .status {
-  font-size: 18px;
+  font-size: var(--status-font);
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -61,13 +80,13 @@ body {
 .status-icons {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: clamp(6px, 2vw, 12px);
   align-items: center;
 }
 
 .status-icon {
-  width: 18px;
-  height: 18px;
+  width: clamp(16px, 4vmin, 24px);
+  height: clamp(16px, 4vmin, 24px);
   display: none;
   object-fit: contain;
   filter: brightness(0.9);
@@ -77,7 +96,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: clamp(11px, 3vmin, 16px);
   color: var(--muted);
 }
 
@@ -108,28 +127,35 @@ body {
 /* ── Emoji ──────────────────────────────────────────────────────────────── */
 .emoji-area {
   text-align: center;
-  padding: 8px 16px 4px;
+  padding: clamp(4px, 1.5vh, 12px) var(--edge-x);
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
 }
 
 .emoji {
-  font-size: 56px;
+  font-size: var(--emoji-size);
   line-height: 1.1;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 64px;
+  min-width: var(--emoji-size);
+  min-height: var(--emoji-size);
 }
 
-.emoji img {
-  width: 56px;
-  height: 56px;
+.emoji .emoji-image {
+  width: var(--emoji-size);
+  height: var(--emoji-size);
+  display: block;
   object-fit: contain;
 }
 
 /* ── Text body ──────────────────────────────────────────────────────────── */
 .body {
-  padding: 8px 18px 10px;
+  padding: clamp(4px, 1.5vh, 10px) var(--edge-x) clamp(6px, 2vh, 14px);
   overflow: hidden;
   position: relative;
   z-index: 1;
@@ -144,7 +170,7 @@ body {
 .text-content {
   position: absolute;
   left: 0; top: 0; right: 0;
-  font-size: 20px;
+  font-size: var(--body-font);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
@@ -174,7 +200,7 @@ body {
   display: none;
   align-items: center;
   gap: 8px;
-  padding: 0 18px 6px;
+  padding: 0 var(--edge-x) clamp(4px, 1vh, 8px);
   z-index: 2;
 }
 
@@ -211,7 +237,7 @@ body {
 
 /* ── Record button area ─────────────────────────────────────────────────── */
 .button-area {
-  padding: 12px 16px 20px;
+  padding: clamp(6px, 1.5vh, 12px) var(--edge-x) clamp(10px, 3vh, 22px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -220,8 +246,8 @@ body {
 }
 
 .record-btn {
-  width: 80px;
-  height: 80px;
+  width: var(--record-size);
+  height: var(--record-size);
   border: 2px solid rgba(255,255,255,.12);
   background: linear-gradient(145deg, #1a2a3f, #0e141f);
   color: var(--text);
@@ -242,8 +268,8 @@ body {
 }
 
 .mic-icon {
-  width: 32px;
-  height: 32px;
+  width: calc(var(--record-size) * .4);
+  height: calc(var(--record-size) * .4);
 }
 
 .record-btn.pressed .mic-icon {
@@ -253,10 +279,10 @@ body {
 /* ── Menu button (bottom-left) ──────────────────────────────────────────── */
 .menu-btn {
   position: absolute;
-  left: 6px;
-  bottom: 10px;
-  width: 56px;
-  height: 56px;
+  left: max(6px, env(safe-area-inset-left, 0px));
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  width: var(--menu-size);
+  height: var(--menu-size);
   border: none;
   background: rgba(255,255,255,.06);
   color: var(--muted);
@@ -317,9 +343,11 @@ body {
 
 .menu-panel {
   width: 100%;
-  max-width: 480px;
+  max-width: min(720px, 100vw);
+  max-height: 100vh;
+  overflow-y: auto;
   background: #131c2a;
-  padding: 20px 24px 32px;
+  padding: clamp(14px, 3vmin, 24px) var(--edge-x) max(20px, env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -10px 40px rgba(0,0,0,.6);
 }
 
@@ -408,4 +436,48 @@ body {
   color: var(--text);
   min-width: 40px;
   text-align: right;
+}
+
+/* Landscape DSI panels: place the Python-style emoji beside the response. */
+@media (orientation: landscape) and (max-height: 600px) {
+  :root {
+    --emoji-size: clamp(72px, 24vh, 128px);
+    --record-size: clamp(58px, 15vh, 76px);
+    --menu-size: clamp(44px, 12vh, 58px);
+  }
+
+  .screen {
+    grid-template-columns: minmax(120px, 30vw) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .emoji-area {
+    grid-column: 1;
+    grid-row: 2;
+    padding: var(--edge-y) var(--edge-x);
+  }
+
+  .body {
+    grid-column: 2;
+    grid-row: 2;
+    padding-top: var(--edge-y);
+  }
+
+  .button-area {
+    grid-column: 1;
+    grid-row: 3;
+    padding: 4px var(--edge-x) max(8px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .music-bar {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: center;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
 }

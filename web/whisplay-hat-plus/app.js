@@ -110,26 +110,32 @@ function updateEmoji(emoji) {
   if (emoji === lastEmoji) return;
   lastEmoji = emoji;
   if (!emoji) {
-    emojiText.textContent = "...";
+    emojiText.textContent = "…";
     return;
   }
   const img = document.createElement("img");
+  img.className = "emoji-image";
   img.src = emojiToSvgUrl(emoji);
   img.alt = emoji;
+  img.decoding = "async";
+  img.draggable = false;
   img.onerror = function () {
     // Try without variant selectors (fe0f)
     const stripped = emoji.replace(/\uFE0F/g, "");
     if (stripped !== emoji) {
       const img2 = document.createElement("img");
+      img2.className = "emoji-image";
       img2.src = emojiToSvgUrl(stripped);
       img2.alt = emoji;
+      img2.decoding = "async";
+      img2.draggable = false;
       img2.onerror = function () {
-        emojiText.textContent = emoji;
+        emojiText.textContent = "…";
       };
       emojiText.innerHTML = "";
       emojiText.appendChild(img2);
     } else {
-      emojiText.textContent = emoji;
+      emojiText.textContent = "…";
     }
   };
   emojiText.innerHTML = "";
