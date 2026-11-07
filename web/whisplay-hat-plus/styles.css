@@ -299,6 +299,10 @@ body {
   background: rgba(255,255,255,.15);
 }
 
+.menu-btn svg {
+  transition: transform .15s ease;
+}
+
 /* ── Image / camera overlay ─────────────────────────────────────────────── */
 .image-layer {
   position: absolute;
@@ -469,15 +473,23 @@ body {
   }
 
   .button-area {
-    grid-column: 1;
+    grid-column: 2;
     grid-row: 3;
+    justify-self: end;
+    align-self: end;
     padding: 4px var(--edge-x) max(8px, env(safe-area-inset-bottom, 0px));
   }
 
   .music-bar {
-    grid-column: 2;
+    grid-column: 1 / -1;
     grid-row: 3;
     align-self: center;
+    padding-left: calc(var(--menu-size) + var(--edge-x) * 1.5);
+    padding-right: calc(var(--record-size) + var(--edge-x) * 1.5);
     padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .menu-btn svg {
+    transform: rotate(90deg);
   }
 }
