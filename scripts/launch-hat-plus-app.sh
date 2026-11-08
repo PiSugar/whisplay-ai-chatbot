@@ -28,4 +28,3 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 nohup setsid bash "$PROJECT_DIR/run_chatbot.sh" >>"$LOG_FILE" 2>&1 </dev/null &
 launcher_pid=$!
 printf '%s\n' "$launcher_pid" >"$PID_FILE"
-
