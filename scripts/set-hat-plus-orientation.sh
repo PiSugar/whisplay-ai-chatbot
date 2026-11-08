@@ -31,10 +31,11 @@ case "$MODE" in
         TOUCH_MATRIX="1 0 0 0 1 0"
         ;;
     landscape)
-        # The Whisplay Plus landscape mounting used by the Raspberry Pi is
-        # Wayland transform 270. Touch coordinates need the inverse rotation.
+        # Match Sky Console on the .253 Goodix panel: labwc maps the touch
+        # device to DSI-1 and applies the output transform, so the touchscreen
+        # itself must keep its native (identity) calibration matrix.
         TRANSFORM="270"
-        TOUCH_MATRIX="0 1 0 -1 0 1"
+        TOUCH_MATRIX="1 0 0 0 1 0"
         ;;
     status)
         ;;
