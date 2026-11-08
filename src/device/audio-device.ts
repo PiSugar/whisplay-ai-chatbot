@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { execFileSync } from "child_process";
 import { readFileSync } from "fs";
 
 const detectWhisplaySoundCardRef = (): string | undefined => {
@@ -24,8 +25,20 @@ export const soundCardRef =
   detectWhisplaySoundCardRef();
 
 const defaultAlsaInputDevice = soundCardRef ? `hw:${soundCardRef},0` : "default";
+const alsaPcmExists = (name: string): boolean => {
+  try {
+    return execFileSync("aplay", ["-L"], { encoding: "utf8" })
+      .split("\n")
+      .some((line) => line.trim() === name);
+  } catch {
+    return false;
+  }
+};
+
 const defaultAlsaOutputDevice = soundCardRef === "whisplaysound"
-  ? "playback"
+  ? alsaPcmExists("playback")
+    ? "playback"
+    : `plughw:${soundCardRef},0`
   : soundCardRef
     ? `plughw:${soundCardRef},0`
     : "default";

@@ -87,7 +87,7 @@ const piperHttpTTS = async (
       }
 
       try {
-        // The Whisplay ES8389 ALSA device rejects Piper's 22050 Hz mono output
+        // The unified Whisplay ALSA device rejects Piper's 22050 Hz mono output
         // when opened directly through hw:*, so normalize to the codec format.
         await new Promise<void>((res, rej) => {
           const soxProcess = spawn("sox", [

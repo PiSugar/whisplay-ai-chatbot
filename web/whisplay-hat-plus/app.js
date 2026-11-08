@@ -1,0 +1,806 @@
+// ── DOM references ──────────────────────────────────────────────────────────
+const statusText = document.getElementById("statusText");
+const emojiText = document.getElementById("emojiText");
+const textContent = document.getElementById("textContent");
+const batteryFill = document.getElementById("batteryFill");
+const batteryText = document.getElementById("batteryText");
+const netIcon = document.getElementById("netIcon");
+const vpnIcon = document.getElementById("vpnIcon");
+const imageIcon = document.getElementById("imageIcon");
+const ragIcon = document.getElementById("ragIcon");
+const ledDot = document.getElementById("ledDot");
+const recordBtn = document.getElementById("recordBtn");
+const dim = document.getElementById("dim");
+const imageLayer = document.getElementById("imageLayer");
+const imageDisplay = document.getElementById("imageDisplay");
+const screen = document.querySelector(".screen");
+const menuBtn = document.getElementById("menuBtn");
+const cameraEntryBtn = document.getElementById("cameraEntryBtn");
+const cameraUi = document.getElementById("cameraUi");
+const cameraBackBtn = document.getElementById("cameraBackBtn");
+const cameraShutterBtn = document.getElementById("cameraShutterBtn");
+const focusRing = document.getElementById("focusRing");
+const menuOverlay = document.getElementById("menuOverlay");
+const menuClose = document.getElementById("menuClose");
+const volumeSlider = document.getElementById("volumeSlider");
+const volumeValue = document.getElementById("volumeValue");
+const exitAppBtn = document.getElementById("exitAppBtn");
+const exitConfirm = document.getElementById("exitConfirm");
+const exitCancelBtn = document.getElementById("exitCancelBtn");
+const exitConfirmBtn = document.getElementById("exitConfirmBtn");
+const musicBar = document.getElementById("musicBar");
+const musicElapsed = document.getElementById("musicElapsed");
+const musicTotal = document.getElementById("musicTotal");
+const musicFill = document.getElementById("musicFill");
+
+// ── Text state ──────────────────────────────────────────────────────────────
+let lastText = "";
+let lastSourceText = "";
+let lastImageRevision = -1;
+let isPressed = false;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function setIconVisible(el, visible) {
+  el.style.display = visible ? "block" : "none";
+}
+
+function rgb565ToRgb(color) {
+  const r = (color >> 11) & 0x1f;
+  const g = (color >> 5) & 0x3f;
+  const b = color & 0x1f;
+  return [
+    Math.round((r * 255) / 31),
+    Math.round((g * 255) / 63),
+    Math.round((b * 255) / 31),
+  ];
+}
+
+function normalizeColor(value) {
+  if (typeof value === "number") {
+    const rgb = rgb565ToRgb(value);
+    return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+  }
+  if (typeof value === "string" && value.length > 0) {
+    return value.startsWith("#") ? value : `#${value}`;
+  }
+  return "#44f28a";
+}
+
+function emojiToSvgUrl(emoji) {
+  const codepoints = [...emoji]
+    .map((c) => c.codePointAt(0).toString(16))
+    .join("-");
+  return `/emoji-svg/${codepoints}.svg`;
+}
+
+// Append text with emojis replaced by SVG images (same set as the emoji-area).
+function appendTextWithEmoji(text, container) {
+  if (!text) return;
+  // Match regional flag pairs OR extended pictographic with optional modifiers/ZWJ chains
+  const emojiRe = /(?:\p{RI}{2}|\p{ExtPict}(?:\p{EMod}|\uFE0F|\u200D(?:\p{ExtPict}|\p{RI}{2}))*)/gu;
+  let lastIdx = 0;
+  let m;
+  while ((m = emojiRe.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      container.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+    }
+    const emoji = m[0];
+    const img = document.createElement('img');
+    img.className = 'inline-emoji';
+    img.src = emojiToSvgUrl(emoji);
+    img.alt = emoji;
+    img.onerror = function () {
+      const stripped = emoji.replace(/\uFE0F/g, '');
+      if (stripped !== emoji) {
+        this.src = emojiToSvgUrl(stripped);
+        this.onerror = function () { this.replaceWith(document.createTextNode(emoji)); };
+      } else {
+        this.replaceWith(document.createTextNode(emoji));
+      }
+    };
+    container.appendChild(img);
+    lastIdx = emojiRe.lastIndex;
+  }
+  if (lastIdx < text.length) {
+    container.appendChild(document.createTextNode(text.slice(lastIdx)));
+  }
+}
+
+let lastEmoji = "";
+
+function updateEmoji(emoji) {
+  if (emoji === lastEmoji) return;
+  lastEmoji = emoji;
+  if (!emoji) {
+    emojiText.textContent = "…";
+    return;
+  }
+  const img = document.createElement("img");
+  img.className = "emoji-image";
+  img.src = emojiToSvgUrl(emoji);
+  img.alt = emoji;
+  img.decoding = "async";
+  img.draggable = false;
+  img.onerror = function () {
+    // Try without variant selectors (fe0f)
+    const stripped = emoji.replace(/\uFE0F/g, "");
+    if (stripped !== emoji) {
+      const img2 = document.createElement("img");
+      img2.className = "emoji-image";
+      img2.src = emojiToSvgUrl(stripped);
+      img2.alt = emoji;
+      img2.decoding = "async";
+      img2.draggable = false;
+      img2.onerror = function () {
+        emojiText.textContent = "…";
+      };
+      emojiText.innerHTML = "";
+      emojiText.appendChild(img2);
+    } else {
+      emojiText.textContent = "…";
+    }
+  };
+  emojiText.innerHTML = "";
+  emojiText.appendChild(img);
+}
+
+// ── Tool tags and native text scrolling ─────────────────────────────────────
+const TOOL_TAG_RE = /[%％﹪]\s*([A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)(?:\s+([0-9]+s))?/gi;
+const TOOL_PLACEHOLDER_RE = /\{tool:([A-Za-z0-9_-]+)\}/g;
+
+function applyToolPlaceholders(text, placeholders) {
+  const source = text || "";
+  if (!placeholders || typeof placeholders !== "object") {
+    return source.replace(TOOL_PLACEHOLDER_RE, "");
+  }
+  return source.replace(TOOL_PLACEHOLDER_RE, (_, key) => {
+    const value = placeholders[key];
+    return typeof value === "string" ? value : "";
+  });
+}
+
+function isToolArgToken(token) {
+  return /^[A-Za-z0-9_./:=+-]+$/.test(token);
+}
+
+function consumeTailAfterMarker(value, toolName = "") {
+  const markerTail = value.replace(/^[ \t]+/, "");
+  if (markerTail.startsWith("...")) {
+    return { tail: markerTail.slice(3).replace(/^[ \t:\-—,，.。…]+/, ""), extraCount: 0 };
+  }
+  if (markerTail.startsWith("…")) {
+    return { tail: markerTail.slice(1).replace(/^[ \t:\-—,，.。…]+/, ""), extraCount: 0 };
+  }
+
+  let tail = value.replace(/^[ \t:\-—,，.。…]+/, "");
+  if (!tail) return { tail: "", extraCount: 0 };
+
+  let extraCount = 0;
+  let consumedCurrentArg = false;
+  while (tail) {
+    const parts = tail.split(/\s+/, 2);
+    const first = parts[0];
+    const rest = tail.slice(first.length).replace(/^[\s:\-—,，.。…]+/, "");
+    if (toolName && first.toLowerCase() === toolName.toLowerCase()) {
+      extraCount += 1;
+      tail = rest;
+      const nextParts = tail.split(/\s+/, 2);
+      if (nextParts[0] && isToolArgToken(nextParts[0])) {
+        tail = tail.slice(nextParts[0].length).replace(/^[\s:\-—,，.。…]+/, "");
+      }
+      continue;
+    }
+    if (!consumedCurrentArg && isToolArgToken(first)) {
+      consumedCurrentArg = true;
+      tail = rest;
+      continue;
+    }
+    return { tail, extraCount };
+  }
+  return { tail: "", extraCount };
+}
+
+function createToolTagNode(label, count, elapsed = "") {
+  const tag = document.createElement("span");
+  tag.className = "tool-tag";
+
+  const name = document.createElement("span");
+  name.className = "tool-tag-name";
+  name.textContent = label;
+  tag.appendChild(name);
+
+  if (count > 1) {
+    const countNode = document.createElement("span");
+    countNode.className = "tool-tag-count";
+    countNode.textContent = `x${count}`;
+    tag.appendChild(countNode);
+  }
+  if (elapsed) {
+    const elapsedNode = document.createElement("span");
+    elapsedNode.className = "tool-tag-elapsed";
+    elapsedNode.textContent = elapsed;
+    tag.appendChild(elapsedNode);
+  }
+  return tag;
+}
+
+function renderToolTaggedText(container, text) {
+  const fragment = document.createDocumentFragment();
+  let pendingToolName = "";
+  let pendingToolCount = 0;
+  let pendingToolElapsed = "";
+
+  const flushToolTag = () => {
+    if (!pendingToolName || pendingToolCount <= 0) return;
+    fragment.appendChild(
+      createToolTagNode(pendingToolName, pendingToolCount, pendingToolElapsed),
+    );
+    pendingToolName = "";
+    pendingToolCount = 0;
+    pendingToolElapsed = "";
+  };
+
+  const appendToolTag = (name, elapsed = "") => {
+    if (pendingToolName && pendingToolName !== name) flushToolTag();
+    pendingToolName = name;
+    pendingToolCount += 1;
+    if (elapsed) pendingToolElapsed = elapsed;
+  };
+
+  const appendText = (value) => appendTextWithEmoji(value, fragment);
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+
+  lines.forEach((rawLine, lineIndex) => {
+    TOOL_TAG_RE.lastIndex = 0;
+    const matches = [...rawLine.matchAll(TOOL_TAG_RE)];
+    if (lineIndex > 0) {
+      flushToolTag();
+      appendText("\n");
+    }
+    if (matches.length === 0) {
+      flushToolTag();
+      appendText(rawLine);
+      return;
+    }
+
+    const before = rawLine.slice(0, matches[0].index);
+    if (before.trim()) {
+      flushToolTag();
+      appendText(before);
+    }
+
+    let cursor = matches[0].index;
+    matches.forEach((match) => {
+      const between = rawLine.slice(cursor, match.index);
+      const consumed = consumeTailAfterMarker(between, pendingToolName);
+      for (let i = 0; i < consumed.extraCount; i += 1) appendToolTag(pendingToolName);
+      if (consumed.tail.trim()) {
+        flushToolTag();
+        appendText(consumed.tail);
+      }
+      appendToolTag(match[1], match[2] || "");
+      cursor = match.index + match[0].length;
+    });
+
+    const consumed = consumeTailAfterMarker(rawLine.slice(cursor), pendingToolName);
+    for (let i = 0; i < consumed.extraCount; i += 1) appendToolTag(pendingToolName);
+    if (consumed.tail.trim()) {
+      flushToolTag();
+      appendText(consumed.tail);
+    }
+  });
+
+  flushToolTag();
+  container.replaceChildren(fragment);
+}
+
+function isNearTextBottom(viewport) {
+  return viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 4;
+}
+
+function jumpTextToBottom(viewport) {
+  viewport.scrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+}
+
+function updateText(text, toolPlaceholders) {
+  const viewport = document.querySelector(".text-viewport");
+  if (!viewport) return;
+
+  const sourceText = text || "";
+  const nextText = applyToolPlaceholders(sourceText, toolPlaceholders);
+  if (nextText === lastText && sourceText === lastSourceText) return;
+
+  const sourceIsContinuation = sourceText.startsWith(lastSourceText);
+  const isNewText = sourceText !== lastSourceText && !sourceIsContinuation;
+  const shouldFollowBottom = isNearTextBottom(viewport) || isNewText;
+  renderToolTaggedText(textContent, nextText);
+  lastText = nextText;
+  lastSourceText = sourceText;
+
+  if (shouldFollowBottom) {
+    // Layout is synchronous here; assigning scrollTop jumps without animation.
+    jumpTextToBottom(viewport);
+  }
+}
+
+// ── WebSocket ───────────────────────────────────────────────────────────────
+let ws = null;
+let reconnectTimer = null;
+let cameraTimer = null;
+let volumeFetchPending = false;
+let cameraModeActive = false;
+let focusPointerStart = null;
+
+function formatMusicTime(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return min + ":" + (sec < 10 ? "0" : "") + sec;
+}
+
+function updateMusicBar(progress, durationMs) {
+  const hasMusic = typeof progress === "number" && progress >= 0;
+  musicBar.classList.toggle("visible", hasMusic);
+  if (!hasMusic) return;
+  const p = Math.min(1, Math.max(0, progress));
+  const dur = durationMs || 0;
+  musicFill.style.width = (p * 100).toFixed(1) + "%";
+  musicElapsed.textContent = formatMusicTime(dur * p);
+  musicTotal.textContent = formatMusicTime(dur);
+}
+
+function applyState(data) {
+  if (!data || !data.ready) return;
+
+  statusText.textContent = data.status || "";
+  updateEmoji(data.emoji || "");
+  updateText(data.text || "", data.tool_placeholders);
+
+  // LED dot
+  const ledColor = normalizeColor(data.RGB);
+  ledDot.style.background = ledColor;
+  ledDot.style.boxShadow = `0 0 8px ${ledColor}`;
+
+  // Battery
+  const batteryLevel = typeof data.battery_level === "number" ? data.battery_level : null;
+  if (batteryLevel === null) {
+    batteryText.textContent = "--%";
+    batteryFill.style.width = "0%";
+  } else {
+    batteryText.textContent = `${batteryLevel}%`;
+    batteryFill.style.width = `${Math.min(100, Math.max(0, batteryLevel))}%`;
+  }
+  batteryFill.style.background = normalizeColor(data.battery_color);
+
+  // Icons
+  setIconVisible(netIcon, Boolean(data.network_connected));
+  setIconVisible(vpnIcon, Boolean(data.vpn_connected));
+  setIconVisible(imageIcon, Boolean(data.image_icon_visible));
+  setIconVisible(ragIcon, Boolean(data.rag_icon_visible));
+
+  // Music progress bar
+  updateMusicBar(data.music_progress, data.music_duration_ms);
+
+  // Brightness dim
+  const dimOpacity = Math.max(0, Math.min(1, (100 - (data.brightness ?? 100)) / 100));
+  dim.style.opacity = dimOpacity.toFixed(2);
+
+  // Camera mode
+  cameraModeActive = Boolean(data.camera_mode);
+  const cameraEntryVisible = Boolean(data.camera_available) && !cameraModeActive && data.status === "idle";
+  cameraEntryBtn.classList.toggle("available", cameraEntryVisible);
+  screen.classList.toggle("camera-active", cameraModeActive);
+  imageLayer.classList.toggle("camera-preview", cameraModeActive);
+  cameraUi.setAttribute("aria-hidden", cameraModeActive ? "false" : "true");
+
+  if (cameraModeActive) {
+    imageLayer.style.display = "flex";
+    startCameraFeed();
+    return;
+  }
+
+  cameraShutterBtn.disabled = false;
+  focusRing.classList.remove("visible");
+  stopCameraFeed();
+  if (data.image && data.image_revision !== lastImageRevision) {
+    lastImageRevision = data.image_revision;
+    imageDisplay.src = `/image?rev=${lastImageRevision}`;
+    imageLayer.style.display = "flex";
+  } else if (!data.image) {
+    imageLayer.style.display = "none";
+  }
+}
+
+function startCameraFeed() {
+  if (cameraTimer) return;
+  cameraTimer = setInterval(() => {
+    imageDisplay.src = `/camera?ts=${Date.now()}`;
+  }, 200);
+}
+
+function stopCameraFeed() {
+  if (!cameraTimer) return;
+  clearInterval(cameraTimer);
+  cameraTimer = null;
+}
+
+function connectWebSocket() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  const url = `${protocol}://${window.location.host}/ws`;
+  ws = new WebSocket(url);
+
+  ws.addEventListener("open", () => {
+    // Request current volume when connected
+    sendJson({ type: "get_volume" });
+  });
+
+  ws.addEventListener("message", (event) => {
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (message.type === "state") {
+      applyState(message.payload);
+    } else if (message.type === "volume") {
+      // Volume response from server
+      const pct = Math.round(message.percent || 0);
+      volumeSlider.value = pct;
+      volumeValue.textContent = `${pct}%`;
+    } else if (message.type === "exit_app_ack") {
+      exitConfirmBtn.textContent = "Exiting…";
+    } else if (message.type === "start_record") {
+      startWebAudioRecording();
+    } else if (message.type === "stop_record") {
+      stopWebAudioRecording();
+    } else if (message.type === "play_audio") {
+      playWebAudio(message.data, message.format, message.duration);
+    } else if (message.type === "stop_audio") {
+      stopWebAudio();
+    } else if (message.type === "start_camera_stream") {
+      startWebCameraStream();
+    } else if (message.type === "stop_camera_stream") {
+      stopWebCameraStream();
+    } else if (message.type === "capture_photo") {
+      sendWebCameraCapture();
+    }
+  });
+
+  ws.addEventListener("close", () => {
+    stopCameraFeed();
+    reconnectTimer = setTimeout(connectWebSocket, 1000);
+  });
+
+  ws.addEventListener("error", () => {
+    ws.close();
+  });
+}
+
+function sendJson(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+function sendButton(action) {
+  sendJson({ type: "button", action });
+}
+
+// ── Camera controls ─────────────────────────────────────────────────────────
+cameraEntryBtn.addEventListener("click", () => {
+  sendJson({ type: "camera_open" });
+});
+
+cameraBackBtn.addEventListener("click", () => {
+  sendJson({ type: "camera_back" });
+});
+
+cameraShutterBtn.addEventListener("click", () => {
+  if (!cameraModeActive || cameraShutterBtn.disabled) return;
+  cameraShutterBtn.disabled = true;
+  sendJson({ type: "camera_shutter" });
+});
+
+function cameraFocusCoordinates(event) {
+  const rect = imageDisplay.getBoundingClientRect();
+  const naturalWidth = imageDisplay.naturalWidth || rect.width;
+  const naturalHeight = imageDisplay.naturalHeight || rect.height;
+  if (!rect.width || !rect.height || !naturalWidth || !naturalHeight) return null;
+
+  const scale = Math.max(rect.width / naturalWidth, rect.height / naturalHeight);
+  const renderedWidth = naturalWidth * scale;
+  const renderedHeight = naturalHeight * scale;
+  const cropX = (renderedWidth - rect.width) / 2;
+  const cropY = (renderedHeight - rect.height) / 2;
+  return {
+    x: Math.max(0, Math.min(1, (event.clientX - rect.left + cropX) / renderedWidth)),
+    y: Math.max(0, Math.min(1, (event.clientY - rect.top + cropY) / renderedHeight)),
+  };
+}
+
+function showFocusRing(clientX, clientY) {
+  const layerRect = imageLayer.getBoundingClientRect();
+  focusRing.style.left = `${clientX - layerRect.left}px`;
+  focusRing.style.top = `${clientY - layerRect.top}px`;
+  focusRing.classList.remove("visible");
+  // Restart the focus animation even when tapping the same point twice.
+  void focusRing.offsetWidth;
+  focusRing.classList.add("visible");
+}
+
+imageDisplay.addEventListener("pointerdown", (event) => {
+  if (!cameraModeActive) return;
+  focusPointerStart = { x: event.clientX, y: event.clientY };
+});
+
+imageDisplay.addEventListener("pointerup", (event) => {
+  if (!cameraModeActive || !focusPointerStart) return;
+  const movement = Math.hypot(
+    event.clientX - focusPointerStart.x,
+    event.clientY - focusPointerStart.y,
+  );
+  focusPointerStart = null;
+  if (movement > 16) return;
+  const focus = cameraFocusCoordinates(event);
+  if (!focus) return;
+  showFocusRing(event.clientX, event.clientY);
+  sendJson({ type: "camera_focus", x: focus.x, y: focus.y });
+});
+
+imageDisplay.addEventListener("pointercancel", () => {
+  focusPointerStart = null;
+});
+
+// ── Button press-and-hold ───────────────────────────────────────────────────
+function setPressed(value) {
+  isPressed = value;
+  recordBtn.classList.toggle("pressed", value);
+}
+
+const press = () => {
+  setPressed(true);
+  sendButton("press");
+};
+
+const release = () => {
+  if (!isPressed) return;
+  setPressed(false);
+  sendButton("release");
+};
+
+recordBtn.addEventListener("mousedown", (e) => { e.preventDefault(); press(); });
+recordBtn.addEventListener("mouseup", release);
+recordBtn.addEventListener("mouseleave", release);
+window.addEventListener("mouseup", release);
+recordBtn.addEventListener("touchstart", (e) => { e.preventDefault(); press(); });
+recordBtn.addEventListener("touchend", (e) => { e.preventDefault(); release(); });
+window.addEventListener("touchend", release);
+
+// ── Menu ────────────────────────────────────────────────────────────────────
+function openMenu() {
+  menuOverlay.setAttribute("aria-hidden", "false");
+  menuOverlay.classList.add("open");
+  sendJson({ type: "get_volume" });
+}
+
+function closeMenu() {
+  menuOverlay.classList.remove("open");
+  menuOverlay.setAttribute("aria-hidden", "true");
+  hideExitConfirmation();
+}
+
+function showExitConfirmation() {
+  exitAppBtn.hidden = true;
+  exitConfirm.classList.add("visible");
+  exitConfirm.setAttribute("aria-hidden", "false");
+}
+
+function hideExitConfirmation() {
+  exitAppBtn.hidden = false;
+  exitConfirm.classList.remove("visible");
+  exitConfirm.setAttribute("aria-hidden", "true");
+  exitConfirmBtn.disabled = false;
+  exitCancelBtn.disabled = false;
+  exitConfirmBtn.textContent = "Exit";
+}
+
+menuBtn.addEventListener("click", openMenu);
+
+menuClose.addEventListener("click", closeMenu);
+
+exitAppBtn.addEventListener("click", showExitConfirmation);
+exitCancelBtn.addEventListener("click", hideExitConfirmation);
+exitConfirmBtn.addEventListener("click", () => {
+  exitConfirmBtn.disabled = true;
+  exitCancelBtn.disabled = true;
+  exitConfirmBtn.textContent = "Exiting…";
+  sendJson({ type: "exit_app" });
+});
+
+menuOverlay.addEventListener("click", (e) => {
+  if (e.target === menuOverlay) {
+    closeMenu();
+  }
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && menuOverlay.classList.contains("open")) {
+    closeMenu();
+  }
+});
+
+// Volume slider
+let volumeDebounce = null;
+volumeSlider.addEventListener("input", () => {
+  const pct = parseInt(volumeSlider.value, 10);
+  volumeValue.textContent = `${pct}%`;
+  clearTimeout(volumeDebounce);
+  volumeDebounce = setTimeout(() => {
+    sendJson({ type: "set_volume", percent: pct });
+  }, 100);
+});
+
+// ── Start ───────────────────────────────────────────────────────────────────
+connectWebSocket();
+
+// ── Web Audio Recording ─────────────────────────────────────────────────────
+const FRAME_AUDIO = 0x01;
+const FRAME_CAM_LIVE = 0x02;
+const FRAME_CAM_CAPTURE = 0x03;
+
+let mediaRecorder = null;
+let audioStream = null;
+
+async function startWebAudioRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") return;
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const preferredMimes = [
+      "audio/webm;codecs=opus",
+      "audio/ogg;codecs=opus",
+      "audio/webm",
+    ];
+    const mimeType = preferredMimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+    const options = mimeType ? { mimeType } : {};
+    mediaRecorder = new MediaRecorder(audioStream, options);
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (!event.data || event.data.size === 0) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      event.data.arrayBuffer().then((buf) => {
+        const payload = new Uint8Array(1 + buf.byteLength);
+        payload[0] = FRAME_AUDIO;
+        payload.set(new Uint8Array(buf), 1);
+        ws.send(payload);
+      });
+    };
+
+    mediaRecorder.onstop = () => {
+      if (audioStream) {
+        audioStream.getTracks().forEach((t) => t.stop());
+        audioStream = null;
+      }
+      mediaRecorder = null;
+      sendJson({ type: "record_complete" });
+    };
+
+    mediaRecorder.start(500);
+  } catch (e) {
+    console.error("[WebAudio] getUserMedia failed:", e);
+    sendJson({ type: "record_complete" });
+  }
+}
+
+function stopWebAudioRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+}
+
+// ── Web Audio Playback ──────────────────────────────────────────────────────
+let audioCtx = null;
+let currentAudioSource = null;
+
+function ensureAudioContext() {
+  if (!audioCtx || audioCtx.state === "closed") {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+async function playWebAudio(base64Data, _format, _duration) {
+  try {
+    const ctx = ensureAudioContext();
+    const binary = atob(base64Data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const decoded = await ctx.decodeAudioData(bytes.buffer);
+    stopWebAudio();
+    currentAudioSource = ctx.createBufferSource();
+    currentAudioSource.buffer = decoded;
+    currentAudioSource.connect(ctx.destination);
+    currentAudioSource.onended = () => {
+      currentAudioSource = null;
+      sendJson({ type: "play_complete" });
+    };
+    currentAudioSource.start(0);
+  } catch (e) {
+    console.error("[WebAudio] Playback failed:", e);
+    sendJson({ type: "play_complete" });
+  }
+}
+
+function stopWebAudio() {
+  if (currentAudioSource) {
+    try { currentAudioSource.stop(); } catch {}
+    currentAudioSource = null;
+  }
+}
+
+// ── Web Camera ──────────────────────────────────────────────────────────────
+let webCamStream = null;
+let webCamVideo = null;
+let webCamCanvas = null;
+let webCamSendTimer = null;
+
+async function startWebCameraStream() {
+  if (webCamStream) return;
+  try {
+    webCamStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+    });
+    if (!webCamVideo) {
+      webCamVideo = document.createElement("video");
+      webCamVideo.autoplay = true;
+      webCamVideo.muted = true;
+      webCamVideo.playsInline = true;
+      webCamCanvas = document.createElement("canvas");
+    }
+    webCamVideo.srcObject = webCamStream;
+    await webCamVideo.play().catch(() => {});
+    webCamSendTimer = setInterval(() => sendWebCameraFrameInternal(false), 200);
+  } catch (e) {
+    console.error("[WebCamera] getUserMedia (video) failed:", e);
+    webCamStream = null;
+  }
+}
+
+function stopWebCameraStream() {
+  if (webCamSendTimer) { clearInterval(webCamSendTimer); webCamSendTimer = null; }
+  if (webCamStream) { webCamStream.getTracks().forEach((t) => t.stop()); webCamStream = null; }
+}
+
+function sendWebCameraCapture() {
+  sendWebCameraFrameInternal(true);
+}
+
+function sendWebCameraFrameInternal(isCapture) {
+  if (!webCamVideo || !webCamCanvas || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const w = webCamVideo.videoWidth || 640;
+  const h = webCamVideo.videoHeight || 480;
+  webCamCanvas.width = w;
+  webCamCanvas.height = h;
+  const ctx2d = webCamCanvas.getContext("2d");
+  ctx2d.drawImage(webCamVideo, 0, 0, w, h);
+  const quality = isCapture ? 0.95 : 0.75;
+  webCamCanvas.toBlob(
+    (blob) => {
+      if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
+      blob.arrayBuffer().then((buf) => {
+        const prefixByte = isCapture ? FRAME_CAM_CAPTURE : FRAME_CAM_LIVE;
+        const payload = new Uint8Array(1 + buf.byteLength);
+        payload[0] = prefixByte;
+        payload.set(new Uint8Array(buf), 1);
+        ws.send(payload);
+      });
+    },
+    "image/jpeg",
+    quality,
+  );
+}

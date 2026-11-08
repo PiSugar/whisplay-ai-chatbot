@@ -106,6 +106,9 @@ if [ -f ".env" ]; then
   ALSA_OUTPUT_DEVICE=$(get_env_value "ALSA_OUTPUT_DEVICE")
   [ -n "$ALSA_OUTPUT_DEVICE" ] && export ALSA_OUTPUT_DEVICE
 
+  WHISPLAY_HAT_MODEL=$(get_env_value "WHISPLAY_HAT_MODEL")
+  [ -n "$WHISPLAY_HAT_MODEL" ] && export WHISPLAY_HAT_MODEL
+
   echo ".env variables loaded."
 
   # check if SERVE_OLLAMA is set to true
@@ -121,10 +124,27 @@ else
   exit 1
 fi
 
-# Adjust initial volume (Linux only). INITIAL_VOLUME_PERCENT is the percentage
-# users see in alsamixer. The unified driver exposes a 0-100 speaker control;
-# legacy WM8960 accepts percentages through amixer set Speaker.
-if [ "$audio_supported" = true ]; then
+# Detect Hat Plus before any startup volume write. Both HAT models use the same
+# sound-card name, so use the explicit model setting or the connected DSI panel.
+is_hat_plus=false
+case "${WHISPLAY_HAT_MODEL:-auto}" in
+  hat-plus) is_hat_plus=true ;;
+  hat) is_hat_plus=false ;;
+  *)
+    for dsi_status in /sys/class/drm/*DSI*/status /sys/class/drm/*dsi*/status; do
+      if [ -r "$dsi_status" ] && grep -qi '^connected$' "$dsi_status"; then
+        is_hat_plus=true
+        break
+      fi
+    done
+    ;;
+esac
+
+# Startup volume initialization is for Whisplay HAT only. Hat Plus retains its
+# current hardware volume because it is controlled from the on-screen UI.
+if [ "$is_hat_plus" = true ]; then
+  echo "[Volume] Hat Plus detected; keeping the current speaker volume."
+elif [ "$audio_supported" = true ]; then
   if [ -z "$initial_volume_percent" ]; then
     initial_volume_percent=$default_initial_volume_percent
   fi
@@ -141,7 +161,7 @@ if [ -n "$card_name" ]; then
   export SOUND_CARD_INDEX="$card_index"
   export ALSA_INPUT_DEVICE="${ALSA_INPUT_DEVICE:-hw:${card_name},0}"
   if [ -z "$ALSA_OUTPUT_DEVICE" ]; then
-    if [ "$card_name" = "whisplaysound" ]; then
+    if [ "$card_name" = "whisplaysound" ] && command -v aplay >/dev/null 2>&1 && aplay -L 2>/dev/null | grep -Fxq playback; then
       export ALSA_OUTPUT_DEVICE="playback"
     else
       export ALSA_OUTPUT_DEVICE="plughw:${card_name},0"
@@ -155,6 +175,13 @@ if [ "$serve_ollama" = true ]; then
   echo "Starting Ollama server..."
   export OLLAMA_KEEP_ALIVE=-1 # ensure Ollama server stays alive
   OLLAMA_HOST=0.0.0.0:11434 ollama serve &
+fi
+
+# Auto-launch the Hat Plus UI using the model detected above.
+if [ "$is_hat_plus" = true ] && [ -f "scripts/start-hat-plus-ui.sh" ]; then
+  echo "Hat Plus detected, launching Hat Plus UI in background..."
+  bash scripts/start-hat-plus-ui.sh &
+  hat_plus_ui_pid=$!
 fi
 
 # if file use_npm exists and is true, use npm
@@ -189,6 +216,14 @@ fi
 
 # After the service ends, perform cleanup
 echo "Cleaning up after service..."
+
+# Stop Hat Plus UI browser if we launched it
+if [ -n "$hat_plus_ui_pid" ]; then
+  echo "Stopping Hat Plus UI browser..."
+  kill $hat_plus_ui_pid 2>/dev/null
+  pkill -f "firefox.*17881" 2>/dev/null || true
+  pkill -f "chromium.*17881" 2>/dev/null || true
+fi
 
 if [ "$serve_ollama" = true ]; then
   echo "Stopping Ollama server..."

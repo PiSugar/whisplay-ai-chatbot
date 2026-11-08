@@ -137,15 +137,14 @@ const topLevelGroups: TopLevelGroup[] = [
   },
   {
     key: "device-ui",
-    title: "Device & UI",
-    description: "Display, audio, camera simulation, icons and device presentation settings.",
+    title: "Hardware & UI",
+    description: "Whisplay hardware, display appearance, device audio and browser-based UI settings.",
     matches: (section) =>
       [
+        "Whisplay Hardware",
         "VPN Status Icon",
-        "Default Emoji",
-        "Custom Font",
-        "Initial Volume Percent",
-        "Audio Playback",
+        "Display Appearance",
+        "Device Audio",
         "Web Display Settings",
         "Web Audio Settings (requires WHISPLAY_WEB_ENABLED=true)",
         "Web Camera Settings (requires WHISPLAY_WEB_ENABLED=true)",

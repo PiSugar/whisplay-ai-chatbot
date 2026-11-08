@@ -16,6 +16,12 @@ try:
 except ImportError:
     Picamera2 = None
 
+try:
+    from libcamera import Rectangle, controls
+except ImportError:
+    Rectangle = None
+    controls = None
+
 
 def _default_web_frame_path() -> str:
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -72,6 +78,68 @@ class SharedCameraService:
         temp_path = f"{self.web_frame_path}.tmp"
         image.save(temp_path, format="JPEG", quality=80)
         os.replace(temp_path, self.web_frame_path)
+
+    def _focus_at(self, normalized_x: float, normalized_y: float) -> dict:
+        with self.camera_lock:
+            self._ensure_camera_ready()
+            available = self.picam2.camera_controls
+            if controls is None or Rectangle is None or "AfMode" not in available:
+                return {"ok": True, "supported": False}
+
+            x = min(1.0, max(0.0, float(normalized_x)))
+            y = min(1.0, max(0.0, float(normalized_y)))
+            metadata = self.picam2.capture_metadata()
+            crop = metadata.get("ScalerCrop")
+
+            if crop is not None and all(
+                hasattr(crop, attr) for attr in ("x", "y", "width", "height")
+            ):
+                crop_x, crop_y = crop.x, crop.y
+                crop_width, crop_height = crop.width, crop.height
+            else:
+                pixel_size = self.picam2.camera_properties.get("PixelArraySize")
+                if pixel_size is None:
+                    return {"ok": True, "supported": False}
+                crop_x = 0
+                crop_y = 0
+                if hasattr(pixel_size, "width") and hasattr(pixel_size, "height"):
+                    crop_width = pixel_size.width
+                    crop_height = pixel_size.height
+                else:
+                    crop_width, crop_height = pixel_size[0], pixel_size[1]
+
+            window_width = max(32, int(crop_width * 0.2))
+            window_height = max(32, int(crop_height * 0.2))
+            center_x = crop_x + int(crop_width * x)
+            center_y = crop_y + int(crop_height * y)
+            window_x = min(
+                crop_x + crop_width - window_width,
+                max(crop_x, center_x - window_width // 2),
+            )
+            window_y = min(
+                crop_y + crop_height - window_height,
+                max(crop_y, center_y - window_height // 2),
+            )
+
+            focus_controls = {"AfMode": controls.AfModeEnum.Auto}
+            if "AfWindows" in available and "AfMetering" in available:
+                focus_controls.update(
+                    {
+                        "AfMetering": controls.AfMeteringEnum.Windows,
+                        "AfWindows": [
+                            Rectangle(
+                                window_x,
+                                window_y,
+                                window_width,
+                                window_height,
+                            )
+                        ],
+                    }
+                )
+            if "AfTrigger" in available:
+                focus_controls["AfTrigger"] = controls.AfTriggerEnum.Start
+            self.picam2.set_controls(focus_controls)
+            return {"ok": True, "supported": True}
 
     def _stream_loop(self) -> None:
         while self.running:
@@ -130,6 +198,12 @@ class SharedCameraService:
                 image = self._capture_frame_image()
                 image.save(target_path, format="JPEG", quality=95)
                 return {"ok": True, "path": target_path}
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+
+        if cmd == "focus":
+            try:
+                return self._focus_at(payload.get("x", 0.5), payload.get("y", 0.5))
             except Exception as e:
                 return {"ok": False, "error": str(e)}
 

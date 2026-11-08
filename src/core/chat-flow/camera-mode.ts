@@ -8,7 +8,7 @@ let cameraModeLongPressTimer: NodeJS.Timeout | null = null;
 let cameraModeExitAfterCaptureTimer: NodeJS.Timeout | null = null;
 let onCameraModeExitCallback: () => void = () => {};
 
-function exitCameraMode(): void {
+export function exitCameraMode(): void {
   if (!getCurrentStatus().camera_mode) {
     return;
   }
@@ -69,15 +69,22 @@ export function handleCameraModeRelease(): void {
   }
 
   if (cameraModePressAt > 0 && duration <= CAMERA_LONG_PRESS_MS) {
-    display({ camera_capture: true });
-    if (cameraModeExitAfterCaptureTimer) {
-      clearTimeout(cameraModeExitAfterCaptureTimer);
-    }
-    cameraModeExitAfterCaptureTimer = setTimeout(() => {
-      exitCameraMode();
-      cameraModeExitAfterCaptureTimer = null;
-    }, CAMERA_EXIT_AFTER_CAPTURE_MS);
+    captureCameraImage();
   }
 
   cameraModePressAt = 0;
+}
+
+export function captureCameraImage(): void {
+  if (!getCurrentStatus().camera_mode) {
+    return;
+  }
+  display({ camera_capture: true });
+  if (cameraModeExitAfterCaptureTimer) {
+    clearTimeout(cameraModeExitAfterCaptureTimer);
+  }
+  cameraModeExitAfterCaptureTimer = setTimeout(() => {
+    exitCameraMode();
+    cameraModeExitAfterCaptureTimer = null;
+  }, CAMERA_EXIT_AFTER_CAPTURE_MS);
 }

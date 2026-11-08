@@ -2,8 +2,29 @@
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+configured_hat_model="${WHISPLAY_HAT_MODEL:-}"
+if [ -z "$configured_hat_model" ] && [ -f "$SCRIPT_DIR/.env" ]; then
+    configured_hat_model=$(grep -E '^[[:space:]]*WHISPLAY_HAT_MODEL[[:space:]]*=' "$SCRIPT_DIR/.env" | tail -n1 | cut -d'=' -f2- | tr -d '"' | xargs)
+fi
+
+hat_plus_detected=false
+case "${configured_hat_model:-auto}" in
+    hat-plus) hat_plus_detected=true ;;
+    hat) hat_plus_detected=false ;;
+    *)
+        for dsi_status in /sys/class/drm/*DSI*/status /sys/class/drm/*dsi*/status; do
+            if [ -r "$dsi_status" ] && grep -qi '^connected$' "$dsi_status"; then
+                hat_plus_detected=true
+                break
+            fi
+        done
+        ;;
+esac
+
 # if graphical interface is enabled, ask user whether to disable graphical interface
-if [ "$(systemctl get-default)" == "graphical.target" ]; then
+if [ "$hat_plus_detected" = true ]; then
+    echo "Detected Whisplay Hat Plus; keeping the graphical interface enabled for the DSI UI."
+elif [ "$(systemctl get-default)" == "graphical.target" ]; then
     echo "Graphical interface is currently enabled."
     read -p "Disabling graphical interface is recommended for a headless setup. Do you want to disable the graphical interface? (y/n) " disable_gui
     if [[ "$disable_gui" == "y" ]]; then
@@ -106,6 +127,50 @@ RestartSec=2
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# ── Hat Plus kiosk service (DSI display) ─────────────────────────────────
+# The sound card name is always whisplaysound, so identify Hat Plus by model/DSI.
+if [ "$hat_plus_detected" = true ]; then
+    echo ""
+    echo "Setting up the Whisplay Hat Plus kiosk UI service..."
+
+    # Ensure graphical target for Chromium kiosk
+    if [ "$(systemctl get-default)" != "graphical.target" ]; then
+        echo "Hat Plus requires graphical interface for DSI display kiosk."
+        sudo systemctl set-default graphical.target
+        echo "Graphical interface enabled."
+    fi
+
+    sudo tee /etc/systemd/system/whisplay-hat-plus-ui.service > /dev/null <<HATEOF
+[Unit]
+Description=Whisplay Hat Plus Kiosk UI
+After=graphical.target chatbot.service
+Wants=chatbot.service
+PartOf=chatbot.service
+
+[Service]
+Type=simple
+User=$TARGET_USER
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u $TARGET_USER)
+Environment=HOME=$USER_HOME
+Environment=WHISPLAY_HAT_PLUS_PORT=17881
+WorkingDirectory=$USER_HOME/whisplay-ai-chatbot
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash $USER_HOME/whisplay-ai-chatbot/scripts/start-hat-plus-ui.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
+HATEOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable whisplay-hat-plus-ui.service
+    sudo systemctl restart whisplay-hat-plus-ui.service
+    echo "Hat Plus kiosk UI service configured."
+fi
 
 # start the service
 echo "Service file created. Reloading Systemd..."

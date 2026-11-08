@@ -84,6 +84,40 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    Please note that this will disable the graphical interface and set the system to multi-user mode, which is suitable for headless operation.
    You can find the output logs at `chatbot.log`. Running `tail -f chatbot.log` will also display the logs in real-time.
 
+## Whisplay Plus Quick Start
+
+Whisplay Plus is detected automatically from its DSI display. If automatic detection is unavailable, set the model explicitly in `.env`:
+
+```bash
+WHISPLAY_HAT_MODEL=hat-plus
+```
+
+Start the app with `bash run_chatbot.sh`. The fullscreen touchscreen UI opens automatically and is also available at `http://<raspberry-pi-ip>:17881/` by default.
+
+- Press and hold either the physical button or the on-screen microphone button to speak, then release it to send the recording.
+- Use the three-dot settings button to adjust volume and brightness or exit the app. Whisplay Plus keeps the current speaker volume when the app starts.
+- If `ENABLE_CAMERA=true`, use the camera button beside Settings to open the preview. Tap the preview to focus, then use the physical button or the on-screen shutter button to take a photo.
+- GPIO17 must be available for the physical button. Stop or reconfigure any other hardware service that owns GPIO17.
+
+The default screen orientation is portrait. Run the orientation script as the desktop user (without `sudo`) to switch the display and touchscreen mapping together:
+
+```bash
+# Portrait (default)
+bash scripts/set-hat-plus-orientation.sh portrait
+
+# Landscape
+bash scripts/set-hat-plus-orientation.sh landscape
+
+# Show the current configuration
+bash scripts/set-hat-plus-orientation.sh status
+```
+
+To add a launcher to the Raspberry Pi desktop:
+
+```bash
+bash scripts/install-hat-plus-desktop-shortcut.sh
+```
+
 ## Build After Code Changes
 
 If you make changes to the node code or just pull the new code from this repository, you need to rebuild the project. You can do this by running:
