@@ -13,7 +13,13 @@ const recordBtn = document.getElementById("recordBtn");
 const dim = document.getElementById("dim");
 const imageLayer = document.getElementById("imageLayer");
 const imageDisplay = document.getElementById("imageDisplay");
+const screen = document.querySelector(".screen");
 const menuBtn = document.getElementById("menuBtn");
+const cameraEntryBtn = document.getElementById("cameraEntryBtn");
+const cameraUi = document.getElementById("cameraUi");
+const cameraBackBtn = document.getElementById("cameraBackBtn");
+const cameraShutterBtn = document.getElementById("cameraShutterBtn");
+const focusRing = document.getElementById("focusRing");
 const menuOverlay = document.getElementById("menuOverlay");
 const menuClose = document.getElementById("menuClose");
 const volumeSlider = document.getElementById("volumeSlider");
@@ -322,6 +328,8 @@ let ws = null;
 let reconnectTimer = null;
 let cameraTimer = null;
 let volumeFetchPending = false;
+let cameraModeActive = false;
+let focusPointerStart = null;
 
 function formatMusicTime(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -378,12 +386,21 @@ function applyState(data) {
   dim.style.opacity = dimOpacity.toFixed(2);
 
   // Camera mode
-  if (data.camera_mode) {
+  cameraModeActive = Boolean(data.camera_mode);
+  const cameraEntryVisible = Boolean(data.camera_available) && !cameraModeActive && data.status === "idle";
+  cameraEntryBtn.classList.toggle("available", cameraEntryVisible);
+  screen.classList.toggle("camera-active", cameraModeActive);
+  imageLayer.classList.toggle("camera-preview", cameraModeActive);
+  cameraUi.setAttribute("aria-hidden", cameraModeActive ? "false" : "true");
+
+  if (cameraModeActive) {
     imageLayer.style.display = "flex";
     startCameraFeed();
     return;
   }
 
+  cameraShutterBtn.disabled = false;
+  focusRing.classList.remove("visible");
   stopCameraFeed();
   if (data.image && data.image_revision !== lastImageRevision) {
     lastImageRevision = data.image_revision;
@@ -473,6 +490,71 @@ function sendJson(obj) {
 function sendButton(action) {
   sendJson({ type: "button", action });
 }
+
+// ── Camera controls ─────────────────────────────────────────────────────────
+cameraEntryBtn.addEventListener("click", () => {
+  sendJson({ type: "camera_open" });
+});
+
+cameraBackBtn.addEventListener("click", () => {
+  sendJson({ type: "camera_back" });
+});
+
+cameraShutterBtn.addEventListener("click", () => {
+  if (!cameraModeActive || cameraShutterBtn.disabled) return;
+  cameraShutterBtn.disabled = true;
+  sendJson({ type: "camera_shutter" });
+});
+
+function cameraFocusCoordinates(event) {
+  const rect = imageDisplay.getBoundingClientRect();
+  const naturalWidth = imageDisplay.naturalWidth || rect.width;
+  const naturalHeight = imageDisplay.naturalHeight || rect.height;
+  if (!rect.width || !rect.height || !naturalWidth || !naturalHeight) return null;
+
+  const scale = Math.max(rect.width / naturalWidth, rect.height / naturalHeight);
+  const renderedWidth = naturalWidth * scale;
+  const renderedHeight = naturalHeight * scale;
+  const cropX = (renderedWidth - rect.width) / 2;
+  const cropY = (renderedHeight - rect.height) / 2;
+  return {
+    x: Math.max(0, Math.min(1, (event.clientX - rect.left + cropX) / renderedWidth)),
+    y: Math.max(0, Math.min(1, (event.clientY - rect.top + cropY) / renderedHeight)),
+  };
+}
+
+function showFocusRing(clientX, clientY) {
+  const layerRect = imageLayer.getBoundingClientRect();
+  focusRing.style.left = `${clientX - layerRect.left}px`;
+  focusRing.style.top = `${clientY - layerRect.top}px`;
+  focusRing.classList.remove("visible");
+  // Restart the focus animation even when tapping the same point twice.
+  void focusRing.offsetWidth;
+  focusRing.classList.add("visible");
+}
+
+imageDisplay.addEventListener("pointerdown", (event) => {
+  if (!cameraModeActive) return;
+  focusPointerStart = { x: event.clientX, y: event.clientY };
+});
+
+imageDisplay.addEventListener("pointerup", (event) => {
+  if (!cameraModeActive || !focusPointerStart) return;
+  const movement = Math.hypot(
+    event.clientX - focusPointerStart.x,
+    event.clientY - focusPointerStart.y,
+  );
+  focusPointerStart = null;
+  if (movement > 16) return;
+  const focus = cameraFocusCoordinates(event);
+  if (!focus) return;
+  showFocusRing(event.clientX, event.clientY);
+  sendJson({ type: "camera_focus", x: focus.x, y: focus.y });
+});
+
+imageDisplay.addEventListener("pointercancel", () => {
+  focusPointerStart = null;
+});
 
 // ── Button press-and-hold ───────────────────────────────────────────────────
 function setPressed(value) {

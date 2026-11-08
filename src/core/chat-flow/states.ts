@@ -7,6 +7,9 @@ import {
   display,
   getCurrentStatus,
   onCameraCapture,
+  onCameraModeRequest,
+  onCameraShutterRequest,
+  onCameraBackRequest,
   onTextInput,
   isButtonDown,
 } from "../../device/display";
@@ -32,6 +35,8 @@ import { sendWhisplayIMMessage } from "../../cloud-api/whisplay-im/whisplay-im";
 import { ChatFlowContext, FlowName, FlowStateHandler } from "./types";
 import {
   enterCameraMode,
+  captureCameraImage,
+  exitCameraMode,
   handleCameraModePress,
   handleCameraModeRelease,
   onCameraModeExit,
@@ -40,6 +45,9 @@ import {
 import { DEFAULT_EMOJI } from "../../utils";
 import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback, onMusicTrackChange, onMusicPlaybackEnd } from "../../device/music-player";
 import { autoSaveExchange, prepareMemoryPrompt } from "../../config/local-memory";
+import { detectHatModel } from "../../utils/hat-detect";
+
+const isHatPlus = detectHatModel() === "hat-plus";
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -53,6 +61,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonReleased(noop);
     onCameraModeExit(null);
+    onCameraShutterRequest(null);
+    onCameraBackRequest(null);
     onTextInput(async (text: string) => {
       if (ctx.currentFlowName !== "sleep") return;
       await ctx.pauseWakeWordListener();
@@ -63,15 +73,24 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       ctx.transitionTo("answer");
     });
     if (ctx.enableCamera) {
-      const captureImgPath = `${cameraDir}/capture-${moment().format(
-        "YYYYMMDD-HHmmss",
-      )}.jpg`;
-      onButtonDoubleClick(async () => {
+      const openCamera = async () => {
         await ctx.pauseWakeWordListener();
         if (ctx.currentFlowName !== "sleep") return;
+        const captureImgPath = `${cameraDir}/capture-${moment().format(
+          "YYYYMMDD-HHmmss",
+        )}.jpg`;
         enterCameraMode(captureImgPath);
         ctx.transitionTo("camera");
-      });
+      };
+      onCameraModeRequest(openCamera);
+      if (isHatPlus) {
+        onButtonDoubleClick(null);
+      } else {
+        onButtonDoubleClick(openCamera);
+      }
+    } else {
+      onCameraModeRequest(null);
+      onButtonDoubleClick(null);
     }
     display({
       status: "idle",
@@ -80,7 +99,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       rag_icon_visible: false,
       ...(getCurrentStatus().text.endsWith("Listening...") || !getCurrentStatus().text
         ? {
-          text: `Long Press the button to say something${ctx.enableCamera ? ",\ndouble click to launch camera" : ""
+          text: `Long Press the button to say something${ctx.enableCamera && !isHatPlus ? ",\ndouble click to launch camera" : ""
             }.`,
         }
         : {}),
@@ -88,11 +107,18 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
   },
   camera: (ctx: ChatFlowContext) => {
     onButtonDoubleClick(null);
+    onCameraModeRequest(null);
     onButtonPressed(() => {
       handleCameraModePress();
     });
     onButtonReleased(() => {
       handleCameraModeRelease();
+    });
+    onCameraShutterRequest(() => {
+      captureCameraImage();
+    });
+    onCameraBackRequest(() => {
+      exitCameraMode();
     });
     onCameraCapture(() => {
       const captureImagePath = getCurrentStatus().capture_image_path;

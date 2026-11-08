@@ -92,6 +92,7 @@ whisplay-ai-chatbot/
 │   ├── whisplay.py               # Hardware board abstraction (GPIO, SPI, LCD)
 │   ├── chatbot-ui.py             # UI rendering server (socket-based)
 │   ├── camera.py                 # Camera module integration
+│   ├── hat-plus-button.py         # Hat Plus GPIO button event monitor
 │   ├── whisplay_client.py        # External Whisplay daemon detection/adaptation
 │   ├── wakeword.py               # Wake word detection host
 │   ├── utils.py                  # Python utilities
@@ -266,6 +267,17 @@ whisplay.on_button_release(callback)
 - **Node.js** (TypeScript) ↔ **Python** (UI renderer) via TCP socket on port 12345
 - JSON messages with newline delimiter
 - Key message types: `button_pressed`, `button_released`, `camera_capture`, display updates
+
+### Whisplay Hat Plus Input and Camera UI
+- When the external `whisplay-daemon` is unavailable, `src/device/display.ts` starts
+  `python/hat-plus-button.py` to monitor the Hat Plus physical button on BCM GPIO17
+  without taking ownership of the desktop display or RGB LED.
+- The physical button keeps push-to-talk behavior while idle and becomes the shutter
+  while camera mode is active. Hat Plus does not use the double-click camera shortcut.
+- The Hat Plus browser UI exposes a camera entry button when `ENABLE_CAMERA=true`,
+  plus shutter, back, and tap-to-focus controls in the camera preview.
+- `python/camera.py` accepts normalized `focus` coordinates and uses Picamera2 autofocus
+  windows when the connected camera exposes autofocus controls.
 
 ### Optional Hardware Daemon
 - The optional local-only `whisplay-daemon` service now lives in the separate `Whisplay` driver repository, not in this repo.

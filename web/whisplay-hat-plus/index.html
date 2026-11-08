@@ -71,6 +71,18 @@
     <!-- Image/camera overlay -->
     <div class="image-layer" id="imageLayer">
       <img id="imageDisplay" alt="display" />
+      <div class="focus-ring" id="focusRing" aria-hidden="true"></div>
+      <div class="camera-ui" id="cameraUi" aria-hidden="true">
+        <button class="camera-back-btn" id="cameraBackBtn" type="button" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <div class="camera-hint">Tap preview to focus</div>
+        <button class="camera-shutter-btn" id="cameraShutterBtn" type="button" aria-label="Take photo">
+          <span></span>
+        </button>
+      </div>
     </div>
 
     <!-- Brightness dim overlay -->
@@ -82,6 +94,14 @@
         <circle cx="12" cy="5" r="2"/>
         <circle cx="12" cy="12" r="2"/>
         <circle cx="12" cy="19" r="2"/>
+      </svg>
+    </button>
+
+    <!-- Camera entry (shown when camera support is enabled) -->
+    <button class="camera-entry-btn" id="cameraEntryBtn" type="button" aria-label="Open camera">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 7h3l1.5-2h7L17 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z" />
+        <circle cx="12" cy="13" r="4" />
       </svg>
     </button>
   </div>

@@ -23,8 +23,12 @@ type ButtonHandler = () => void;
 interface HatPlusDisplayOptions {
   host: string;
   port: number;
+  cameraEnabled: boolean;
   onButtonPress: ButtonHandler;
   onButtonRelease: ButtonHandler;
+  onCameraModeRequest: () => void;
+  onCameraShutterRequest: () => void;
+  onCameraBackRequest: () => void;
   onExitApp: () => void;
 }
 
@@ -36,8 +40,12 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
   private cameraFramePath: string | null = null;
   private host: string;
   private port: number;
+  private cameraEnabled: boolean;
   private onButtonPress: ButtonHandler;
   private onButtonRelease: ButtonHandler;
+  private onCameraModeRequest: () => void;
+  private onCameraShutterRequest: () => void;
+  private onCameraBackRequest: () => void;
   private onExitApp: () => void;
   private exitRequested = false;
   private server: http.Server | null = null;
@@ -47,8 +55,12 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
   constructor(options: HatPlusDisplayOptions) {
     this.host = options.host;
     this.port = options.port;
+    this.cameraEnabled = options.cameraEnabled;
     this.onButtonPress = options.onButtonPress;
     this.onButtonRelease = options.onButtonRelease;
+    this.onCameraModeRequest = options.onCameraModeRequest;
+    this.onCameraShutterRequest = options.onCameraShutterRequest;
+    this.onCameraBackRequest = options.onCameraBackRequest;
     this.onExitApp = options.onExitApp;
     this.app = new Koa();
     this.router = new Router();
@@ -205,6 +217,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       emoji: this.currentStatus.emoji,
       text: this.currentStatus.text,
       tool_placeholders: this.currentStatus.tool_placeholders,
+      camera_available: this.cameraEnabled,
       scroll_speed: this.currentStatus.scroll_speed,
       scroll_sync: this.currentStatus.scroll_sync,
       brightness: this.currentStatus.brightness,
@@ -297,6 +310,29 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       this.sendVolumeToClient(socket);
       return;
     }
+    if (data?.type === "camera_open" && this.cameraEnabled) {
+      this.onCameraModeRequest();
+      return;
+    }
+    if (data?.type === "camera_shutter" && this.currentStatus?.camera_mode) {
+      this.onCameraShutterRequest();
+      return;
+    }
+    if (data?.type === "camera_back" && this.currentStatus?.camera_mode) {
+      this.onCameraBackRequest();
+      return;
+    }
+    if (data?.type === "camera_focus" && this.currentStatus?.camera_mode) {
+      const x = Number(data.x);
+      const y = Number(data.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        this.sendCameraDaemonCommand("focus", {
+          x: Math.max(0, Math.min(1, x)),
+          y: Math.max(0, Math.min(1, y)),
+        });
+      }
+      return;
+    }
     if (data?.type === "exit_app") {
       socket.send(JSON.stringify({ type: "exit_app_ack" }));
       if (!this.exitRequested) {
@@ -326,12 +362,15 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
     return safe || null;
   }
 
-  private sendCameraDaemonCommand(cmd: string): void {
+  private sendCameraDaemonCommand(
+    cmd: string,
+    payload: Record<string, unknown> = {},
+  ): void {
     const port = parseInt(process.env.WHISPLAY_CAMERA_DAEMON_PORT || "18765", 10);
     const socket = new Socket();
     socket.setTimeout(600);
     socket.connect(port, "127.0.0.1", () => {
-      socket.write(`${JSON.stringify({ cmd })}\n`);
+      socket.write(`${JSON.stringify({ cmd, ...payload })}\n`);
       socket.end();
     });
     socket.on("error", () => {

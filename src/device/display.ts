@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { existsSync } from "fs";
 import { resolve } from "path";
 import { Socket } from "net";
@@ -75,6 +75,9 @@ export class WhisplayDisplay {
   private buttonDoubleClickCallback: (() => void) | null = null;
   private buttonDown = false;
   private onCameraCaptureCallback: () => void = () => {};
+  private cameraModeRequestCallback: () => void = () => {};
+  private cameraShutterRequestCallback: () => void = () => {};
+  private cameraBackRequestCallback: () => void = () => {};
   private textInputCallback: (text: string) => void = () => {};
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
@@ -89,6 +92,8 @@ export class WhisplayDisplay {
   private textCounterStartAt = 0;
   private daemonSocketPath = "/tmp/whisplay-daemon.sock";
   private hatPlusDisplay: HatPlusDisplayServer | null = null;
+  private hatPlusButtonProcess: ReturnType<typeof spawn> | null = null;
+  private hatPlusButtonBuffer = "";
 
   constructor() {
     const hatModel = detectHatModel();
@@ -130,14 +135,22 @@ export class WhisplayDisplay {
       this.hatPlusDisplay = new HatPlusDisplayServer({
         host,
         port,
+        cameraEnabled: this.cameraEnabled,
         onButtonPress: () => this.handleButtonPressedEvent(),
         onButtonRelease: () => this.handleButtonReleasedEvent(),
+        onCameraModeRequest: () => this.cameraModeRequestCallback(),
+        onCameraShutterRequest: () => this.cameraShutterRequestCallback(),
+        onCameraBackRequest: () => this.cameraBackRequestCallback(),
         onExitApp: () => {
           console.log("[HatPlusDisplay] Exit requested from settings.");
           process.kill(process.pid, "SIGTERM");
         },
       });
       this.hatPlusDisplay.updateStatus(this.currentStatus);
+    }
+
+    if (hatModel === "hat-plus" && !daemonDetected) {
+      this.startHatPlusButtonProcess();
     }
 
     if (this.deviceEnabled) {
@@ -237,6 +250,53 @@ export class WhisplayDisplay {
       }
       this.pythonProcess = null;
     }
+  }
+
+  private startHatPlusButtonProcess(): void {
+    const scriptPath = resolve(__dirname, "../../python/hat-plus-button.py");
+    console.log("[HatPlusButton] Starting GPIO button monitor.");
+    const child = spawn("python3", [scriptPath], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    this.hatPlusButtonProcess = child;
+    this.hatPlusButtonBuffer = "";
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      this.hatPlusButtonBuffer += chunk.toString();
+      const lines = this.hatPlusButtonBuffer.split("\n");
+      this.hatPlusButtonBuffer = lines.pop() || "";
+      for (const line of lines) {
+        try {
+          const message = JSON.parse(line);
+          if (message.event === "button_pressed") {
+            this.handleButtonPressedEvent();
+          } else if (message.event === "button_released") {
+            this.handleButtonReleasedEvent();
+          }
+        } catch {
+          // Ignore non-JSON diagnostic output.
+        }
+      }
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      console.error(chunk.toString().trim());
+    });
+    child.on("exit", (code, signal) => {
+      if (this.hatPlusButtonProcess === child) {
+        this.hatPlusButtonProcess = null;
+      }
+      if (code !== 0 && signal !== "SIGTERM") {
+        console.error(
+          `[HatPlusButton] Monitor exited with code=${code} signal=${signal || "none"}`,
+        );
+      }
+    });
+  }
+
+  stopHatPlusButtonProcess(): void {
+    if (!this.hatPlusButtonProcess) return;
+    this.hatPlusButtonProcess.kill("SIGTERM");
+    this.hatPlusButtonProcess = null;
   }
 
   async connectWithRetry(
@@ -342,6 +402,18 @@ export class WhisplayDisplay {
 
   onCameraCapture(callback: () => void): void {
     this.onCameraCaptureCallback = callback;
+  }
+
+  onCameraModeRequest(callback: (() => void) | null): void {
+    this.cameraModeRequestCallback = callback || (() => {});
+  }
+
+  onCameraShutterRequest(callback: (() => void) | null): void {
+    this.cameraShutterRequestCallback = callback || (() => {});
+  }
+
+  onCameraBackRequest(callback: (() => void) | null): void {
+    this.cameraBackRequestCallback = callback || (() => {});
   }
 
   onTextInput(callback: (text: string) => void): void {
@@ -503,8 +575,11 @@ export class WhisplayDisplay {
             );
         } else if (!this.deviceEnabled) {
           // No physical hardware and no web camera: use the Pi camera daemon.
-          this.sendCameraDaemonCommand("capture", { path: capturePath });
-          this.handleCameraCaptureEvent();
+          this.sendCameraDaemonCommand("capture", { path: capturePath })
+            .then(() => this.handleCameraCaptureEvent())
+            .catch((error) =>
+              console.error("[CameraDaemon] Capture failed:", error),
+            );
         }
         // When deviceEnabled=true and no web camera: chatbot-ui.py handles the capture.
       }
@@ -571,19 +646,39 @@ export class WhisplayDisplay {
   private sendCameraDaemonCommand(
     cmd: string,
     payload: Record<string, unknown> = {},
-  ): void {
+  ): Promise<void> {
     const port = parseInt(process.env.WHISPLAY_CAMERA_DAEMON_PORT || "18765", 10);
-    const socket = new Socket();
-    socket.setTimeout(1000);
-    socket.connect(port, "127.0.0.1", () => {
-      socket.write(`${JSON.stringify({ cmd, ...payload })}\n`);
-      socket.end();
-    });
-    socket.on("error", () => {
-      socket.destroy();
-    });
-    socket.on("timeout", () => {
-      socket.destroy();
+    return new Promise((resolvePromise, rejectPromise) => {
+      const socket = new Socket();
+      let responseBuffer = "";
+      socket.setTimeout(2000);
+      socket.connect(port, "127.0.0.1", () => {
+        socket.write(`${JSON.stringify({ cmd, ...payload })}\n`);
+      });
+      socket.on("data", (chunk) => {
+        responseBuffer += chunk.toString();
+        const newline = responseBuffer.indexOf("\n");
+        if (newline < 0) return;
+        try {
+          const response = JSON.parse(responseBuffer.slice(0, newline));
+          if (response?.ok) {
+            resolvePromise();
+          } else {
+            rejectPromise(new Error(response?.error || `${cmd} failed`));
+          }
+        } catch (error) {
+          rejectPromise(error);
+        }
+        socket.destroy();
+      });
+      socket.on("error", (error) => {
+        rejectPromise(error);
+        socket.destroy();
+      });
+      socket.on("timeout", () => {
+        rejectPromise(new Error(`${cmd} timed out`));
+        socket.destroy();
+      });
     });
   }
 }
@@ -602,6 +697,12 @@ export const onButtonDoubleClick =
   displayInstance.onButtonDoubleClick.bind(displayInstance);
 export const onCameraCapture =
   displayInstance.onCameraCapture.bind(displayInstance);
+export const onCameraModeRequest =
+  displayInstance.onCameraModeRequest.bind(displayInstance);
+export const onCameraShutterRequest =
+  displayInstance.onCameraShutterRequest.bind(displayInstance);
+export const onCameraBackRequest =
+  displayInstance.onCameraBackRequest.bind(displayInstance);
 export const onTextInput =
   displayInstance.onTextInput.bind(displayInstance);
 export const isButtonDown =
@@ -610,6 +711,7 @@ export const isButtonDown =
 function cleanup() {
   console.log("Cleaning up display process before exit...");
   displayInstance.killPythonProcess();
+  displayInstance.stopHatPlusButtonProcess();
   displayInstance.stopWebDisplay();
 }
 

@@ -310,10 +310,10 @@ body {
   color: var(--danger);
 }
 
-/* ── Menu button (bottom-left) ──────────────────────────────────────────── */
-.menu-btn {
+/* ── Corner controls ───────────────────────────────────────────────────── */
+.menu-btn,
+.camera-entry-btn {
   position: absolute;
-  left: max(var(--corner-control-inset), env(safe-area-inset-left, 0px));
   bottom: max(var(--corner-control-inset), env(safe-area-inset-bottom, 0px));
   width: var(--menu-size);
   height: var(--menu-size);
@@ -321,7 +321,6 @@ body {
   background: rgba(255,255,255,.06);
   color: var(--muted);
   cursor: pointer;
-  display: flex;
   align-items: center;
   justify-content: center;
   z-index: 6;
@@ -329,13 +328,42 @@ body {
   touch-action: manipulation;
 }
 
-.menu-btn:active {
+.menu-btn {
+  left: max(var(--corner-control-inset), env(safe-area-inset-left, 0px));
+  display: flex;
+}
+
+.camera-entry-btn {
+  left: calc(max(var(--corner-control-inset), env(safe-area-inset-left, 0px)) + var(--menu-size) + 10px);
+  display: none;
+}
+
+.camera-entry-btn.available {
+  display: flex;
+}
+
+.menu-btn:active,
+.camera-entry-btn:active,
+.camera-back-btn:active {
   background: rgba(255,255,255,.15);
 }
 
 .menu-btn svg {
   transform: rotate(90deg);
   transition: transform .15s ease;
+}
+
+.camera-entry-btn svg,
+.camera-back-btn svg {
+  width: 26px;
+  height: 26px;
+}
+
+.screen.camera-active .menu-btn,
+.screen.camera-active .camera-entry-btn,
+.screen.camera-active .button-area {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* ── Image / camera overlay ─────────────────────────────────────────────── */
@@ -353,6 +381,117 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.image-layer.camera-preview img {
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.camera-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: none;
+  pointer-events: none;
+}
+
+.image-layer.camera-preview .camera-ui {
+  display: block;
+}
+
+.camera-back-btn {
+  position: absolute;
+  top: max(var(--corner-control-inset), env(safe-area-inset-top, 0px));
+  left: max(var(--corner-control-inset), env(safe-area-inset-left, 0px));
+  width: var(--menu-size);
+  height: var(--menu-size);
+  border: none;
+  border-radius: 12px;
+  background: rgba(11,16,22,.72);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  backdrop-filter: blur(5px);
+}
+
+.camera-hint {
+  position: absolute;
+  top: max(calc(var(--corner-control-inset) + 8px), env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 58%;
+  padding: 7px 12px;
+  border-radius: 14px;
+  background: rgba(11,16,22,.62);
+  color: rgba(255,255,255,.82);
+  font-size: clamp(11px, 2.8vmin, 14px);
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  backdrop-filter: blur(5px);
+}
+
+.camera-shutter-btn {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: clamp(66px, 17vmin, 82px);
+  height: clamp(66px, 17vmin, 82px);
+  padding: 6px;
+  border: 3px solid rgba(255,255,255,.92);
+  border-radius: 50%;
+  background: rgba(11,16,22,.32);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition: transform .08s ease, opacity .15s ease;
+}
+
+.camera-shutter-btn span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.camera-shutter-btn:active {
+  transform: translateX(-50%) scale(.9);
+}
+
+.camera-shutter-btn:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.focus-ring {
+  position: absolute;
+  z-index: 7;
+  display: none;
+  width: clamp(54px, 15vmin, 76px);
+  height: clamp(54px, 15vmin, 76px);
+  border: 2px solid #ffe45c;
+  border-radius: 8px;
+  transform: translate(-50%, -50%) scale(1.25);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.focus-ring.visible {
+  display: block;
+  animation: focus-lock .85s ease-out forwards;
+}
+
+@keyframes focus-lock {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); }
+  20%, 75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.94); }
 }
 
 /* ── Dim overlay (brightness) ───────────────────────────────────────────── */
