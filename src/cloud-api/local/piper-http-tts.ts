@@ -33,7 +33,7 @@ if (ttsServer === TTSServer.piperhttp) {
   if (
     ["localhost", "0.0.0.0", "127.0.0.1"].includes(piperHttpHost)
   ) {
-    console.log("Starting Piper HTTP server at port", piperHttpPort);
+    console.log("Starting Piper HTTP server");
     // python3 -m piper.http_server -m en_US-lessac-medium
     pyProcess = spawn(
       "python3",
@@ -52,7 +52,7 @@ if (ttsServer === TTSServer.piperhttp) {
         stdio: "inherit",
       }
     );
-    pyProcess.on("error", (error: NodeJS.ErrnoException) => console.error("Could not start Piper HTTP server:", error.code));
+    pyProcess.on("error", () => console.error("Could not start Piper HTTP server"));
   }
 }
 
@@ -61,6 +61,7 @@ const piperHttpTTS = async (text: string): Promise<TTSResult> => {
   const raw = path.join(ttsDir, `piper_http_${id}.wav`);
   const converted = path.join(ttsDir, `piper_http_${id}_converted.wav`);
   let ready = false;
+  let stage = "HTTP request";
   try {
     const { stdout } = await run("curl", [
       "-sS", "--connect-timeout", "5", "--max-time", String(requestTimeout),
@@ -68,7 +69,10 @@ const piperHttpTTS = async (text: string): Promise<TTSResult> => {
       "--data-binary", JSON.stringify({ text, length_scale: Number(piperHttpLengthScale), ...(voice ? { voice } : {}) }),
       "-o", raw, url,
     ]);
-    if (stdout.trim() !== "200") throw new Error(`Piper HTTP status ${stdout.trim()}`);
+    const status = stdout.trim();
+    stage = /^\d{3}$/.test(status) ? `HTTP status ${status}` : "invalid HTTP status";
+    if (status !== "200") throw new Error();
+    stage = "WAV validation";
     const handle = await fs.promises.open(raw, "r");
     try {
       const header = Buffer.alloc(12);
@@ -82,15 +86,17 @@ const piperHttpTTS = async (text: string): Promise<TTSResult> => {
     }
 
     // Preserve the format required by the unified Whisplay ALSA device.
+    stage = "SoX conversion";
     await run("sox", ["-v", "0.9", raw, "-r", "48000", "-c", "2", "-b", "16", converted]);
+    stage = "duration probe";
     const duration = (await getAudioDurationInSeconds(converted)) * 1000;
     if (!Number.isFinite(duration) || duration <= 0) throw new Error("Invalid WAV duration");
     ready = true;
     return { filePath: converted, duration };
   } catch (error) {
-    const failure = error as NodeJS.ErrnoException;
-    // Child-process errors can contain the input text in the command line.
-    console.error("Piper synthesis failed:", failure.code ?? failure.message);
+    // Child-process errors may contain the complete command line or stderr.
+    const timedOut = stage === "HTTP request" && (error as { code?: unknown })?.code === 28;
+    console.error("Piper synthesis failed:", timedOut ? "HTTP request timed out" : stage);
     return { duration: 0 };
   } finally {
     for (const file of ready ? [raw] : [raw, converted]) {
@@ -119,13 +125,13 @@ function cleanup() {
 process.on("SIGINT", cleanup); // Ctrl+C
 process.on("SIGTERM", cleanup); // systemctl / docker stop
 process.on("exit", cleanup);
-process.on("uncaughtException", (err) => {
-  console.error(err);
+process.on("uncaughtException", () => {
+  console.error("Uncaught application exception");
   cleanup();
   process.exit(1);
 });
-process.on("unhandledRejection", (err) => {
-  console.error(err);
+process.on("unhandledRejection", () => {
+  console.error("Unhandled application rejection");
   cleanup();
   process.exit(1);
 });

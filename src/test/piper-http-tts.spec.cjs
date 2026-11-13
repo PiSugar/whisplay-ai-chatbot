@@ -12,9 +12,13 @@ test("Piper preserves defaults, sends valid JSON, validates responses and cleans
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   let status = "200", audio = "RIFF0000WAVE", failConversion = false, failRequest = false;
   const calls = [];
+  const logs = [];
+  const marker = "private speech and request arguments";
   function load(env) {
     const exports = {};
-    vm.runInNewContext(source, { exports, Buffer, process: { env, pid: 1, on() {} }, console, require(id) {
+    const capture = (...args) => logs.push(args.join(" "));
+    vm.runInNewContext(source, { exports, Buffer, process: { env, pid: 1, on() {} },
+      console: { log: capture, warn: capture, error: capture }, require(id) {
       if (id === "dotenv") return { config() {} };
       if (id === "../../type") return { TTSServer: { piperhttp: "piper-http" } };
       if (id === "../../utils/dir") return { ttsDir: dir };
@@ -27,10 +31,10 @@ test("Piper preserves defaults, sends valid JSON, validates responses and cleans
         calls.push([command, args]);
         if (command === "curl") {
           fs.writeFileSync(args[args.indexOf("-o") + 1], audio);
-          cb(failRequest ? Object.assign(Error("timeout"), { code: 28 }) : null, status, "");
+          cb(failRequest ? Error(marker) : null, status, marker);
         } else {
           fs.writeFileSync(args.at(-1), audio);
-          cb(failConversion ? Error("conversion failed") : null, "", "");
+          cb(failConversion ? Error(marker) : null, "", marker);
         }
       } };
       return require(id);
@@ -68,4 +72,10 @@ test("Piper preserves defaults, sends valid JSON, validates responses and cleans
   assert.equal((await custom(input)).duration, 0);
   assert.equal(calls.length - offset, 1);
   assert.deepEqual(fs.readdirSync(dir), []);
+  status = marker;
+  failRequest = false;
+  assert.equal((await custom(marker)).duration, 0);
+  assert.ok(logs.some(line => line.includes("HTTP status 500")));
+  assert.ok(logs.some(line => line.includes("SoX conversion")));
+  assert.ok(logs.every(line => !line.includes(marker) && !line.includes(input)));
 });
