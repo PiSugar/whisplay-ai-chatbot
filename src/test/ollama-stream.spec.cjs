@@ -18,14 +18,16 @@ test("Ollama preserves split UTF-8 and tool history and dispatches only complete
   let executions = 0;
   const requests = [];
   const responses = [
-    [record({ content: "Hei 🌍" }), tool, done],
-    [record({ content: "Finished." }), done],
+    [record({ content: "Hei 🌍" }), JSON.stringify({ ...tool, done: true })],
+    [JSON.stringify({ ...record({ content: "Finished." }), done: true })],
     [tool, tool, done],
-    [record({ content: "Already handled." }), done],
+    [JSON.stringify({ ...record({ content: "Already handled." }), done: true })],
     [tool],
     [tool, done, '{'],
     [tool, { error: "fixture failure" }],
     [tool, Error("disconnected")],
+    [JSON.stringify(tool)],
+    [tool, done, Error("disconnected before clean EOF")],
   ];
   const exports = {};
   vm.runInNewContext(source, {
@@ -73,7 +75,7 @@ test("Ollama preserves split UTF-8 and tool history and dispatches only complete
     { role: "tool", content: "result", tool_name: "fixture", tool_call_id: "native-id" },
   ]);
   assert.equal(await ask(), "Already handled.");
-  for (let i = 0; i < 4; i++) assert.equal(await ask(), "");
+  for (let i = 0; i < 6; i++) assert.equal(await ask(), "");
   assert.equal(executions, 1);
   assert.equal(responses.length, 0);
 });
