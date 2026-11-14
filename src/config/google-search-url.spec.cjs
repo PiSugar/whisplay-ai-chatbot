@@ -1,6 +1,6 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
-import { buildGoogleSearchUrl } from "./google-search-url";
+const assert = require("node:assert/strict");
+const { test } = require("node:test");
+const { buildGoogleSearchUrl } = require("../../dist/config/google-search-url.js");
 
 const GOOGLE = "https://www.googleapis.com/customsearch/v1";
 const CUSTOM = "https://example.com/customsearch/v1?tenant=demo";
@@ -9,7 +9,7 @@ const webParams = () => new URLSearchParams({ key: "k", cx: "c", q: "raspberry p
 const imageParams = () => new URLSearchParams({ key: "k", cx: "c", q: "raspberry pi", num: "5", searchType: "image" });
 const sitesParams = () => new URLSearchParams({ key: "k", cx: "c", q: "raspberry pi", num: "5", hl: "zh-CN" });
 
-const query = (url: string) => Object.fromEntries(new URL(url).searchParams);
+const query = (url) => Object.fromEntries(new URL(url).searchParams);
 
 test("default endpoint gets the search parameters", () => {
   const url = buildGoogleSearchUrl(GOOGLE, webParams());
