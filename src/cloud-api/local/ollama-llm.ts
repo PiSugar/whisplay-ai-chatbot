@@ -161,8 +161,12 @@ const stableStringify = (value: unknown): string => {
 const toolCallSignature = (call: OllamaFunctionCall): string =>
   `${call.function?.name || ""}:${stableStringify(call.function?.arguments || {})}`;
 
+// Only results produced after the latest user message belong to the current request;
+// earlier turns' results are never offered as an answer source.
 const previousToolResultFor = (toolName: string): string => {
-  const previous = [...messages]
+  const requestStart = messages.map((message) => message.role).lastIndexOf("user");
+  const previous = messages
+    .slice(requestStart + 1)
     .reverse()
     .find((message) => message.role === "tool" && message.tool_name === toolName);
   return previous?.content || "";
@@ -357,13 +361,23 @@ const chatWithLLMStreamInternal = async (
         return;
       }
 
-      const seen = new Set(toolLoopState.signatures);
-      const duplicateCall = functionCalls.find((call) => {
-        const signature = toolCallSignature(call);
-        if (seen.has(signature)) return true;
-        seen.add(signature);
-        return false;
-      });
+      // Identical calls inside one response collapse to their first occurrence.
+      const inResponse = new Set<string>();
+      const uniquePackages = functionCallsPackages
+        .map((calls) =>
+          calls.filter((call) => {
+            const signature = toolCallSignature(call);
+            if (inResponse.has(signature)) return false;
+            inResponse.add(signature);
+            return true;
+          }),
+        )
+        .filter((calls) => calls.length);
+      const uniqueCalls = uniquePackages.flat();
+      // Only a call executed earlier in this top-level request is blocked.
+      const duplicateCall = uniqueCalls.find((call) =>
+        toolLoopState.signatures.has(toolCallSignature(call)),
+      );
       if (duplicateCall) {
         const signature = toolCallSignature(duplicateCall);
         const name = duplicateCall.function?.name || "tool";
@@ -386,17 +400,17 @@ const chatWithLLMStreamInternal = async (
         return;
       }
 
-      for (const call of functionCalls) {
+      for (const call of uniqueCalls) {
         toolLoopState.signatures.add(toolCallSignature(call));
       }
 
       messages.push({
         role: "assistant",
         content: partialAnswer,
-        tool_calls: functionCallsPackages,
+        tool_calls: uniquePackages,
       });
       const results = await Promise.all(
-        functionCalls.map(async (call: OllamaFunctionCall) => {
+        uniqueCalls.map(async (call: OllamaFunctionCall) => {
           const {
             id,
             function: { arguments: args, name },
