@@ -14,6 +14,10 @@ dotEnv.config();
 const DOUBLE_CLICK_WINDOW_MS = 800;
 const DOUBLE_CLICK_MAX_PRESS_MS = 350;
 
+type ShutdownHandler = () => void | Promise<void>;
+const shutdownHandlers = new Set<ShutdownHandler>();
+let shutdownPromise: Promise<void> | null = null;
+
 export interface Status {
   status: string;
   emoji: string;
@@ -370,9 +374,7 @@ export class WhisplayDisplay {
               this.display({ camera_mode: false });
             }
             if (json.event === "app_exit_requested") {
-              console.log("[WhisplayApp] Exit requested by daemon");
-              cleanup();
-              process.exit(0);
+              void requestShutdown("Whisplay daemon requested app exit", 0);
             }
           } catch {
             // ignore invalid non-json lines
@@ -708,6 +710,30 @@ export const onTextInput =
 export const isButtonDown =
   displayInstance.isButtonDown.bind(displayInstance);
 
+export function registerShutdownHandler(handler: ShutdownHandler): () => void {
+  shutdownHandlers.add(handler);
+  return () => shutdownHandlers.delete(handler);
+}
+
+async function requestShutdown(reason: string, exitCode: number): Promise<void> {
+  if (shutdownPromise) return shutdownPromise;
+
+  shutdownPromise = (async () => {
+    console.log(`${reason}; shutting down...`);
+    for (const handler of shutdownHandlers) {
+      try {
+        await handler();
+      } catch (error) {
+        console.error("Shutdown handler failed:", error);
+      }
+    }
+    cleanup();
+    process.exit(exitCode);
+  })();
+
+  return shutdownPromise;
+}
+
 function cleanup() {
   console.log("Cleaning up display process before exit...");
   displayInstance.killPythonProcess();
@@ -719,25 +745,19 @@ function cleanup() {
 process.on("exit", cleanup);
 ["SIGINT", "SIGTERM"].forEach((signal) => {
   process.on(signal, () => {
-    console.log(`Received ${signal}, exiting...`);
-    cleanup();
-    process.exit(0);
+    void requestShutdown(`Received ${signal}`, 0);
   });
 });
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
-  cleanup();
-  process.exit(1);
+  void requestShutdown("Uncaught exception", 1);
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  cleanup();
-  process.exit(1);
+  void requestShutdown("Unhandled rejection", 1);
 });
 process.on("keyboardInterrupt", () => {
-  console.log("Keyboard Interrupt received, killing Python process...");
-  cleanup();
-  process.exit(0);
+  void requestShutdown("Keyboard interrupt received", 0);
 });
 
 function parseBoolEnv(key: string, defaultValue: boolean): boolean {

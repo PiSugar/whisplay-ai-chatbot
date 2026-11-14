@@ -73,6 +73,7 @@ class ChatFlow implements ChatFlowContext {
   private toolDisplaySeq = 0;
   private answerDisplayTimer?: ReturnType<typeof setTimeout>;
   private lastAnswerDisplayAt = 0;
+  private shutdownPromise: Promise<void> | null = null;
 
   constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
@@ -475,6 +476,19 @@ class ChatFlow implements ChatFlowContext {
 
   pauseWakeWordListener = async (): Promise<void> => {
     await this.wakeWordListener?.stop();
+  };
+
+  shutdown = (): Promise<void> => {
+    if (this.shutdownPromise) return this.shutdownPromise;
+
+    this.shutdownPromise = (async () => {
+      this.endWakeSession();
+      await this.wakeWordListener?.stop();
+      this.whisplayIMBridge?.stop();
+      this.whisplayIMBridge = null;
+    })();
+
+    return this.shutdownPromise;
   };
 
   endWakeSession = (): void => {
