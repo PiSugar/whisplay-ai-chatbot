@@ -1,6 +1,7 @@
 import { LLMTool, ToolReturnTag } from "../type";
 import dotenv from "dotenv";
 import { proxyFetch } from "../cloud-api/proxy-fetch";
+import { buildGoogleSearchUrl } from "./google-search-url";
 
 dotenv.config();
 
@@ -19,7 +20,7 @@ const deepseekSearchBaseUrl = (
   process.env.DEEPSEEK_API_BASE_URL ||
   "https://api.deepseek.com"
 ).replace(/\/+$/, "");
-const googleSearchBaseUrl = (process.env.GOOGLE_SEARCH_BASE_URL || "").trim().replace(/\/+$/, "");
+const googleSearchBaseUrl = (process.env.GOOGLE_SEARCH_BASE_URL || "").trim();
 const legacyWebSearchEnabled =
   process.env.WEB_SEARCH_LEGACY_ENABLED === "true" ||
   isConfiguredValue(tavilyApiKey) ||
@@ -1038,7 +1039,7 @@ async function performGoogleImageSearch(query: string): Promise<string> {
 // GOOGLE_SEARCH_BASE_URL replaces the default endpoint for any service that
 // accepts the Custom Search JSON API request format.
 function googleSearchUrl(defaultBaseUrl: string, params: URLSearchParams): string {
-  return `${googleSearchBaseUrl || defaultBaseUrl}?${params.toString()}`;
+  return buildGoogleSearchUrl(googleSearchBaseUrl || defaultBaseUrl, params);
 }
 
 function formatGoogleResults(data: any): string {
