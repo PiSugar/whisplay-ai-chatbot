@@ -1,6 +1,7 @@
 import { LLMTool, ToolReturnTag } from "../type";
 import dotenv from "dotenv";
 import { proxyFetch } from "../cloud-api/proxy-fetch";
+import { buildGoogleSearchUrl } from "./google-search-url";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ const deepseekSearchBaseUrl = (
   process.env.DEEPSEEK_API_BASE_URL ||
   "https://api.deepseek.com"
 ).replace(/\/+$/, "");
+const googleSearchBaseUrl = (process.env.GOOGLE_SEARCH_BASE_URL || "").trim();
 const legacyWebSearchEnabled =
   process.env.WEB_SEARCH_LEGACY_ENABLED === "true" ||
   isConfiguredValue(tavilyApiKey) ||
@@ -596,7 +598,7 @@ async function searchGoogleProgrammable(query: string, limit: number) {
     num: Math.min(limit, 10).toString(),
     hl: "zh-CN",
   });
-  const url = `https://customsearch.googleapis.com/customsearch/v1?${params.toString()}`;
+  const url = googleSearchUrl("https://customsearch.googleapis.com/customsearch/v1", params);
   const response = await webToolFetch(url);
   if (!response.ok) {
     throw new Error(`Google Programmable Search API error: ${response.status} ${response.statusText}`);
@@ -996,7 +998,7 @@ async function performGoogleSearch(query: string): Promise<string> {
   });
 
   const response = await webToolFetch(
-    `https://www.googleapis.com/customsearch/v1?${params.toString()}`
+    googleSearchUrl("https://www.googleapis.com/customsearch/v1", params)
   );
 
   if (!response.ok) {
@@ -1017,7 +1019,7 @@ async function performGoogleImageSearch(query: string): Promise<string> {
   });
 
   const response = await webToolFetch(
-    `https://www.googleapis.com/customsearch/v1?${params.toString()}`
+    googleSearchUrl("https://www.googleapis.com/customsearch/v1", params)
   );
 
   if (!response.ok) {
@@ -1032,6 +1034,12 @@ async function performGoogleImageSearch(query: string): Promise<string> {
 
   return `Found ${data.items.length} images:\n\n` + 
     data.items.map((item: any, i: number) => `${i + 1}. ${item.link}`).join("\n");
+}
+
+// GOOGLE_SEARCH_BASE_URL replaces the default endpoint for any service that
+// accepts the Custom Search JSON API request format.
+function googleSearchUrl(defaultBaseUrl: string, params: URLSearchParams): string {
+  return buildGoogleSearchUrl(googleSearchBaseUrl || defaultBaseUrl, params);
 }
 
 function formatGoogleResults(data: any): string {

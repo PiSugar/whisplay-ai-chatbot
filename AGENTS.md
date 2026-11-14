@@ -419,7 +419,7 @@ The chatbot supports web search functionality via multiple providers:
 | Tavily | `TAVILY_API_KEY` | AI-optimized search, recommended |
 | SerpAPI | `SERP_API_KEY` | Google Search results |
 | Bing | `BING_SEARCH_API_KEY` | Microsoft Bing Search |
-| Google | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` | Custom Search API |
+| Google | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` | Custom Search API, optional `GOOGLE_SEARCH_BASE_URL` |
 | DeepSeek | `DEEPSEEK_SEARCH_API_KEY` or `DEEPSEEK_API_KEY` | DeepSeek Search and Fetch APIs |
 
 **Configuration:**
@@ -436,6 +436,8 @@ WEB_SEARCH_MAX_RESULTS=5
 # Optional: enable image search
 WEB_SEARCH_INCLUDE_IMAGES=false
 ```
+
+Google's Custom Search JSON API is closed to new customers and shuts down on January 1, 2027. `GOOGLE_SEARCH_BASE_URL` points the Google provider and the `search_type=sites` path at any service that accepts the same request format; when it is unset, the Google endpoints are used as before.
 
 **Usage:** Once enabled, LLM automatically uses `webSearch` tool when users ask about current events, news, or time-sensitive information.
 
