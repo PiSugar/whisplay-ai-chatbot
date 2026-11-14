@@ -82,6 +82,7 @@ const topLevelGroups: TopLevelGroup[] = [
         "Gemini Image Generation",
         "OpenAI",
         "OpenAI TTS",
+        "DeepSeek",
         "AWS (Amazon Web Services)",
         "Grok",
         "Anthropic",
@@ -127,6 +128,7 @@ const topLevelGroups: TopLevelGroup[] = [
         "SerpAPI (Google Search via SerpAPI)",
         "Bing Search API",
         "Google Custom Search API",
+        "DeepSeek Search API",
         "Local Music Tool (LLM function calling)",
         "Harness Command Tool (LLM function calling)",
         "Context Auto Compaction",
@@ -501,7 +503,8 @@ function buildSectionMenuNodes(
     title.startsWith("Tavily Search API") ||
     title.startsWith("SerpAPI") ||
     title.startsWith("Bing Search API") ||
-    title.startsWith("Google Custom Search API");
+    title.startsWith("Google Custom Search API") ||
+    title.startsWith("DeepSeek Search API");
 
   const providerSections = sections.filter((section) => isWebSearchProviderSection(section.title));
   const normalSections = sections.filter((section) => !isWebSearchProviderSection(section.title));

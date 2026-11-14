@@ -32,6 +32,20 @@ export function registerVisionPlugins(): void {
   } as VisionPlugin);
 
   pluginRegistry.register({
+    name: "deepseek",
+    displayName: "DeepSeek Vision",
+    version: "1.0.0",
+    type: "vision",
+    description: "DeepSeek multimodal image understanding",
+    activate: () => {
+      const { addDeepseekVisionTool } = require("../../cloud-api/deepseek/deepseek-vision");
+      return {
+        addVisionTools: (tools: LLMTool[]) => addDeepseekVisionTool(tools),
+      };
+    },
+  } as VisionPlugin);
+
+  pluginRegistry.register({
     name: "gemini",
     displayName: "Gemini Vision",
     version: "1.0.0",

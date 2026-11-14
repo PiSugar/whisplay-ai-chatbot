@@ -7,7 +7,7 @@
 Whisplay AI Chatbot is a pocket-sized AI chatbot device built for Raspberry Pi Zero 2W / Pi 5. It features voice interaction (press button, speak, get spoken responses), an LCD display with emoji/status visualization, RGB LED indicators, and extensible AI backend support.
 
 **Key Capabilities:**
-- Multi-provider ASR (Automatic Speech Recognition): Tencent, Volcengine, OpenAI, Gemini, Whisper, Vosk, local models
+- Multi-provider ASR (Automatic Speech Recognition): Tencent, Volcengine, OpenAI, DeepSeek, Gemini, Whisper, Vosk, local models
 - Multi-provider LLM: OpenAI, Gemini, Claude, Ollama, Qwen, Volcengine Doubao, and more
 - Multi-provider TTS: Google, Volcengine, Piper, espeak-ng, local models
 - Image generation and vision understanding
@@ -420,6 +420,7 @@ The chatbot supports web search functionality via multiple providers:
 | SerpAPI | `SERP_API_KEY` | Google Search results |
 | Bing | `BING_SEARCH_API_KEY` | Microsoft Bing Search |
 | Google | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` | Custom Search API |
+| DeepSeek | `DEEPSEEK_SEARCH_API_KEY` or `DEEPSEEK_API_KEY` | DeepSeek Search and Fetch APIs |
 
 **Configuration:**
 ```bash
@@ -437,6 +438,16 @@ WEB_SEARCH_INCLUDE_IMAGES=false
 ```
 
 **Usage:** Once enabled, LLM automatically uses `webSearch` tool when users ask about current events, news, or time-sensitive information.
+
+### DeepSeek
+Set `LLM_SERVER`, `ASR_SERVER`, `TTS_SERVER`, or `VISION_SERVER` to
+`deepseek` to use the matching DeepSeek service. The native LLM integration
+defaults to the stateless Responses API and preserves reasoning and server-tool
+items across turns. Chat Completions remains available through
+`DEEPSEEK_API_MODE=chat-completions`. Native model-managed web search and URL
+reading are opt-in through `DEEPSEEK_ENABLE_WEB_SEARCH` and
+`DEEPSEEK_ENABLE_URL_READING`; the standalone Search/Fetch APIs use
+`WEB_SEARCH_PROVIDER=deepseek`.
 
 ### Modifying UI/Display
 1. Python rendering: `python/chatbot-ui.py` (RenderThread class)

@@ -47,6 +47,19 @@ export function registerTTSPlugins(): void {
   } as TTSPlugin);
 
   pluginRegistry.register({
+    name: "deepseek",
+    displayName: "DeepSeek TTS",
+    version: "1.0.0",
+    type: "tts",
+    audioFormat: "wav",
+    description: "DeepSeek text-to-speech API",
+    activate: () => {
+      const ttsProcessor = require("../../cloud-api/deepseek/deepseek-tts").default;
+      return { ttsProcessor };
+    },
+  } as TTSPlugin);
+
+  pluginRegistry.register({
     name: "tencent",
     displayName: "Tencent TTS",
     version: "1.0.0",

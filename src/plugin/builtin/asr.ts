@@ -60,6 +60,19 @@ export function registerASRPlugins(): void {
   } as ASRPlugin);
 
   pluginRegistry.register({
+    name: "deepseek",
+    displayName: "DeepSeek ASR",
+    version: "1.0.0",
+    type: "asr",
+    audioFormat: "wav",
+    description: "DeepSeek speech-to-text API",
+    activate: () => {
+      const { recognizeAudio } = require("../../cloud-api/deepseek/deepseek-asr");
+      return { recognizeAudio };
+    },
+  } as ASRPlugin);
+
+  pluginRegistry.register({
     name: "gemini",
     displayName: "Gemini ASR",
     version: "1.0.0",

@@ -3,6 +3,10 @@ export interface Message {
   content: string;
   tool_calls?: FunctionCall[];
   tool_call_id?: string;
+  /** Provider-specific thinking trace required by DeepSeek tool-call history. */
+  reasoning_content?: string;
+  /** DeepSeek-managed web search / URL-reading calls retained across turns. */
+  server_tool_calls?: any[];
 }
 
 export interface OllamaMessage {
@@ -25,6 +29,7 @@ export enum ASRServer {
   fasterwhisper = "faster-whisper",
   hailowhisper = "hailowhisper",
   picovoice = "picovoice",
+  deepseek = "deepseek",
 }
 
 export enum LLMServer {
@@ -43,6 +48,7 @@ export enum LLMServer {
   imagetooldirect = "image-tool-direct",
   perplexity = "perplexity",
   openrouter = "openrouter",
+  deepseek = "deepseek",
 }
 
 export enum TTSServer {
@@ -57,6 +63,7 @@ export enum TTSServer {
   llm8850melotts = "llm8850melotts",
   supertonic = "supertonic",
   picovoice = "picovoice",
+  deepseek = "deepseek",
 }
 
 export enum VectorDBServer {
@@ -81,6 +88,7 @@ export enum VisionServer {
   openai = "openai",
   gemini = "gemini",
   volcengine = "volcengine",
+  deepseek = "deepseek",
 }
 
 

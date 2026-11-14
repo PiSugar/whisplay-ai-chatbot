@@ -59,6 +59,22 @@ export function registerLLMPlugins(): void {
   } as LLMPlugin);
 
   pluginRegistry.register({
+    name: "deepseek",
+    displayName: "DeepSeek LLM",
+    version: "1.0.0",
+    type: "llm",
+    description: "DeepSeek Responses and Chat Completions APIs",
+    activate: () => {
+      const mod = require("../../cloud-api/deepseek/deepseek-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+        summaryTextWithLLM: mod.summaryTextWithLLM,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
     name: "ollama",
     displayName: "Ollama LLM",
     version: "1.0.0",

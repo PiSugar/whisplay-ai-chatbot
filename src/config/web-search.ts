@@ -12,11 +12,19 @@ const serpApiKey = process.env.SERP_API_KEY || "";
 const bingApiKey = process.env.BING_SEARCH_API_KEY || "";
 const googleApiKey = process.env.GOOGLE_SEARCH_API_KEY || "";
 const googleCx = process.env.GOOGLE_SEARCH_CX || "";
+const deepseekSearchApiKey =
+  process.env.DEEPSEEK_SEARCH_API_KEY || process.env.DEEPSEEK_API_KEY || "";
+const deepseekSearchBaseUrl = (
+  process.env.DEEPSEEK_SEARCH_API_BASE_URL ||
+  process.env.DEEPSEEK_API_BASE_URL ||
+  "https://api.deepseek.com"
+).replace(/\/+$/, "");
 const legacyWebSearchEnabled =
   process.env.WEB_SEARCH_LEGACY_ENABLED === "true" ||
   isConfiguredValue(tavilyApiKey) ||
   isConfiguredValue(serpApiKey) ||
   isConfiguredValue(bingApiKey) ||
+  (webSearchProvider === "deepseek" && isConfiguredValue(deepseekSearchApiKey)) ||
   (isConfiguredValue(googleApiKey) && isConfiguredValue(googleCx));
 
 // Search result limits
@@ -140,6 +148,9 @@ if (webSearchEnabled && legacyWebSearchEnabled) {
     case "google":
       hasValidConfig = isConfiguredValue(googleApiKey) && isConfiguredValue(googleCx);
       break;
+    case "deepseek":
+      hasValidConfig = isConfiguredValue(deepseekSearchApiKey);
+      break;
     default:
       console.warn(`[WebSearch] Unknown provider: ${webSearchProvider}`);
   }
@@ -226,6 +237,8 @@ async function performWebSearch(query: string): Promise<string> {
       return performBingSearch(query);
     case "google":
       return performGoogleSearch(query);
+    case "deepseek":
+      return performDeepseekSearch(query);
     default:
       throw new Error(`Unsupported web search provider: ${webSearchProvider}`);
   }
@@ -241,6 +254,10 @@ async function performWebImageSearch(query: string): Promise<string> {
       return performBingImageSearch(query);
     case "google":
       return performGoogleImageSearch(query);
+    case "deepseek":
+      throw new Error(
+        "DeepSeek Search API does not support image search; enable DEEPSEEK_ENABLE_WEB_SEARCH for model-managed image search.",
+      );
     default:
       throw new Error(`Unsupported image search provider: ${webSearchProvider}`);
   }
@@ -283,7 +300,69 @@ async function fetchWebpage(params: {
     url = normalizeUrl(requestedUrl || currentUrl);
   }
 
+  if (
+    webSearchProvider === "deepseek" &&
+    isConfiguredValue(deepseekSearchApiKey)
+  ) {
+    return fetchDeepseekPage(url, textLimit);
+  }
+
   return extractPage(url, textLimit);
+}
+
+async function performDeepseekSearch(query: string): Promise<string> {
+  const response = await proxyFetch(`${deepseekSearchBaseUrl}/v1/tools/search`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${deepseekSearchApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, count: maxResults, need_content: false }),
+  });
+  if (!response.ok) {
+    throw new Error(`DeepSeek search error: ${response.status} ${await response.text()}`);
+  }
+  const payload = (await response.json()) as any;
+  const results = (payload.results || []).map((item: any, index: number) =>
+    `${index + 1}. ${item.title}\n${item.url}\n${item.summary || item.snippet || ""}`,
+  );
+  return results.length ? results.join("\n\n") : "No results found.";
+}
+
+async function fetchDeepseekPage(url: string, maxChars: number) {
+  const response = await proxyFetch(`${deepseekSearchBaseUrl}/v1/tools/fetch`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${deepseekSearchApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url }),
+  });
+  if (!response.ok) {
+    throw new Error(`DeepSeek fetch error: ${response.status} ${await response.text()}`);
+  }
+  const payload = (await response.json()) as any;
+  const text = clip(`${payload.content || ""}`, maxChars);
+  const links = dedupeLinks(extractMarkdownLinks(text), url);
+  lastPage.url = url;
+  lastPage.links = links;
+  return {
+    url,
+    status_code: response.status,
+    title: payload.title || "",
+    text,
+    links,
+  };
+}
+
+function extractMarkdownLinks(markdown: string): Array<{ text: string; url: string }> {
+  const links: Array<{ text: string; url: string }> = [];
+  const pattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(markdown))) {
+    links.push({ text: match[1], url: match[2] });
+  }
+  return links;
 }
 
 async function performUniversalWebSearch(params: {
