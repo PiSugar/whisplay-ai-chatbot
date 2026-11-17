@@ -258,12 +258,20 @@ export class WhisplayDisplay {
 
   private startHatPlusButtonProcess(): void {
     const scriptPath = resolve(__dirname, "../../python/hat-plus-button.py");
-    console.log("[HatPlusButton] Starting GPIO button monitor.");
+    console.log("[HatPlusButton] Starting GPIO button and RGB LED controller.");
     const child = spawn("python3", [scriptPath], {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
     this.hatPlusButtonProcess = child;
     this.hatPlusButtonBuffer = "";
+
+    child.on("error", (error) => {
+      console.error("[HatPlusButton] Failed to start controller:", error);
+    });
+    child.stdin.on("error", (error) => {
+      console.error("[HatPlusButton] Failed to send RGB update:", error);
+    });
+    child.stdin.write(`${JSON.stringify({ RGB: this.currentStatus.RGB })}\n`);
 
     child.stdout.on("data", (chunk: Buffer) => {
       this.hatPlusButtonBuffer += chunk.toString();
@@ -423,6 +431,10 @@ export class WhisplayDisplay {
   }
 
   private async sendToDisplay(data: string): Promise<void> {
+    const controller = this.hatPlusButtonProcess;
+    if (controller?.stdin?.writable && !controller.killed) {
+      controller.stdin.write(`${data}\n`);
+    }
     if (!this.deviceEnabled) {
       return;
     }
