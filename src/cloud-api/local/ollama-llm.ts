@@ -1,4 +1,5 @@
 import axios from "axios";
+import { readOllamaNDJSON } from "./ollama-ndjson";
 import * as fs from "fs";
 import * as path from "path";
 import { isEmpty } from "lodash";
@@ -80,6 +81,14 @@ const resolveOllamaContextWindow = async (): Promise<number | undefined> => {
   return ollamaContextWindowCache;
 };
 
+const toWireMessage = ({ role, content, tool_calls, tool_name, tool_call_id }: OllamaMessage) => ({
+  role,
+  content,
+  ...(tool_calls?.length ? { tool_calls: tool_calls.flat() } : {}),
+  ...(tool_name ? { tool_name } : {}),
+  ...(tool_call_id ? { tool_call_id } : {}),
+});
+
 const chatHistoryFileName = `ollama_chat_history_${moment().format(
   "YYYY-MM-DD_HH-mm-ss",
 )}.json`;
@@ -152,8 +161,12 @@ const stableStringify = (value: unknown): string => {
 const toolCallSignature = (call: OllamaFunctionCall): string =>
   `${call.function?.name || ""}:${stableStringify(call.function?.arguments || {})}`;
 
+// Only results produced after the latest user message belong to the current request;
+// earlier turns' results are never offered as an answer source.
 const previousToolResultFor = (toolName: string): string => {
-  const previous = [...messages]
+  const requestStart = messages.map((message) => message.role).lastIndexOf("user");
+  const previous = messages
+    .slice(requestStart + 1)
     .reverse()
     .find((message) => message.role === "tool" && message.tool_name === toolName);
   return previous?.content || "";
@@ -180,10 +193,7 @@ const answerFromAvailableToolResults = async ({
       {
         model: ollamaModel,
         messages: [
-          ...messages.map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+          ...messages.map(toWireMessage),
           {
             role: "user",
             content: instruction,
@@ -205,36 +215,17 @@ const answerFromAvailableToolResults = async ({
       },
     );
 
-    await new Promise<void>((resolve) => {
-      response.data.on("data", (chunk: Buffer) => {
-        const dataLines = chunk
-          .toString()
-          .split("\n")
-          .filter((line) => line.trim() !== "");
-
-        for (const line of dataLines) {
-          try {
-            const parsedData = JSON.parse(line);
-            if (parsedData.message?.content) {
-              const content = parsedData.message.content;
-              partialCallback(content);
-              finalAnswer += content;
-            }
-            if (parsedData.message?.thinking) {
-              const thinking = parsedData.message.thinking;
-              partialThinkingCallback?.(thinking);
-              finalThinking += thinking;
-            }
-          } catch (error) {
-            console.error("Error parsing final answer data:", error, line);
-          }
-        }
-      });
-      response.data.on("end", resolve);
-      response.data.on("error", (error: Error) => {
-        console.error("Error streaming final answer:", error.message);
-        resolve();
-      });
+    await readOllamaNDJSON(response.data, (record) => {
+      const content = record.message?.content;
+      const thinking = record.message?.thinking;
+      if (content) {
+        partialCallback(content);
+        finalAnswer += content;
+      }
+      if (thinking) {
+        partialThinkingCallback?.(thinking);
+        finalThinking += thinking;
+      }
     });
 
     if (finalThinking.trim()) {
@@ -309,8 +300,7 @@ const chatWithLLMStreamInternal = async (
       {
         model: ollamaModel,
         messages: messages.map((msg, index) => ({
-          role: msg.role,
-          content: msg.content,
+          ...toWireMessage(msg),
           ...(capturedImageBase64 &&
           msg.role === "user" &&
           lastUserMessageIndex !== undefined &&
@@ -335,181 +325,170 @@ const chatWithLLMStreamInternal = async (
       },
     );
 
-    response.data.on("data", (chunk: Buffer) => {
-      const data = chunk.toString();
-      const dataLines = data.split("\n");
-      const filteredLines = dataLines.filter((line) => line.trim() !== "");
-
-      for (const line of filteredLines) {
-        try {
-          const parsedData = JSON.parse(line);
-
-          // Handle content from Ollama
-          if (parsedData.message?.content) {
-            const content = parsedData.message.content;
-            partialCallback(content);
-            partialAnswer += content;
-          }
-
-          // Handle thinking from Ollama
-          if (parsedData.message?.thinking) {
-            const thinking = parsedData.message.thinking;
-            partialThinkingCallback?.(thinking);
-            partialThinking += thinking;
-          }
-
-          // Handle tool calls from Ollama
-          if (parsedData.message?.tool_calls) {
-            // tool_calls format: [[{"function":{"index":0,"name":"setVolume","arguments":{"percent":50}}}]]
-            functionCallsPackages.push(parsedData.message.tool_calls);
-          }
-        } catch (error) {
-          console.error("Error parsing data:", error, line);
-        }
+    await readOllamaNDJSON(response.data, (record) => {
+      const message = record.message;
+      if (message?.content) {
+        partialCallback(message.content);
+        partialAnswer += message.content;
       }
+      if (message?.thinking) {
+        partialThinkingCallback?.(message.thinking);
+        partialThinking += message.thinking;
+      }
+      if (message?.tool_calls?.length) functionCallsPackages.push(message.tool_calls);
     });
 
-    response.data.on("end", async () => {
-      console.log("Stream ended");
-      const functionCalls = functionCallsPackages.flat().map((call, index) => ({
-        id: `call_${Date.now()}_${Math.random()}_${index}`,
-        type: "function",
-        function: call.function,
-      }));
-      console.log(
-        "functionCallsPackages: ",
-        JSON.stringify(functionCallsPackages),
+    console.log("Stream ended");
+    const functionCalls = functionCallsPackages.flat();
+    console.log(
+      "functionCallsPackages: ",
+      JSON.stringify(functionCallsPackages),
+    );
+    console.log("functionCalls: ", JSON.stringify(functionCalls));
+
+
+    if (!isEmpty(functionCalls)) {
+      if (toolLoopState.round >= ollamaMaxToolRounds) {
+        console.warn(`[ToolLoop] Reached OLLAMA_MAX_TOOL_ROUNDS=${ollamaMaxToolRounds}.`);
+        await answerFromAvailableToolResults({
+          instruction:
+            "You have already checked enough tool results for this request. Answer the user's latest request now using the available conversation and tool results. Do not call or ask for another tool. Do not mention internal tool instructions, raw status markers such as [success], exit_code, duration_ms, timed_out, truncated, or phrases like previous tool result.",
+          partialCallback,
+          endResolve,
+          endCallback,
+          partialThinkingCallback,
+        });
+        return;
+      }
+
+      // Identical calls inside one response collapse to their first occurrence.
+      const inResponse = new Set<string>();
+      const uniquePackages = functionCallsPackages
+        .map((calls) =>
+          calls.filter((call) => {
+            const signature = toolCallSignature(call);
+            if (inResponse.has(signature)) return false;
+            inResponse.add(signature);
+            return true;
+          }),
+        )
+        .filter((calls) => calls.length);
+      const uniqueCalls = uniquePackages.flat();
+      // Only a call executed earlier in this top-level request is blocked.
+      const duplicateCall = uniqueCalls.find((call) =>
+        toolLoopState.signatures.has(toolCallSignature(call)),
       );
-      console.log("functionCalls: ", JSON.stringify(functionCalls));
+      if (duplicateCall) {
+        const signature = toolCallSignature(duplicateCall);
+        const name = duplicateCall.function?.name || "tool";
+        const previous = previousToolResultFor(name);
+        console.warn(`[ToolLoop] Repeated tool call blocked: ${signature}`);
+        await answerFromAvailableToolResults({
+          instruction: [
+            `The ${name} tool was already called for this request, so do not call it again.`,
+            "Answer the user's latest request now using the available result below.",
+            "Do not mention internal tool instructions, raw status markers such as [success], exit_code, duration_ms, timed_out, truncated, or phrases like previous tool result.",
+            previous ? `\nAvailable ${name} result:\n${previous}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          partialCallback,
+          endResolve,
+          endCallback,
+          partialThinkingCallback,
+        });
+        return;
+      }
+
+      for (const call of uniqueCalls) {
+        toolLoopState.signatures.add(toolCallSignature(call));
+      }
+
       messages.push({
         role: "assistant",
         content: partialAnswer,
-        tool_calls: functionCallsPackages as any,
+        tool_calls: uniquePackages,
       });
+      const results = await Promise.all(
+        uniqueCalls.map(async (call: OllamaFunctionCall) => {
+          const {
+            id,
+            function: { arguments: args, name },
+          } = call;
+          const func = llmFuncMap[name! as string];
+          if (func) {
+            invokeFunctionCallback?.(name! as string);
+            return [
+              name,
+              id,
+              await func(args)
+                .then((res) => {
+                  invokeFunctionCallback?.(name! as string, res);
+                  return res;
+                })
+                .catch((err) => {
+                  console.error(`Error executing function ${name}:`, err);
+                  return `Error executing function ${name}: ${err.message}`;
+                }),
+            ];
+          } else {
+            console.error(`Function ${name} not found`);
+            return [name, id, `Function ${name} not found`];
+          }
+        }),
+      );
 
-      if (!isEmpty(functionCalls)) {
-        if (toolLoopState.round >= ollamaMaxToolRounds) {
-          console.warn(`[ToolLoop] Reached OLLAMA_MAX_TOOL_ROUNDS=${ollamaMaxToolRounds}.`);
-          await answerFromAvailableToolResults({
-            instruction:
-              "You have already checked enough tool results for this request. Answer the user's latest request now using the available conversation and tool results. Do not call or ask for another tool. Do not mention internal tool instructions, raw status markers such as [success], exit_code, duration_ms, timed_out, truncated, or phrases like previous tool result.",
-            partialCallback,
-            endResolve,
-            endCallback,
-            partialThinkingCallback,
-          });
-          return;
-        }
+      const newMessages: OllamaMessage[] = results.map(
+        ([name, id, result]) => ({
+          role: "tool",
+          content: result as string,
+          tool_name: name as string,
+          ...(id ? { tool_call_id: id } : {}),
+        }),
+      );
 
-        const duplicateCall = functionCalls.find((call) =>
-          toolLoopState.signatures.has(toolCallSignature(call)),
+      // Directly extract and return the tool result if available
+      const describeMessage = newMessages.find((msg) =>
+        msg.content.startsWith(ToolReturnTag.Response),
+      );
+      const responseContent = extractToolResponse(
+        describeMessage?.content || "",
+      );
+      if (responseContent) {
+        console.log(
+          `[LLM] Tool response starts with "[response]", return it directly.`,
         );
-        if (duplicateCall) {
-          const signature = toolCallSignature(duplicateCall);
-          const name = duplicateCall.function?.name || "tool";
-          const previous = previousToolResultFor(name);
-          console.warn(`[ToolLoop] Repeated tool call blocked: ${signature}`);
-          await answerFromAvailableToolResults({
-            instruction: [
-              `The ${name} tool was already called for this request, so do not call it again.`,
-              "Answer the user's latest request now using the available result below.",
-              "Do not mention internal tool instructions, raw status markers such as [success], exit_code, duration_ms, timed_out, truncated, or phrases like previous tool result.",
-              previous ? `\nAvailable ${name} result:\n${previous}` : "",
-            ]
-              .filter(Boolean)
-              .join("\n"),
-            partialCallback,
-            endResolve,
-            endCallback,
-            partialThinkingCallback,
-          });
-          return;
-        }
-
-        for (const call of functionCalls) {
-          toolLoopState.signatures.add(toolCallSignature(call));
-        }
-
-        const results = await Promise.all(
-          functionCalls.map(async (call: OllamaFunctionCall) => {
-            const {
-              function: { arguments: args, name },
-            } = call;
-            const func = llmFuncMap[name! as string];
-            if (func) {
-              invokeFunctionCallback?.(name! as string);
-              return [
-                name,
-                await func(args)
-                  .then((res) => {
-                    invokeFunctionCallback?.(name! as string, res);
-                    return res;
-                  })
-                  .catch((err) => {
-                    console.error(`Error executing function ${name}:`, err);
-                    return `Error executing function ${name}: ${err.message}`;
-                  }),
-              ];
-            } else {
-              console.error(`Function ${name} not found`);
-              return [name, `Function ${name} not found`];
-            }
-          }),
-        );
-
-        const newMessages: OllamaMessage[] = results.map(
-          ([name, result]: any) => ({
-            role: "tool",
-            content: result as string,
-            tool_name: name as string,
-          }),
-        );
-
-        // Directly extract and return the tool result if available
-        const describeMessage = newMessages.find((msg) =>
-          msg.content.startsWith(ToolReturnTag.Response),
-        );
-        const responseContent = extractToolResponse(
-          describeMessage?.content || "",
-        );
-        if (responseContent) {
-          console.log(
-            `[LLM] Tool response starts with "[response]", return it directly.`,
-          );
-          newMessages.push({
-            role: "assistant",
-            content: responseContent,
-          });
-          // append responseContent in chunks
-          await stimulateStreamResponse({
-            content: responseContent,
-            partialCallback,
-            endResolve,
-            endCallback,
-          });
-          return;
-        }
-
-        await chatWithLLMStreamInternal(
-          newMessages as Message[],
+        messages.push(...newMessages, { role: "assistant", content: responseContent });
+        // append responseContent in chunks
+        await stimulateStreamResponse({
+          content: responseContent,
           partialCallback,
-          () => {
-            endResolve();
-            endCallback();
-          },
-          partialThinkingCallback,
-          invokeFunctionCallback,
-          {
-            round: toolLoopState.round + 1,
-            signatures: toolLoopState.signatures,
-          },
-        );
+          endResolve,
+          endCallback,
+        });
         return;
-      } else {
-        endResolve();
-        endCallback();
       }
-    });
+
+      await chatWithLLMStreamInternal(
+        newMessages as Message[],
+        partialCallback,
+        () => {
+          endResolve();
+          endCallback();
+        },
+        partialThinkingCallback,
+        invokeFunctionCallback,
+        {
+          round: toolLoopState.round + 1,
+          signatures: toolLoopState.signatures,
+        },
+      );
+      return;
+    } else {
+      messages.push({ role: "assistant", content: partialAnswer });
+      endResolve();
+      endCallback();
+    }
   } catch (error: any) {
     console.error("Error:", error.message);
     endResolve();

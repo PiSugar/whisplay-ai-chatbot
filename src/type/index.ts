@@ -14,6 +14,7 @@ export interface OllamaMessage {
   content: string
   tool_calls?: OllamaFunctionCall[][];
   tool_name?: string;
+  tool_call_id?: string;
 }
 
 export enum ASRServer {
@@ -104,6 +105,7 @@ export interface FunctionCall {
 
 // {"function":{"index":0,"name":"setVolume","arguments":{"percent":50}}}
 export interface OllamaFunctionCall {
+  id?: string;
   function: {
     index: number;
     name: string;
