@@ -11,6 +11,8 @@ import { ASRServer, TTSResult, TTSServer } from "../type";
 import { alsaInputDevice, alsaOutputDevice } from "./audio-device";
 import { webAudioBridge } from "./web-audio-bridge";
 import { pcm16WavHeader, VOICE_PCM_SAMPLE_RATE } from "../utils/pcm-wav";
+import { getVoiceDetectEndLevel } from "./voice-detect";
+import { getVoiceDetectEndSilenceSeconds } from "../config/auto-listening";
 
 export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
@@ -32,13 +34,7 @@ const ttsAudioFormat: AudioFormat = normalizeAudioFormat(
 );
 
 const MP3_SOX_GAIN_DB = "2";
-const voiceDetectEndSilenceSecRaw = parseFloat(
-  process.env.VOICE_DETECT_END_SILENCE_SEC || "1.5",
-);
-const voiceDetectEndSilenceSec =
-  Number.isFinite(voiceDetectEndSilenceSecRaw) && voiceDetectEndSilenceSecRaw > 0
-    ? voiceDetectEndSilenceSecRaw
-    : 1.5;
+const voiceDetectEndSilenceSec = getVoiceDetectEndSilenceSeconds(process.env.VOICE_DETECT_END_SILENCE_SEC);
 const voiceDetectEndLevelRatioRaw = parseFloat(
   process.env.VOICE_DETECT_END_LEVEL_RATIO || "0.5",
 );
@@ -150,18 +146,49 @@ const recordAudio = async (
   outputPath: string,
   duration: number = 10,
   voiceDetectLevel: number = 30,
+  signal?: AbortSignal,
+  onPcm?: (audio: Buffer) => void,
+  finishSignal?: AbortSignal,
 ): Promise<string> => {
+  if (signal?.aborted) throw signal.reason;
   // Delegate to browser microphone when web audio is enabled and a client is connected.
   if (webAudioBridge.isAvailable()) {
     console.log(`[WebAudio] Starting browser recording, max ${duration} seconds...`);
-    return webAudioBridge.startRecording(outputPath, duration);
+    return webAudioBridge.startRecording(outputPath, duration, {
+      silenceMs: voiceDetectEndSilenceSec * 1000,
+      endLevelRatio: voiceDetectEndLevelRatio,
+    }, signal);
+  }
+
+  const voiceDetectEndLevel = getVoiceDetectEndLevel(voiceDetectLevel, voiceDetectEndLevelRatio);
+  const silence = [
+    "silence", "1", "0.1", `${voiceDetectLevel}%`,
+    "1", String(voiceDetectEndSilenceSec), `${voiceDetectEndLevel}%`,
+  ];
+  console.log(
+    `Starting recording, maximum ${duration} seconds (start=${voiceDetectLevel}%, stop=${voiceDetectEndLevel}% for ${voiceDetectEndSilenceSec}s)...`,
+  );
+  if (onPcm) {
+    const capture = recordPcm(outputPath, onPcm, silence);
+    const timer = setTimeout(capture.stop, duration * 1000);
+    const finishAtEndpoint = () => {
+      console.log("[Audio] Stopping automatic recording at ASR endpoint");
+      capture.stop();
+    };
+    signal?.addEventListener("abort", capture.stop, { once: true });
+    finishSignal?.addEventListener("abort", finishAtEndpoint, { once: true });
+    if (finishSignal?.aborted) finishAtEndpoint();
+    try {
+      return await capture.result;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", capture.stop);
+      finishSignal?.removeEventListener("abort", finishAtEndpoint);
+      if (signal?.aborted) throw signal.reason;
+    }
   }
 
   return new Promise((resolve, reject) => {
-    const voiceDetectEndLevel = Math.max(
-      1,
-      voiceDetectLevel * voiceDetectEndLevelRatio,
-    );
     const args = [
       "-t",
       "alsa",
@@ -173,24 +200,15 @@ const recordAudio = async (
       "-r",
       "16000",
       outputPath,
-      "silence",
-      "1",
-      "0.1",
-      `${voiceDetectLevel}%`,
-      "1",
-      `${voiceDetectEndSilenceSec}`,
-      `${voiceDetectEndLevel}%`,
+      ...silence,
     ];
-    console.log(
-      `Starting recording, maximum ${duration} seconds (start=${voiceDetectLevel}%, stop=${voiceDetectEndLevel}% for ${voiceDetectEndSilenceSec}s)...`,
-    );
     currentRecordingReject = reject;
     const recordingProcess = spawn("sox", args);
 
-    recordingProcess.on("error", (err) => {
-      killAllRecordingProcesses();
-      reject(err);
-    });
+    let recordingError: Error | undefined;
+    let timedOut = false;
+    const abort = () => killRecordingProcess(recordingProcess);
+    recordingProcess.on("error", (error) => { recordingError = error; });
 
     recordingProcess.stdout?.on("data", (data) => {
       console.log(data.toString());
@@ -199,34 +217,38 @@ const recordAudio = async (
       console.error(data.toString());
     });
 
-    recordingProcess.on("exit", (code) => {
+    recordingProcess.on("close", (code) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
       removeRecordingProcess(recordingProcess);
-      if (code && code !== 0) {
-        reject(code);
-        return;
+      if (signal?.aborted) {
+        reject(signal.reason);
+      } else if (recordingError || (code && !timedOut)) {
+        reject(recordingError ?? code);
+      } else {
+        resolve(outputPath);
       }
-      resolve(outputPath);
     });
     recordingProcessList.push(recordingProcess);
 
     // Set a timeout to kill the recording process after the specified duration
-    setTimeout(() => {
-      if (recordingProcessList.includes(recordingProcess)) {
-        killRecordingProcess(recordingProcess);
-        resolve(outputPath);
-      }
+    const timer = setTimeout(() => {
+      if (signal?.aborted) return;
+      timedOut = true;
+      killRecordingProcess(recordingProcess);
     }, duration * 1000);
+    signal?.addEventListener("abort", abort, { once: true });
   });
 };
 
-export const canStreamManualRecording = () =>
+export const canStreamRecording = () =>
   recordFileFormat === "wav" && !webAudioBridge.isAvailable();
 
-const recordPcmManually = (outputPath: string, onPcm: (audio: Buffer) => void) => {
+const recordPcm = (outputPath: string, onPcm: (audio: Buffer) => void, effects: string[] = []) => {
   const child = spawn("sox", [
     "--buffer", "2048", "-t", "alsa", alsaInputDevice, "-t", "raw", "-c", "1", "-r",
     String(VOICE_PCM_SAMPLE_RATE),
-    "-e", "signed-integer", "-b", "16", "-L", "-",
+    "-e", "signed-integer", "-b", "16", "-L", "-", ...effects,
   ]);
   const destination = createWriteStream(outputPath);
   destination.write(pcm16WavHeader(0, VOICE_PCM_SAMPLE_RATE, 1));
@@ -240,15 +262,19 @@ const recordPcmManually = (outputPath: string, onPcm: (audio: Buffer) => void) =
   });
   let stopRequested = false;
   const stop = () => {
+    if (stopRequested) return;
     stopRequested = true;
     killRecordingProcess(child);
   };
   const captureDone = new Promise<void>((resolve, reject) => {
     currentRecordingReject = reject;
-    child.once("error", reject);
+    let spawnError: Error | undefined;
+    child.once("error", error => { spawnError = error; });
     child.once("close", (code, signal) => {
       removeRecordingProcess(child);
-      if (code === 0 || (stopRequested && (signal === "SIGINT" || code === 2 || code === 130))) {
+      if (spawnError) {
+        reject(spawnError);
+      } else if (code === 0 || (stopRequested && (signal === "SIGINT" || code === 2 || code === 130))) {
         resolve();
       } else {
         reject(new Error(`SoX recording exited with ${code ?? signal}`));
@@ -257,8 +283,14 @@ const recordPcmManually = (outputPath: string, onPcm: (audio: Buffer) => void) =
   });
   child.stderr.on("data", (data) => console.error(data.toString()));
   recordingProcessList.push(child);
-  const result = Promise.all([captureDone, pipeline(child.stdout, tap, destination)])
-    .then(async () => {
+  const saved = pipeline(child.stdout, tap, destination).catch(error => {
+    stop();
+    throw error;
+  });
+  const result = Promise.allSettled([captureDone, saved])
+    .then(async ([capture, fileWrite]) => {
+      if (fileWrite.status === "rejected") throw fileWrite.reason;
+      if (capture.status === "rejected") throw capture.reason;
       const file = await fs.open(outputPath, "r+");
       try {
         const alignedLength = byteLength - byteLength % 2;
@@ -268,10 +300,6 @@ const recordPcmManually = (outputPath: string, onPcm: (audio: Buffer) => void) =
         await file.close();
       }
       return outputPath;
-    })
-    .catch((error) => {
-      stop();
-      throw error;
     });
   return { result, stop };
 };
@@ -284,7 +312,7 @@ const recordAudioManually = (
     console.log(`[WebAudio] Starting manual browser recording...`);
     return webAudioBridge.startManualRecording(outputPath);
   }
-  if (onPcm) return recordPcmManually(outputPath, onPcm);
+  if (onPcm) return recordPcm(outputPath, onPcm);
 
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {

@@ -50,6 +50,9 @@ interface RecordingState {
   reject: (e: unknown) => void;
   timer: NodeJS.Timeout | null;
   stopRequested: boolean;
+  auto?: boolean;
+  signal?: AbortSignal;
+  onAbort?: () => void;
 }
 
 interface PlaybackState {
@@ -120,33 +123,37 @@ class WebAudioBridge {
    * @param durationSec Maximum recording duration in seconds.
    * @returns Promise that resolves with `outputPath` when recording finishes.
    */
-  startRecording(outputPath: string, durationSec: number): Promise<string> {
+  startRecording(
+    outputPath: string,
+    durationSec: number,
+    voiceActivity: { silenceMs: number; endLevelRatio: number },
+    signal?: AbortSignal,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.server) {
         return reject(new Error("WebAudioBridge: no server registered"));
       }
+      if (signal?.aborted) return reject(signal.reason);
       this.abortCurrentRecording();
 
-      const timer = setTimeout(() => {
-        if (this.recording) {
-          this.recording.stopRequested = true;
-          this.server?.broadcastToWebClients(
-            JSON.stringify({ type: "stop_record" }),
-          );
-          // Allow up to 800 ms for remaining chunks to arrive before assembling.
-          setTimeout(() => this.finishRecording(), 800);
-        }
-      }, durationSec * 1000);
-
-      this.recording = {
+      const onAbort = () => this.stopRecording();
+      const rec: RecordingState = {
         outputPath,
         chunks: [],
         resolve,
         reject,
-        timer,
+        timer: null,
         stopRequested: false,
+        auto: true,
+        signal,
+        onAbort,
       };
-      this.server.broadcastToWebClients(JSON.stringify({ type: "start_record" }));
+      this.recording = rec;
+      rec.timer = setTimeout(() => {
+        if (this.recording === rec) this.stopRecording();
+      }, durationSec * 1000);
+      this.server.broadcastToWebClients(JSON.stringify({ type: "start_record", voiceActivity }));
+      signal?.addEventListener("abort", onAbort, { once: true });
     });
   }
 
@@ -185,15 +192,20 @@ class WebAudioBridge {
 
   /** Signal the browser to stop recording and wait for final data. */
   stopRecording(): void {
-    if (!this.recording || this.recording.stopRequested) return;
-    this.recording.stopRequested = true;
+    const rec = this.recording;
+    if (!rec || rec.stopRequested) return;
+    rec.stopRequested = true;
+    if (rec.timer) clearTimeout(rec.timer);
     this.server?.broadcastToWebClients(JSON.stringify({ type: "stop_record" }));
-    setTimeout(() => this.finishRecording(), 800);
+    rec.timer = setTimeout(() => {
+      if (this.recording === rec) this.finishRecording();
+    }, 800);
   }
 
   private abortCurrentRecording(): void {
     if (!this.recording) return;
     if (this.recording.timer) clearTimeout(this.recording.timer);
+    if (this.recording.onAbort) this.recording.signal?.removeEventListener("abort", this.recording.onAbort);
     this.recording.reject(new Error("Recording interrupted"));
     this.recording = null;
   }
@@ -203,8 +215,11 @@ class WebAudioBridge {
     if (!rec) return;
     this.recording = null;
     if (rec.timer) clearTimeout(rec.timer);
+    if (rec.onAbort) rec.signal?.removeEventListener("abort", rec.onAbort);
+    if (rec.signal?.aborted) return rec.reject(rec.signal.reason);
 
     if (rec.chunks.length === 0) {
+      if (rec.auto) return rec.reject(new Error("Browser microphone did not provide audio"));
       // Write an empty file so downstream code doesn't crash.
       try {
         fs.writeFileSync(rec.outputPath, Buffer.alloc(0));
@@ -283,7 +298,7 @@ class WebAudioBridge {
 
   /** Browser signals that MediaRecorder has stopped; assemble the file. */
   handleRecordComplete(): void {
-    if (this.recording?.stopRequested) {
+    if (this.recording?.stopRequested || this.recording?.auto) {
       this.finishRecording();
     }
   }

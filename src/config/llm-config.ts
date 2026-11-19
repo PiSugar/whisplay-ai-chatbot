@@ -7,10 +7,11 @@ const baseSystemPrompt =
 const speechFriendlyPrompt =
   " Format your replies for spoken text-to-speech. Do not use Markdown formatting that sounds awkward when read aloud, such as tables, code blocks, headings, bullet lists, numbered lists, inline links, footnote markers, or decorative separators. Use natural conversational sentences and plain punctuation instead.";
 
-const wakeWordEnabled =
-  (process.env.WAKE_WORD_ENABLED || "").toLowerCase() === "true";
+const automaticConversationEnabled =
+  process.env.WAKE_WORD_ENABLED?.toLowerCase() === "true" ||
+  process.env.AUTO_LISTENING_ENABLED?.toLowerCase() === "true";
 
-const wakeWordConversationToolPrompt = wakeWordEnabled
+const wakeWordConversationToolPrompt = automaticConversationEnabled
   ? " If the endConversation tool is available and the user clearly wants to end the current conversation, call that tool before giving your brief final reply."
   : "";
 

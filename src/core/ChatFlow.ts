@@ -3,7 +3,8 @@ import {
   getRecordFileDurationMs,
   splitSentences,
 } from "./../utils/index";
-import { display } from "../device/display";
+import { display, onAutoListeningChange } from "../device/display";
+import { isAutoListeningEnabled } from "../config/auto-listening";
 import { recognizeAudio, ttsProcessor } from "../cloud-api/server";
 import { isImMode } from "../cloud-api/llm";
 import { DEFAULT_EMOJI, extractEmojis } from "../utils";
@@ -18,11 +19,26 @@ import {
 import { FlowStateMachine } from "./chat-flow/stateMachine";
 import { flowStates } from "./chat-flow/states";
 import { ChatFlowContext, FlowName } from "./chat-flow/types";
-import { playWakeupChime } from "../device/audio";
 import { stopMusicPlayback, isMusicPlaying } from "../device/music-player";
 import type { Status } from "../device/display";
 
 dotEnv.config();
+
+const normalizeEndPhrase = (text: string): string =>
+  text.toLowerCase()
+    .replace(/\bgood[\s-]+bye\b/g, "goodbye")
+    .replace(/\bbye[\s-]+bye\b/g, "byebye");
+
+const defaultWakeEndKeywords = "byebye,goodbye,stop";
+const defaultAutoListeningEndKeywords = "byebye,goodbye,bye for now,stop,all done,end conversation";
+
+const parseEndKeywords = (value: string): string[] =>
+  value.split(",").map(item => normalizeEndPhrase(item.trim())).filter(Boolean);
+
+const matchesEndKeyword = (text: string, keywords: string[]): boolean => {
+  const normalized = normalizeEndPhrase(text);
+  return keywords.some(keyword => normalized.includes(keyword));
+};
 
 class ChatFlow implements ChatFlowContext {
   currentFlowName: FlowName = "sleep";
@@ -34,9 +50,13 @@ class ChatFlow implements ChatFlowContext {
   thinkingSentences: string[] = [];
   answerId: number = 0;
   enableCamera: boolean = false;
+  autoListeningEnabled = isAutoListeningEnabled();
+  autoCapture?: ChatFlowContext["autoCapture"];
+  wakeChimePending = false;
   knowledgePrompts: string[] = [];
   wakeWordListener: WakeWordListener | null = null;
   wakeSessionActive: boolean = false;
+  private wakeSessionFromButton = false;
   wakeSessionStartAt: number = 0;
   wakeSessionLastSpeechAt: number = 0;
   wakeSessionIdleTimeoutMs: number =
@@ -44,10 +64,12 @@ class ChatFlow implements ChatFlowContext {
   wakeRecordMaxSec: number = parseInt(
     process.env.WAKE_WORD_RECORD_MAX_SEC || "60",
   );
-  wakeEndKeywords: string[] = (process.env.WAKE_WORD_END_KEYWORDS || "byebye,goodbye,stop,byebye").toLowerCase()
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter((item) => item.length > 0);
+  private readonly wakeEndKeywords = parseEndKeywords(
+    process.env.WAKE_WORD_END_KEYWORDS ?? defaultWakeEndKeywords,
+  );
+  private readonly autoListeningEndKeywords = parseEndKeywords(
+    process.env.AUTO_LISTENING_END_KEYWORDS ?? defaultAutoListeningEndKeywords,
+  );
   endAfterAnswer: boolean = false;
   whisplayIMBridge: WhisplayIMBridgeServer | null = null;
   pendingExternalReply: string = "";
@@ -61,7 +83,7 @@ class ChatFlow implements ChatFlowContext {
   musicDisplayText: string = "";
   toolDisplayText: string = "";
   answerDisplayText: string = "";
-  manualRecognition?: ChatFlowContext["manualRecognition"];
+  recordingRecognition?: ChatFlowContext["recordingRecognition"];
   private toolDisplayItems: {
     id: string;
     name: string;
@@ -119,14 +141,15 @@ class ChatFlow implements ChatFlowContext {
       this.enableCamera = true;
     }
 
+    onAutoListeningChange(this.setAutoListening);
     this.transitionTo("sleep");
 
     const wakeEnabled = (process.env.WAKE_WORD_ENABLED || "").toLowerCase();
     if (wakeEnabled === "true") {
       this.wakeWordListener = new WakeWordListener();
       this.wakeWordListener.on("wake", () => {
-        if (this.currentFlowName === "sleep") {
-          void this.startWakeSession();
+        if (this.currentFlowName === "sleep" && !this.autoCapture) {
+          this.startWakeSession();
         }
       });
       this.wakeWordListener.start();
@@ -235,9 +258,11 @@ class ChatFlow implements ChatFlowContext {
   };
 
   transitionTo = (flowName: FlowName): void => {
-    if (!(this.currentFlowName === "listening" && flowName === "asr")) {
-      this.manualRecognition?.cancel();
-      this.manualRecognition = undefined;
+    if (this.currentFlowName === "wake_listening") this.autoCapture?.cancel();
+    if (!(flowName === "asr" &&
+      (this.currentFlowName === "listening" || this.currentFlowName === "wake_listening"))) {
+      this.recordingRecognition?.cancel();
+      this.recordingRecognition = undefined;
     }
     if (flowName !== "music" && isMusicPlaying()) {
       stopMusicPlayback();
@@ -248,7 +273,11 @@ class ChatFlow implements ChatFlowContext {
     console.log(`[${getCurrentTimeTag()}] switch to:`, flowName);
     this.stateMachine.transitionTo(flowName);
     if (flowName === "sleep") {
-      this.wakeWordListener?.start();
+      const startWakeWord = () => {
+        if (this.currentFlowName === "sleep") this.wakeWordListener?.start();
+      };
+      if (this.autoCapture) void this.autoCapture.closed.then(startWakeWord);
+      else startWakeWord();
     }
     display({ text_input_enabled: flowName === "sleep" });
   };
@@ -471,15 +500,14 @@ class ChatFlow implements ChatFlowContext {
     if (isCurrent()) this.streamResponser.endPartial();
   };
 
-  startWakeSession = async (): Promise<void> => {
+  startWakeSession = (fromButton = false): void => {
     this.wakeSessionActive = true;
+    this.wakeSessionFromButton = fromButton;
     this.wakeSessionStartAt = Date.now();
     this.wakeSessionLastSpeechAt = this.wakeSessionStartAt;
     this.endAfterAnswer = false;
-    await playWakeupChime();
-    if (this.currentFlowName === "sleep" && this.wakeSessionActive) {
-      this.transitionTo("wake_listening");
-    }
+    this.wakeChimePending = true;
+    this.transitionTo("wake_listening");
   };
 
   pauseWakeWordListener = async (): Promise<void> => {
@@ -490,10 +518,12 @@ class ChatFlow implements ChatFlowContext {
     if (this.shutdownPromise) return this.shutdownPromise;
 
     this.shutdownPromise = (async () => {
-      this.manualRecognition?.cancel();
-      this.manualRecognition = undefined;
+      this.recordingRecognition?.cancel();
+      this.recordingRecognition = undefined;
+      this.autoCapture?.cancel();
       this.endWakeSession();
       await this.wakeWordListener?.stop();
+      await this.autoCapture?.closed;
       this.whisplayIMBridge?.stop();
       this.whisplayIMBridge = null;
     })();
@@ -503,7 +533,20 @@ class ChatFlow implements ChatFlowContext {
 
   endWakeSession = (): void => {
     this.wakeSessionActive = false;
+    this.wakeSessionFromButton = false;
+    this.wakeChimePending = false;
     this.endAfterAnswer = false;
+  };
+
+  private setAutoListening = (enabled: boolean): void => {
+    if (enabled === this.autoListeningEnabled) return;
+    this.autoListeningEnabled = enabled;
+    if (!enabled && this.wakeSessionFromButton) {
+      this.endWakeSession();
+      if (this.currentFlowName === "wake_listening") this.transitionTo("sleep");
+    } else if (this.currentFlowName === "sleep") {
+      this.transitionTo("sleep");
+    }
   };
 
   shouldContinueWakeSession = (): boolean => {
@@ -512,12 +555,12 @@ class ChatFlow implements ChatFlowContext {
     return Date.now() - last < this.wakeSessionIdleTimeoutMs;
   };
 
-  shouldEndAfterAnswer = (text: string): boolean => {
-    const lower = text.toLowerCase();
-    return this.wakeEndKeywords.some(
-      (keyword) => keyword && lower.includes(keyword),
-    );
-  };
+  shouldEndAutoListening = (text: string): boolean =>
+    this.wakeSessionFromButton && matchesEndKeyword(text, this.autoListeningEndKeywords);
+
+  shouldEndAfterAnswer = (text: string): boolean =>
+    this.wakeSessionActive && !this.wakeSessionFromButton &&
+    matchesEndKeyword(text, this.wakeEndKeywords);
 }
 
 export default ChatFlow;

@@ -116,10 +116,11 @@ const topLevelGroups: TopLevelGroup[] = [
   {
     key: "ai-features",
     title: "AI Features",
-    description: "Wake word, camera, RAG, web search, memory and local tools.",
+    description: "Auto Listening, wake word, camera, RAG, web search, memory and local tools.",
     matches: (section) =>
       [
         "Wake word",
+        "Auto Listening",
         "Pi Camera",
         "RAG Settings",
         "RAG Providers & Storage",
@@ -920,7 +921,7 @@ async function main(): Promise<void> {
         { label: "Quit", value: "__quit__" },
       ],
       {
-        subtitle: withPath(["Home"], "Top-level groups are condensed from the full .env template."),
+        subtitle: withPath(["Home"], "Auto Listening is under AI Features. Zipformer ASR is under Local Providers."),
         escapeValue: "__quit__",
       },
     );

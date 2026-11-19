@@ -81,8 +81,33 @@ test("stream shows revised previews and submits one final after the last capture
   assert.equal(await stream.finish(), "New words.");
   assert.deepEqual(subtitles, ["Old words", "New words"]);
   assert.deepEqual(messages.map(item => item.type), ["start", "audio", "audio", "finish"]);
+  assert.equal(messages[0].endpoint, undefined);
   assert.deepEqual(Buffer.concat(messages.filter(item => item.pcm).map(item => Buffer.from(item.pcm, "base64"))),
     Buffer.from([1, 2, 3, 4]));
+});
+
+test("native endpoints are opt-in and request a stop without settling the final", async t => {
+  const path = await serverFixture(t, (message, socket) => {
+    if (message.type === "start" && message.endpoint === true) {
+      send(socket, "wrong-id", "endpoint");
+      send(socket, message.id, "endpoint");
+    }
+    if (message.type === "finish") {
+      send(socket, message.id, "endpoint");
+      send(socket, message.id, "final", "Finished.");
+    }
+  });
+  let requestStop;
+  const stopped = new Promise(resolve => { requestStop = resolve; });
+  let stopCount = 0;
+  const stream = openZipformerStream(path, () => {}, undefined, () => {
+    stopCount++;
+    requestStop();
+  });
+  await stopped;
+  assert.equal(stopCount, 1);
+  assert.equal(await stream.finish(), "Finished.");
+  assert.equal(stopCount, 1);
 });
 
 test("a timed-out Zipformer stream cancels and ignores a late final", async t => {

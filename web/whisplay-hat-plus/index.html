@@ -123,6 +123,13 @@
           <span class="volume-value" id="volumeValue">60%</span>
         </div>
       </div>
+      <div class="menu-section">
+        <label class="setting-switch" for="autoListeningToggle">
+          <span>Auto Listening</span>
+          <input id="autoListeningToggle" type="checkbox" role="switch" disabled />
+        </label>
+        <p class="setting-error" id="autoListeningError" role="status" hidden></p>
+      </div>
       <div class="menu-section app-actions">
         <div class="menu-label">Application</div>
         <button class="exit-app-btn" id="exitAppBtn" type="button">
@@ -144,6 +151,7 @@
     </div>
   </div>
 
+  <script src="/voice-activity.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

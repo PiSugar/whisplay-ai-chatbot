@@ -19,8 +19,9 @@ import {
   recordAudioManually,
   recordFileFormat,
   getDynamicVoiceDetectLevel,
-  canStreamManualRecording,
+  canStreamRecording,
   waitForPlaybackToStop,
+  playWakeupChime,
 } from "../../device/audio";
 import { chatWithLLMStream, startRecordingStream } from "../../cloud-api/server";
 import { isImMode, summaryTextWithLLM } from "../../cloud-api/llm";
@@ -53,8 +54,14 @@ import { VOICE_PCM_SAMPLE_RATE } from "../../utils/pcm-wav";
 
 const isHatPlus = detectHatModel() === "hat-plus";
 const MIN_PUSH_TO_TALK_MS = 500;
+const STREAM_FINAL_TIMEOUT_MS = 3000;
 // The streaming capture is mono signed 16-bit PCM.
 const MIN_CAPTURE_BYTES = VOICE_PCM_SAMPLE_RATE * 2 * MIN_PUSH_TO_TALK_MS / 1000;
+
+const listenFromButton = (ctx: ChatFlowContext): void => {
+  if (ctx.autoListeningEnabled) ctx.startWakeSession(true);
+  else ctx.transitionTo("listening");
+};
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -62,6 +69,10 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       resetCameraModeControl();
       // Stop any playing music when waking up
       stopMusicPlayback();
+      if (ctx.autoListeningEnabled) {
+        listenFromButton(ctx);
+        return;
+      }
       await ctx.pauseWakeWordListener();
       if (ctx.currentFlowName !== "sleep") return;
       ctx.transitionTo("listening");
@@ -90,7 +101,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         ctx.transitionTo("camera");
       };
       onCameraModeRequest(openCamera);
-      if (isHatPlus) {
+      if (isHatPlus || ctx.autoListeningEnabled) {
         onButtonDoubleClick(null);
       } else {
         onButtonDoubleClick(openCamera);
@@ -99,15 +110,19 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       onCameraModeRequest(null);
       onButtonDoubleClick(null);
     }
+    const status = getCurrentStatus();
     display({
       status: "idle",
       emoji: "😴",
       RGB: "#000055",
       rag_icon_visible: false,
-      ...(getCurrentStatus().text.endsWith("Listening...") || !getCurrentStatus().text
+      ...(status.status === "detecting" || status.status === "listening" ||
+        status.text.endsWith("Listening...") ||
+        status.text.startsWith("Long Press the button") ||
+        status.text === "Press the button to start listening." || !status.text
         ? {
-          text: `Long Press the button to say something${ctx.enableCamera && !isHatPlus ? ",\ndouble click to launch camera" : ""
-            }.`,
+          text: ctx.autoListeningEnabled ? "Press the button to start listening." :
+            `Long Press the button to say something${ctx.enableCamera && !isHatPlus ? ",\ndouble click to launch camera" : ""}.`,
         }
         : {}),
     });
@@ -173,7 +188,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       onMusicTrackChange(null);
       onMusicPlaybackEnd(null);
       stopMusicPlayback();
-      ctx.transitionTo("listening");
+      listenFromButton(ctx);
     });
     onButtonReleased(noop);
 
@@ -195,8 +210,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     ctx.musicDisplayText = "";
     ctx.isFromWakeListening = false;
     ctx.answerId += 1;
-    ctx.wakeSessionActive = false;
-    ctx.endAfterAnswer = false;
+    ctx.endWakeSession();
     onButtonDoubleClick(null);
     ctx.currentRecordFilePath = `${ctx.recordingsDir
       }/user-${Date.now()}.${recordFileFormat}`;
@@ -206,7 +220,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     const listeningStartedAt = performance.now();
     const turn = ctx.answerId;
     const playbackClosed = waitForPlaybackToStop();
-    if (playbackClosed) await playbackClosed;
+    if (playbackClosed || ctx.autoCapture) await Promise.all([playbackClosed, ctx.autoCapture?.closed]);
     if (ctx.answerId !== turn || ctx.currentFlowName !== "listening") return;
     // If button was already released before we entered this state, go back to sleep
     if (releasedBeforeCapture || !isButtonDown()) {
@@ -215,7 +229,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       return;
     }
     let releasedAt: number | undefined;
-    const stream = canStreamManualRecording() ? startRecordingStream?.((text) => {
+    const stream = canStreamRecording() ? startRecordingStream?.((text) => {
       if (ctx.answerId !== turn || ctx.currentFlowName !== "listening" || releasedAt !== undefined) return;
       display({ text: text || "Listening..." });
     }) : undefined;
@@ -228,12 +242,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     );
     if (stream) {
       const isCurrentTurn = () => ctx.answerId === turn && ctx.currentFlowName === "asr";
-      ctx.manualRecognition = {
+      ctx.recordingRecognition = {
         async resolve() {
           // Let the recorder deliver the last PCM frame before asking for the transcript.
           const path = await result;
           if (!isCurrentTurn() || capturedBytes < MIN_CAPTURE_BYTES) return "";
-          const remainingMs = 3000 - (performance.now() - (releasedAt ?? listeningStartedAt));
+          const remainingMs = STREAM_FINAL_TIMEOUT_MS - (performance.now() - (releasedAt ?? listeningStartedAt));
           const text = await stream.finish(remainingMs);
           if (!isCurrentTurn()) return "";
           return text ?? ctx.recognizeAudio(path);
@@ -288,11 +302,28 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     ctx.enterMusicAfterAnswer = false;
     ctx.musicDisplayText = "";
     ctx.isFromWakeListening = true;
-    ctx.answerId += 1;
-    ctx.currentRecordFilePath = `${ctx.recordingsDir
-      }/user-${Date.now()}.${recordFileFormat}`;
+    const turn = ++ctx.answerId;
+    const previousCapture = ctx.autoCapture?.closed;
+    const chime = ctx.wakeChimePending;
+    ctx.wakeChimePending = false;
+    const controller = new AbortController();
+    const endpoint = new AbortController();
+    let stream: ReturnType<NonNullable<typeof startRecordingStream>>;
+    const cancelStream = () => {
+      stream?.cancel();
+      stream = undefined;
+    };
+    let hasPcm = false;
+    const isCurrent = () => !controller.signal.aborted &&
+      ctx.answerId === turn && ctx.currentFlowName === "wake_listening";
+    onButtonDoubleClick(null);
     onButtonPressed(() => {
-      ctx.transitionTo("listening");
+      if (ctx.autoListeningEnabled) {
+        ctx.endWakeSession();
+        ctx.transitionTo("sleep");
+      } else {
+        ctx.transitionTo("listening");
+      }
     });
     onButtonReleased(noop);
     display({
@@ -302,7 +333,13 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       text: "Detecting voice level...",
       rag_icon_visible: false,
     });
-    getDynamicVoiceDetectLevel().then((level) => {
+    const capture = async (): Promise<string | undefined> => {
+      await Promise.all([previousCapture, ctx.pauseWakeWordListener(), waitForPlaybackToStop()]);
+      if (!isCurrent()) return;
+      if (chime) await playWakeupChime();
+      if (!isCurrent()) return;
+      const level = await getDynamicVoiceDetectLevel();
+      if (!isCurrent()) return;
       display({
         status: "listening",
         emoji: DEFAULT_EMOJI,
@@ -310,15 +347,58 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         text: `(Detect level: ${level}%) Listening...`,
         rag_icon_visible: false,
       });
-      recordAudio(ctx.currentRecordFilePath, ctx.wakeRecordMaxSec, level)
-        .then(() => {
-          ctx.transitionTo("asr");
-        })
-        .catch((err) => {
-          console.error("Error during auto recording:", err);
-          ctx.endWakeSession();
-          ctx.transitionTo("sleep");
-        });
+      const path = `${ctx.recordingsDir}/user-${Date.now()}.${recordFileFormat}`;
+      if (canStreamRecording()) {
+        stream = startRecordingStream?.(
+          text => { if (isCurrent()) display({ text: text || "Listening..." }); },
+          () => { if (isCurrent()) endpoint.abort(); },
+        );
+      }
+      return recordAudio(path, ctx.wakeRecordMaxSec, level, controller.signal, stream ? chunk => {
+        if (!isCurrent()) return;
+        hasPcm = true;
+        stream?.write(chunk);
+      } : undefined, endpoint.signal);
+    };
+    const result = capture();
+    const task = ctx.autoCapture = {
+      cancel: () => {
+        controller.abort();
+        cancelStream();
+      },
+      closed: result.then(noop, noop),
+    };
+    void task.closed.then(() => {
+      if (ctx.autoCapture === task) ctx.autoCapture = undefined;
+    });
+    void result.then((path) => {
+      if (!path || !isCurrent()) {
+        cancelStream();
+        return;
+      }
+      ctx.currentRecordFilePath = path;
+      if (stream && hasPcm) {
+        const recognition = stream;
+        stream = undefined;
+        const isCurrentTurn = () => ctx.answerId === turn && ctx.currentFlowName === "asr";
+        ctx.recordingRecognition = {
+          async resolve() {
+            const text = await recognition.finish(STREAM_FINAL_TIMEOUT_MS);
+            if (!isCurrentTurn()) return "";
+            return text ?? ctx.recognizeAudio(path, true);
+          },
+          cancel: () => recognition.cancel(),
+        };
+      } else {
+        cancelStream();
+      }
+      ctx.transitionTo("asr");
+    }, (error) => {
+      cancelStream();
+      if (!isCurrent()) return;
+      console.error("Error during auto recording:", error);
+      ctx.endWakeSession();
+      ctx.transitionTo("sleep");
     });
   },
   asr: (ctx: ChatFlowContext) => {
@@ -329,7 +409,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     onButtonDoubleClick(null);
     Promise.race([
-      ctx.manualRecognition?.resolve() ?? ctx.recognizeAudio(ctx.currentRecordFilePath, ctx.isFromWakeListening),
+      ctx.recordingRecognition?.resolve() ?? ctx.recognizeAudio(ctx.currentRecordFilePath, ctx.isFromWakeListening),
       new Promise<typeof interrupted>((resolve) => {
         onButtonPressed(() => {
           resolve(interrupted);
@@ -339,12 +419,18 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     ]).then((result) => {
       if (ctx.currentFlowName !== "asr" || ctx.answerId !== turn) return;
       if (result === interrupted) {
-        ctx.transitionTo("listening");
+        listenFromButton(ctx);
         return;
       }
       if (result) {
         console.log("Audio recognized result:", result);
         ctx.asrText = result;
+        if (ctx.shouldEndAutoListening(result)) {
+          ctx.endWakeSession();
+          display({ text: "Press the button to start listening." });
+          ctx.transitionTo("sleep");
+          return;
+        }
         ctx.endAfterAnswer = ctx.shouldEndAfterAnswer(result);
         if (ctx.wakeSessionActive) {
           ctx.wakeSessionLastSpeechAt = Date.now();
@@ -366,6 +452,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     }).catch((error) => {
       console.error("Error during recognition:", error);
       if (ctx.currentFlowName === "asr" && ctx.answerId === turn) {
+        ctx.endWakeSession();
         ctx.transitionTo("sleep");
       }
     });
@@ -380,7 +467,11 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       RGB: "#00c8a3",
     });
     const currentAnswerId = ctx.answerId;
+    const isCurrentAnswer = (): boolean =>
+      currentAnswerId === ctx.answerId && ctx.currentFlowName === "answer";
     if (isImMode) {
+      onButtonPressed(() => listenFromButton(ctx));
+      onButtonReleased(noop);
       const prompt: {
         role: "system" | "user";
         content: string;
@@ -392,6 +483,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         ];
       sendWhisplayIMMessage(prompt)
         .then((ok) => {
+          if (!isCurrentAnswer()) return;
           if (ok) {
             display({
               status: "idle",
@@ -409,15 +501,12 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           }
         })
         .finally(() => {
+          if (!isCurrentAnswer()) return;
           clearPendingCapturedImgForChat();
           ctx.transitionTo("sleep");
         });
       return;
     }
-    onButtonPressed(() => {
-      ctx.transitionTo("listening");
-    });
-    onButtonReleased(noop);
     const {
       partial,
       endPartial,
@@ -425,8 +514,6 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       stop: stopPlaying,
     } = ctx.streamResponser;
     let llmResponseText = "";
-    const isCurrentAnswer = (): boolean =>
-      currentAnswerId === ctx.answerId && ctx.currentFlowName === "answer";
     const trackingPartial = (text: string): void => {
       if (!isCurrentAnswer()) return;
       llmResponseText += text;
@@ -445,6 +532,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       Promise.resolve().then(() => prepareMemoryPrompt(ctx.asrText)),
     ])
       .then(([res, memoryPrompt]: [string, string]) => {
+        if (!isCurrentAnswer()) return;
         let knowledgePrompt = res;
         if (res) {
           console.log("Retrieved knowledge for RAG:\n", res);
@@ -552,7 +640,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       })
       .catch((error) => {
         console.error("[answer] Failed to prepare prompt:", error);
-        if (currentAnswerId === ctx.answerId) {
+        if (isCurrentAnswer()) {
           resolveLlmDone();
           ctx.transitionTo("sleep");
         }
@@ -587,14 +675,14 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       stopPlaying();
       clearPendingCapturedImgForChat();
       display({ image_icon_visible: false });
-      ctx.transitionTo("listening");
+      listenFromButton(ctx);
     });
     onButtonReleased(noop);
   },
   image: (ctx: ChatFlowContext) => {
     onButtonPressed(() => {
       display({ image: "" });
-      ctx.transitionTo("listening");
+      listenFromButton(ctx);
     });
     onButtonReleased(noop);
   },
@@ -680,7 +768,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     onButtonPressed(() => {
       ctx.streamResponser.stop();
       display({ image: "" });
-      ctx.transitionTo("listening");
+      listenFromButton(ctx);
     });
     onButtonReleased(noop);
     const replyText = ctx.pendingExternalReply;

@@ -2,6 +2,7 @@
 import argparse
 import base64
 import json
+import math
 from pathlib import Path
 import socketserver
 import subprocess
@@ -52,7 +53,7 @@ def audio_frames(path):
 
 
 class Zipformer:
-    def __init__(self, directory, threads):
+    def __init__(self, directory, threads, end_silence_sec):
         import numpy as np
         import sherpa_onnx
 
@@ -68,7 +69,11 @@ class Zipformer:
             feature_dim=80,
             num_threads=threads,
             decoding_method="greedy_search",
-            enable_endpoint_detection=False,
+            enable_endpoint_detection=True,
+            # Only silence after decoded speech should request a stop.
+            rule1_min_trailing_silence=math.inf,
+            rule2_min_trailing_silence=end_silence_sec,
+            rule3_min_utterance_length=math.inf,
             provider="cpu",
         )
         self.np = np
@@ -82,13 +87,14 @@ class Zipformer:
 
 
 class ZipformerSession:
-    def __init__(self, model, send=None):
+    def __init__(self, model, send=None, detect_endpoint=False):
         self.model = model
         self.send = send
         self.pending_byte = b""
         self.previous = ""
         self.has_audio = False
         self.finished = False
+        self.detect_endpoint = detect_endpoint
         with model.lock:
             self.stream = model.recognizer.create_stream()
 
@@ -111,10 +117,15 @@ class ZipformerSession:
         with self.model.lock:
             self.stream.accept_waveform(SAMPLE_RATE, samples)
             self.decode()
-            text = self.model.recognizer.get_result(self.stream).strip() if self.send else ""
+            recognizer = self.model.recognizer
+            text = recognizer.get_result(self.stream).strip() if self.send else ""
+            endpoint = self.detect_endpoint and bool(text) and recognizer.is_endpoint(self.stream)
         if self.send and text != self.previous:
             self.previous = text
             self.send("partial", text)
+        if endpoint:
+            self.detect_endpoint = False
+            self.send("endpoint")
 
     def finish(self):
         if self.finished:
@@ -161,7 +172,7 @@ def make_server(path, model):
                 if first.get("type") != "start":
                     send("error")
                     return
-                session = ZipformerSession(model, send)
+                session = ZipformerSession(model, send, detect_endpoint=first.get("endpoint") is True)
                 while line := self.rfile.readline(16_384):
                     message = json.loads(line)
                     if message.get("id") != session_id:
@@ -192,12 +203,15 @@ def main():
     parser.add_argument("--socket", required=True)
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=2)
+    parser.add_argument("--end-silence-sec", type=float, default=1.5)
     args = parser.parse_args()
     if args.threads < 1:
         parser.error("--threads must be positive")
+    if not math.isfinite(args.end_silence_sec) or args.end_silence_sec <= 0:
+        parser.error("--end-silence-sec must be positive and finite")
 
     try:
-        model = Zipformer(args.model_dir, args.threads)
+        model = Zipformer(args.model_dir, args.threads, args.end_silence_sec)
         with make_server(args.socket, model) as server:
             print("[Zipformer] Offline ASR ready", flush=True)
             server.serve_forever()

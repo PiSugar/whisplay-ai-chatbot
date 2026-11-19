@@ -25,13 +25,15 @@ export interface ChatFlowContext {
   thinkingSentences: string[];
   answerId: number;
   enableCamera: boolean;
+  autoListeningEnabled: boolean;
+  autoCapture?: { cancel: () => void; closed: Promise<void> };
+  wakeChimePending: boolean;
   knowledgePrompts: string[];
   wakeSessionActive: boolean;
   wakeSessionStartAt: number;
   wakeSessionLastSpeechAt: number;
   wakeSessionIdleTimeoutMs: number;
   wakeRecordMaxSec: number;
-  wakeEndKeywords: string[];
   endAfterAnswer: boolean;
   pendingExternalReply: string;
   pendingExternalEmoji: string;
@@ -43,7 +45,7 @@ export interface ChatFlowContext {
   musicDisplayText: string;
   toolDisplayText: string;
   answerDisplayText: string;
-  manualRecognition?: { resolve: () => Promise<string>; cancel: () => void };
+  recordingRecognition?: { resolve: () => Promise<string>; cancel: () => void };
 
   transitionTo: (flowName: FlowName) => void;
   composeAnswerDisplayText: (text?: string) => string;
@@ -55,10 +57,11 @@ export interface ChatFlowContext {
   resetToolCallDisplay: () => void;
   recognizeAudio: (path: string, isFromAutoListening?: boolean) => Promise<string>;
   partialThinkingCallback: (partialThinking: string) => void;
-  startWakeSession: () => Promise<void>;
+  startWakeSession: (fromButton?: boolean) => void;
   pauseWakeWordListener: () => Promise<void>;
   endWakeSession: () => void;
   shouldContinueWakeSession: () => boolean;
+  shouldEndAutoListening: (text: string) => boolean;
   shouldEndAfterAnswer: (text: string) => boolean;
   streamExternalReply: (text: string, emoji?: string) => Promise<void>;
 }

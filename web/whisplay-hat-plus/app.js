@@ -24,6 +24,8 @@ const menuOverlay = document.getElementById("menuOverlay");
 const menuClose = document.getElementById("menuClose");
 const volumeSlider = document.getElementById("volumeSlider");
 const volumeValue = document.getElementById("volumeValue");
+const autoListeningToggle = document.getElementById("autoListeningToggle");
+const autoListeningError = document.getElementById("autoListeningError");
 const exitAppBtn = document.getElementById("exitAppBtn");
 const exitConfirm = document.getElementById("exitConfirm");
 const exitCancelBtn = document.getElementById("exitCancelBtn");
@@ -436,6 +438,7 @@ function connectWebSocket() {
   ws.addEventListener("open", () => {
     // Request current volume when connected
     sendJson({ type: "get_volume" });
+    sendJson({ type: "get_auto_listening" });
   });
 
   ws.addEventListener("message", (event) => {
@@ -452,14 +455,20 @@ function connectWebSocket() {
       const pct = Math.round(message.percent || 0);
       volumeSlider.value = pct;
       volumeValue.textContent = `${pct}%`;
+    } else if (message.type === "auto_listening") {
+      autoListeningToggle.checked = message.enabled === true;
+      autoListeningToggle.disabled = false;
+      autoListeningError.textContent = message.error || "";
+      autoListeningError.hidden = !message.error;
+      recordBtn.setAttribute("aria-label", message.enabled ? "Toggle listening" : "Hold to talk");
     } else if (message.type === "exit_app_ack") {
       exitConfirmBtn.textContent = "Exiting…";
     } else if (message.type === "start_record") {
-      startWebAudioRecording();
+      startWebAudioRecording(message.voiceActivity);
     } else if (message.type === "stop_record") {
       stopWebAudioRecording();
     } else if (message.type === "play_audio") {
-      playWebAudio(message.data, message.format, message.duration);
+      playWebAudio(message.data, message.playId);
     } else if (message.type === "stop_audio") {
       stopWebAudio();
     } else if (message.type === "start_camera_stream") {
@@ -472,6 +481,7 @@ function connectWebSocket() {
   });
 
   ws.addEventListener("close", () => {
+    autoListeningToggle.disabled = true;
     stopCameraFeed();
     reconnectTimer = setTimeout(connectWebSocket, 1000);
   });
@@ -613,6 +623,12 @@ menuBtn.addEventListener("click", openMenu);
 
 menuClose.addEventListener("click", closeMenu);
 
+autoListeningToggle.addEventListener("change", () => {
+  autoListeningToggle.disabled = true;
+  autoListeningError.hidden = true;
+  sendJson({ type: "set_auto_listening", enabled: autoListeningToggle.checked });
+});
+
 exitAppBtn.addEventListener("click", showExitConfirmation);
 exitCancelBtn.addEventListener("click", hideExitConfirmation);
 exitConfirmBtn.addEventListener("click", () => {
@@ -655,51 +671,61 @@ const FRAME_CAM_CAPTURE = 0x03;
 
 let mediaRecorder = null;
 let audioStream = null;
+let audioStartInProgress = false;
+let stopRequestedBeforeStart = false;
 
-async function startWebAudioRecording() {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") return;
+async function startWebAudioRecording(voiceActivity) {
+  if (audioStartInProgress || (mediaRecorder && mediaRecorder.state !== "inactive")) return;
+  stopRequestedBeforeStart = false;
+  audioStartInProgress = true;
   try {
     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const preferredMimes = [
-      "audio/webm;codecs=opus",
-      "audio/ogg;codecs=opus",
-      "audio/webm",
-    ];
+    if (stopRequestedBeforeStart) {
+      audioStream.getTracks().forEach((track) => track.stop());
+      audioStream = null;
+      sendJson({ type: "record_complete" });
+      return;
+    }
+    const preferredMimes = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/webm"];
     const mimeType = preferredMimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
-    const options = mimeType ? { mimeType } : {};
-    mediaRecorder = new MediaRecorder(audioStream, options);
-
+    mediaRecorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : {});
+    const pendingChunks = new Set();
     mediaRecorder.ondataavailable = (event) => {
-      if (!event.data || event.data.size === 0) return;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      event.data.arrayBuffer().then((buf) => {
+      if (!event.data?.size || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const send = event.data.arrayBuffer().then((buf) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
         const payload = new Uint8Array(1 + buf.byteLength);
         payload[0] = FRAME_AUDIO;
         payload.set(new Uint8Array(buf), 1);
         ws.send(payload);
       });
+      pendingChunks.add(send);
+      void send.then(() => pendingChunks.delete(send), () => pendingChunks.delete(send));
     };
-
+    let stopSpeechMonitor = () => {};
     mediaRecorder.onstop = () => {
-      if (audioStream) {
-        audioStream.getTracks().forEach((t) => t.stop());
-        audioStream = null;
-      }
+      stopSpeechMonitor();
+      audioStream.getTracks().forEach((track) => track.stop());
+      audioStream = null;
       mediaRecorder = null;
-      sendJson({ type: "record_complete" });
+      void Promise.allSettled(pendingChunks).then(() => sendJson({ type: "record_complete" }));
     };
-
     mediaRecorder.start(500);
-  } catch (e) {
-    console.error("[WebAudio] getUserMedia failed:", e);
+    stopSpeechMonitor = window.watchForSpeechEnd(audioStream, voiceActivity, stopWebAudioRecording);
+  } catch (error) {
+    console.error("[WebAudio] getUserMedia failed:", error);
+    audioStream?.getTracks().forEach((track) => track.stop());
+    audioStream = null;
+    mediaRecorder = null;
     sendJson({ type: "record_complete" });
+  } finally {
+    audioStartInProgress = false;
   }
 }
 
 function stopWebAudioRecording() {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-  }
+  stopRequestedBeforeStart = true;
+  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
 }
 
 // ── Web Audio Playback ──────────────────────────────────────────────────────
@@ -714,30 +740,39 @@ function ensureAudioContext() {
   return audioCtx;
 }
 
-async function playWebAudio(base64Data, _format, _duration) {
+let audioPlaybackGeneration = 0;
+
+async function playWebAudio(base64Data, playId) {
+  stopWebAudio();
+  const generation = audioPlaybackGeneration;
+  const complete = () => {
+    if (generation !== audioPlaybackGeneration) return;
+    currentAudioSource = null;
+    sendJson({ type: "play_complete", playId });
+  };
   try {
     const ctx = ensureAudioContext();
     const binary = atob(base64Data);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const decoded = await ctx.decodeAudioData(bytes.buffer);
-    stopWebAudio();
+    if (generation !== audioPlaybackGeneration) return;
     currentAudioSource = ctx.createBufferSource();
     currentAudioSource.buffer = decoded;
     currentAudioSource.connect(ctx.destination);
-    currentAudioSource.onended = () => {
-      currentAudioSource = null;
-      sendJson({ type: "play_complete" });
-    };
+    currentAudioSource.onended = complete;
     currentAudioSource.start(0);
   } catch (e) {
+    if (generation !== audioPlaybackGeneration) return;
     console.error("[WebAudio] Playback failed:", e);
-    sendJson({ type: "play_complete" });
+    complete();
   }
 }
 
 function stopWebAudio() {
+  audioPlaybackGeneration += 1;
   if (currentAudioSource) {
+    currentAudioSource.onended = null;
     try { currentAudioSource.stop(); } catch {}
     currentAudioSource = null;
   }

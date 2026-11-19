@@ -24,7 +24,8 @@ ZIPFORMER_THREADS=2
 
 Restart the chatbot using its usual launcher. For a service-managed installation,
 run `whisplay service restart`. The local microphone shows interim subtitles
-during push-to-talk. Releasing the button submits the final transcript.
-Wake-word and browser microphone input use complete recordings, as does fallback
-when a live stream fails. The selected ASR uses the local model for all three
-paths. To switch back, set `ASR_SERVER=faster-whisper` and restart.
+during push-to-talk and automatic listening. Releasing the button finalizes
+push-to-talk. Automatic listening finalizes after a pause. To enable the
+button-started mode and set its end phrases, open **AI Features → Auto Listening**.
+Browser microphones and failed live streams use complete recordings. To switch
+back, set `ASR_SERVER=faster-whisper` and restart.

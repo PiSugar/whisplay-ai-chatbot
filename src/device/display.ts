@@ -76,6 +76,7 @@ export class WhisplayDisplay {
   private client = null as Socket | null;
   private buttonPressedCallback: () => void = () => {};
   private buttonReleasedCallback: () => void = () => {};
+  private autoListeningChangeCallback: (enabled: boolean) => void = () => {};
   private buttonDoubleClickCallback: (() => void) | null = null;
   private buttonDown = false;
   private onCameraCaptureCallback: () => void = () => {};
@@ -142,6 +143,7 @@ export class WhisplayDisplay {
         cameraEnabled: this.cameraEnabled,
         onButtonPress: () => this.handleButtonPressedEvent(),
         onButtonRelease: () => this.handleButtonReleasedEvent(),
+        onAutoListeningChange: enabled => this.autoListeningChangeCallback(enabled),
         onCameraModeRequest: () => this.cameraModeRequestCallback(),
         onCameraShutterRequest: () => this.cameraShutterRequestCallback(),
         onCameraBackRequest: () => this.cameraBackRequestCallback(),
@@ -404,6 +406,10 @@ export class WhisplayDisplay {
 
   onButtonReleased(callback: () => void): void {
     this.buttonReleasedCallback = callback;
+  }
+
+  onAutoListeningChange(callback: (enabled: boolean) => void): void {
+    this.autoListeningChangeCallback = callback;
   }
 
   onButtonDoubleClick(callback: (() => void) | null): void {
@@ -707,6 +713,8 @@ export const onButtonPressed =
   displayInstance.onButtonPressed.bind(displayInstance);
 export const onButtonReleased =
   displayInstance.onButtonReleased.bind(displayInstance);
+export const onAutoListeningChange =
+  displayInstance.onAutoListeningChange.bind(displayInstance);
 export const onButtonDoubleClick =
   displayInstance.onButtonDoubleClick.bind(displayInstance);
 export const onCameraCapture =

@@ -453,7 +453,7 @@ function connectWebSocket() {
     if (message.type === "state") {
       applyState(message.payload);
     } else if (message.type === "start_record") {
-      startWebAudioRecording();
+      startWebAudioRecording(message.voiceActivity);
     } else if (message.type === "stop_record") {
       stopWebAudioRecording();
     } else if (message.type === "play_audio") {
@@ -550,7 +550,7 @@ let audioStartInProgress = false;
 let stopRequestedBeforeStart = false;
 let pendingAudioChunkSends = [];
 
-async function startWebAudioRecording() {
+async function startWebAudioRecording(voiceActivity) {
   if (audioStartInProgress) return;
   if (mediaRecorder && mediaRecorder.state !== "inactive") return;
   stopRequestedBeforeStart = false;
@@ -599,7 +599,9 @@ async function startWebAudioRecording() {
       });
     };
 
+    let stopSpeechMonitor = () => {};
     mediaRecorder.onstop = () => {
+      stopSpeechMonitor();
       updateMicIndicator(false);
       if (audioStream) {
         audioStream.getTracks().forEach((t) => t.stop());
@@ -615,6 +617,7 @@ async function startWebAudioRecording() {
 
     // Emit data chunks every 500 ms so the server can monitor progress.
     mediaRecorder.start(500);
+    stopSpeechMonitor = window.watchForSpeechEnd(audioStream, voiceActivity, stopWebAudioRecording);
     if (stopRequestedBeforeStart && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
     }

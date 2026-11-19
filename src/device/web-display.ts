@@ -59,6 +59,7 @@ export class WebDisplayServer implements WebAudioBridgeServer {
     this.app.use(this.router.routes());
     this.app.use(this.router.allowedMethods());
     this.app.use(serve(staticRoot));
+    this.app.use(serve(path.resolve(staticRoot, "../shared")));
 
     this.server = http.createServer(this.app.callback());
     this.wsServer = new WebSocketServer({ server: this.server, path: "/ws" });

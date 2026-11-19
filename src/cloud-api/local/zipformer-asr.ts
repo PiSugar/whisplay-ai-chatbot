@@ -6,15 +6,17 @@ import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
+import { getVoiceDetectEndSilenceSeconds } from "../../config/auto-listening";
 import type { ASRProvider, ASRRecordingStream, PluginContext } from "../../plugin/types";
 
-type RecognitionRequest = { type: "start" } | { type: "file"; path: string };
+type RecognitionRequest = { type: "start"; endpoint?: true } | { type: "file"; path: string };
 
 function connectZipformer(
   path: string,
   request: RecognitionRequest,
   timeoutMs: number,
   onPartial?: (text: string) => void,
+  onEndpoint?: () => void,
 ): ASRRecordingStream {
   const id = randomUUID();
   const socket = createConnection(path);
@@ -49,6 +51,7 @@ function connectZipformer(
       if (message.type === "partial" && !finishing && typeof message.text === "string") {
         onPartial?.(message.text);
       }
+      if (message.type === "endpoint" && !finishing) onEndpoint?.();
       if (message.type === "final" && finishing && typeof message.text === "string") {
         settle(message.text);
       }
@@ -102,8 +105,10 @@ export function openZipformerStream(
   path: string,
   onPartial: (text: string) => void,
   timeoutMs = 3000,
+  onEndpoint?: () => void,
 ): ASRRecordingStream {
-  return connectZipformer(path, { type: "start" }, timeoutMs, onPartial);
+  const request: RecognitionRequest = onEndpoint ? { type: "start", endpoint: true } : { type: "start" };
+  return connectZipformer(path, request, timeoutMs, onPartial, onEndpoint);
 }
 
 export function recognizeZipformerFile(
@@ -130,6 +135,7 @@ export function createZipformerProvider(env: PluginContext["env"]): ASRProvider 
     "--socket", socketPath,
     "--model-dir", resolve(directory),
     "--threads", String(threads),
+    "--end-silence-sec", String(getVoiceDetectEndSilenceSeconds(env.VOICE_DETECT_END_SILENCE_SEC)),
   ], { detached: true, stdio: ["ignore", "inherit", "inherit"] });
 
   let running = true;
@@ -166,8 +172,8 @@ export function createZipformerProvider(env: PluginContext["env"]): ASRProvider 
   const isReady = () => running && existsSync(socketPath);
 
   return {
-    startRecordingStream(onPartial) {
-      return isReady() ? openZipformerStream(socketPath, onPartial) : undefined;
+    startRecordingStream(onPartial, onEndpoint) {
+      return isReady() ? openZipformerStream(socketPath, onPartial, undefined, onEndpoint) : undefined;
     },
     async recognizeAudio(audioPath) {
       // A press during model loading still has a complete file to recognize once ready.

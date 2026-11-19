@@ -586,6 +586,26 @@ body {
   margin-bottom: 20px;
 }
 
+.setting-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.setting-switch input {
+  width: 24px;
+  height: 24px;
+  accent-color: #44f28a;
+}
+
+.setting-error {
+  margin: 4px 0 0;
+  color: #ffb4ab;
+  font-size: 13px;
+}
+
 .menu-label {
   font-size: 13px;
   color: var(--muted);

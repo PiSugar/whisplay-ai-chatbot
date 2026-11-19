@@ -6,6 +6,19 @@
 
 This is a pocket-sized AI chatbot device built using a Raspberry Pi Zero 2w / 5. Just press the button, speak, and it talks back—like a futuristic walkie-talkie with a mind of its own.
 
+Set `AUTO_LISTENING_ENABLED=true` in `.env`, or use **AI Features → Auto Listening**
+in `whisplay configure`, then restart the chatbot. On Whisplay Plus, change
+**Settings → Auto Listening** to apply and save the setting immediately. A single press starts automatic
+listening and speech ends after a pause. Press again while listening to cancel,
+or press during recognition or playback to start listening again. The button and
+wake word share the automatic recording and conversation timeouts. Zipformer
+shows live subtitles with the local microphone. Under **AI Features → Auto Listening**,
+set `AUTO_LISTENING_END_KEYWORDS` to a comma-separated list of phrases that return
+a button-started session to standby after recognition, regardless of letter case.
+The defaults are `byebye,goodbye,bye for now,stop,all done,end conversation`.
+Wake-word sessions use `WAKE_WORD_END_KEYWORDS`. With Auto Listening
+enabled, use the on-screen camera control on supported displays.
+
 Test Video Playlist:
 [https://www.youtube.com/watch?v=lOVA0Gui-4Q](https://www.youtube.com/playlist?list=PLpTS9YM-tG_mW5H7Xs2EO0qvlAI-Jm1e_)
 

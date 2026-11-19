@@ -9,6 +9,7 @@ import { WebSocketServer, WebSocket, RawData } from "ws";
 import { dataDir, cameraFeedDir } from "../utils/dir";
 import { getImageMimeType } from "../utils/image";
 import { getCurrentLogPercent, setVolumeByAmixer } from "../utils/volume";
+import { isAutoListeningEnabled, saveAutoListening } from "../config/auto-listening";
 import {
   webAudioBridge,
   FRAME_AUDIO_CHUNK,
@@ -26,6 +27,7 @@ interface HatPlusDisplayOptions {
   cameraEnabled: boolean;
   onButtonPress: ButtonHandler;
   onButtonRelease: ButtonHandler;
+  onAutoListeningChange: (enabled: boolean) => void;
   onCameraModeRequest: () => void;
   onCameraShutterRequest: () => void;
   onCameraBackRequest: () => void;
@@ -43,6 +45,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
   private cameraEnabled: boolean;
   private onButtonPress: ButtonHandler;
   private onButtonRelease: ButtonHandler;
+  private onAutoListeningChange: (enabled: boolean) => void;
   private onCameraModeRequest: () => void;
   private onCameraShutterRequest: () => void;
   private onCameraBackRequest: () => void;
@@ -58,6 +61,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
     this.cameraEnabled = options.cameraEnabled;
     this.onButtonPress = options.onButtonPress;
     this.onButtonRelease = options.onButtonRelease;
+    this.onAutoListeningChange = options.onAutoListeningChange;
     this.onCameraModeRequest = options.onCameraModeRequest;
     this.onCameraShutterRequest = options.onCameraShutterRequest;
     this.onCameraBackRequest = options.onCameraBackRequest;
@@ -71,6 +75,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
     this.app.use(this.router.routes());
     this.app.use(this.router.allowedMethods());
     this.app.use(serve(staticRoot));
+    this.app.use(serve(path.resolve(staticRoot, "../shared")));
 
     this.server = http.createServer(this.app.callback());
     this.wsServer = new WebSocketServer({ server: this.server, path: "/ws" });
@@ -292,11 +297,28 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       return;
     }
     if (data?.type === "play_complete") {
-      webAudioBridge.handlePlayComplete();
+      webAudioBridge.handlePlayComplete(data.playId);
       return;
     }
     if (data?.type === "get_volume") {
       this.sendVolumeToClient(socket);
+      return;
+    }
+    if (data?.type === "get_auto_listening") {
+      socket.send(JSON.stringify({ type: "auto_listening", enabled: isAutoListeningEnabled() }));
+      return;
+    }
+    if (data?.type === "set_auto_listening" && typeof data.enabled === "boolean") {
+      try {
+        saveAutoListening(data.enabled);
+        this.onAutoListeningChange(data.enabled);
+        this.broadcastToWebClients(JSON.stringify({ type: "auto_listening", enabled: data.enabled }));
+      } catch (error) {
+        console.error("[HatPlusDisplay] Failed to set Auto Listening:", error);
+        socket.send(JSON.stringify({
+          type: "auto_listening", enabled: isAutoListeningEnabled(), error: "Unable to save Auto Listening.",
+        }));
+      }
       return;
     }
     if (data?.type === "set_volume") {

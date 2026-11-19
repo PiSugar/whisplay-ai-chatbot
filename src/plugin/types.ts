@@ -22,7 +22,7 @@ export interface ASRRecordingStream {
 }
 
 export interface ASRProvider {
-  startRecordingStream?: (onPartial: (text: string) => void) =>
+  startRecordingStream?: (onPartial: (text: string) => void, onEndpoint?: () => void) =>
     ASRRecordingStream | undefined;
   recognizeAudio(audioPath: string): Promise<string>;
 }

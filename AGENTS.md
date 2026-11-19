@@ -319,7 +319,7 @@ The chat flow uses a finite state machine (`src/core/chat-flow/stateMachine.ts`)
 | State | Description |
 |-------|-------------|
 | `sleep` | Idle, waiting for button press or wake word |
-| `wake_listening` | Wake word activated, listening for speech |
+| `wake_listening` | Automatic speech detection initiated by wake word or a button press |
 | `listening` | Button pressed, recording audio |
 | `recognizing` | ASR processing |
 | `thinking` | LLM generating response |
@@ -329,12 +329,25 @@ The chat flow uses a finite state machine (`src/core/chat-flow/stateMachine.ts`)
 
 State transitions are triggered by button events, wake word detection, or completion of async operations.
 
+`AUTO_LISTENING_ENABLED=true` routes a button press through the wake-word
+conversation flow. A press during automatic capture cancels the current recording,
+and a press during recognition or answering starts a new automatic capture.
+The previous recorder or player releases ALSA before a new capture starts.
+The Hat Plus Settings switch updates the running flow and saves only
+`AUTO_LISTENING_ENABLED` in `.env`. Automatic endpointing still uses the existing
+silence settings. Button-started sessions match `AUTO_LISTENING_END_KEYWORDS`
+against the final transcript case-insensitively. Wake-word sessions use
+`WAKE_WORD_END_KEYWORDS` and end after the final reply.
+
 ### Zipformer ASR
 
 `ASR_SERVER=zipformer` uses sherpa-onnx for offline speech recognition. Local
-ALSA push-to-talk streams PCM to a private Unix socket and shows interim
-subtitles. The same host reads complete recordings for browser audio, wake-word
-input and streaming fallback. Model and Python paths are configurable in `.env`.
+ALSA capture streams PCM to a private Unix socket and shows interim subtitles
+in push-to-talk and automatic listening. The same host reads complete recordings
+for browser audio and streaming fallback. Model and Python paths are configurable in `.env`.
+For automatic listening, the stream can also request a graceful recorder stop
+after decoded speech and the configured trailing pause, even if the SoX
+amplitude threshold is held open by steady noise.
 
 ## Testing Strategy
 

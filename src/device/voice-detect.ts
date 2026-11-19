@@ -39,7 +39,7 @@ const defaultVoiceDetectLevel = Number.isFinite(envVoiceDetectLevel)
 
 let currentVoiceDetectLevel = defaultVoiceDetectLevel;
 let lastNoiseSampleAt = 0;
-let hasAmbientNoiseSample = false;
+let ambientNoiseFloor: number | undefined;
 
 const parseRmsAmplitude = (soxOutput: string): number | null => {
   const match = soxOutput.match(/RMS\s+amplitude:\s+([0-9.eE+-]+)/i);
@@ -81,7 +81,7 @@ const detectAmbientNoiseLevel = (): Promise<number | null> => {
         resolve(null);
         return;
       }
-      const noisePercent = clamp(Math.round(rms * 100), 0, 100);
+      const noisePercent = clamp(rms * 100, 0, 100);
       resolve(noisePercent);
     };
 
@@ -124,9 +124,8 @@ export const getDynamicVoiceDetectLevel = async (): Promise<number> => {
     voiceDetectMaxLevel,
   );
 
-  if (!hasAmbientNoiseSample) {
+  if (ambientNoiseFloor === undefined) {
     currentVoiceDetectLevel = targetLevel;
-    hasAmbientNoiseSample = true;
   } else {
     const smoothing = clamp(voiceDetectSmoothing, 0, 1);
     const smoothedLevel = Math.round(
@@ -139,9 +138,19 @@ export const getDynamicVoiceDetectLevel = async (): Promise<number> => {
       voiceDetectMaxLevel,
     );
   }
+  ambientNoiseFloor = ambientNoisePercent;
 
   console.log(
-    `[Audio] Ambient noise=${ambientNoisePercent}% -> voiceDetectLevel=${currentVoiceDetectLevel}%`,
+    `[Audio] Ambient noise=${ambientNoisePercent.toFixed(2)}% -> voiceDetectLevel=${currentVoiceDetectLevel}%`,
   );
   return currentVoiceDetectLevel;
+};
+
+export const getVoiceDetectEndLevel = (startLevel: number, endRatio: number): number => {
+  // The end threshold needs headroom above the microphone's measured noise.
+  // Keep the ambient adjustment at or below the speech start threshold.
+  const noiseAdjustedLevel = ambientNoiseFloor === undefined
+    ? 0
+    : Math.min(startLevel, ambientNoiseFloor + 0.75);
+  return Number(Math.max(1, startLevel * endRatio, noiseAdjustedLevel).toFixed(2));
 };

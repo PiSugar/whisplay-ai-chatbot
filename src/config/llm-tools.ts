@@ -12,16 +12,17 @@ import { pluginRegistry } from "../plugin";
 // ── Collect tools from all llm-tools plugins ────────────────
 const pluginTools: LLMTool[] = [];
 
-const wakeWordEnabled =
-  (process.env.WAKE_WORD_ENABLED || "").toLowerCase() === "true";
+const automaticConversationEnabled =
+  process.env.WAKE_WORD_ENABLED?.toLowerCase() === "true" ||
+  process.env.AUTO_LISTENING_ENABLED?.toLowerCase() === "true";
 
-if (wakeWordEnabled) {
+if (automaticConversationEnabled) {
   pluginTools.push({
     type: "function",
     function: {
       name: "endConversation",
       description:
-        "Mark the current wakeword conversation to end after your next reply. Call this when the user clearly wants to stop, end, or wrap up the conversation. Do not mention the function name.",
+        "Mark the current hands-free conversation to end after your next reply. Call this when the user clearly wants to stop, end, or wrap up the conversation. Do not mention the function name.",
       parameters: {},
     },
     func: async () => {
