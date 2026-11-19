@@ -21,6 +21,7 @@ import { vectorDB, embedText } from "./knowledge";
 dotenv.config();
 
 let recognizeAudio: RecognizeAudioFunction = noop as any;
+export let startRecordingStream: ASRProvider["startRecordingStream"];
 let ttsProcessor: TTSProcessorFunction = noop as any;
 
 export const asrServer: ASRServer = (
@@ -51,6 +52,7 @@ if (visionServer) console.log(`Current Vision Server: ${visionServer}`);
 try {
   const asrProvider = pluginRegistry.activatePluginSync<"asr">("asr", asrServer);
   recognizeAudio = asrProvider.recognizeAudio;
+  startRecordingStream = asrProvider.startRecordingStream;
 } catch (e: any) {
   console.warn(e.message);
 }

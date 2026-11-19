@@ -15,7 +15,15 @@ export type AudioFormat = "wav" | "mp3";
 // ========== Provider Interfaces ==========
 
 /** ASR (Automatic Speech Recognition) provider */
+export interface ASRRecordingStream {
+  write(audio: Buffer): void;
+  finish(timeoutMs?: number): Promise<string | undefined>;
+  cancel(): void;
+}
+
 export interface ASRProvider {
+  startRecordingStream?: (onPartial: (text: string) => void) =>
+    ASRRecordingStream | undefined;
   recognizeAudio(audioPath: string): Promise<string>;
 }
 

@@ -43,6 +43,7 @@ export interface ChatFlowContext {
   musicDisplayText: string;
   toolDisplayText: string;
   answerDisplayText: string;
+  manualRecognition?: { resolve: () => Promise<string>; cancel: () => void };
 
   transitionTo: (flowName: FlowName) => void;
   composeAnswerDisplayText: (text?: string) => string;

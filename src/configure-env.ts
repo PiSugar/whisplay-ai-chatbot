@@ -96,7 +96,7 @@ const topLevelGroups: TopLevelGroup[] = [
   {
     key: "providers-local",
     title: "Local Providers",
-    description: "Ollama, Whisper, Piper, Vosk, Picovoice and other on-device services.",
+    description: "Ollama, Whisper, Zipformer, Piper, Vosk, Picovoice and other on-device services.",
     matches: (section) =>
       [
         "Ollama",
@@ -106,6 +106,7 @@ const topLevelGroups: TopLevelGroup[] = [
         "Vosk ASR",
         "Whisper ASR & Whisper HTTP Server",
         "Faster Whisper ASR",
+        "Zipformer ASR",
         "Supertonic TTS",
         "Raspberry Pi AI Hat+ 2 (Hailo-10H)",
         "LLM8850",

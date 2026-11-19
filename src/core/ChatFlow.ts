@@ -61,6 +61,7 @@ class ChatFlow implements ChatFlowContext {
   musicDisplayText: string = "";
   toolDisplayText: string = "";
   answerDisplayText: string = "";
+  manualRecognition?: ChatFlowContext["manualRecognition"];
   private toolDisplayItems: {
     id: string;
     name: string;
@@ -234,6 +235,10 @@ class ChatFlow implements ChatFlowContext {
   };
 
   transitionTo = (flowName: FlowName): void => {
+    if (!(this.currentFlowName === "listening" && flowName === "asr")) {
+      this.manualRecognition?.cancel();
+      this.manualRecognition = undefined;
+    }
     if (flowName !== "music" && isMusicPlaying()) {
       stopMusicPlayback();
     }
@@ -439,6 +444,8 @@ class ChatFlow implements ChatFlowContext {
   };
 
   streamExternalReply = async (text: string, emoji?: string): Promise<void> => {
+    const turn = this.answerId;
+    const isCurrent = () => this.answerId === turn && this.currentFlowName === "external_answer";
     if (!text) {
       this.streamResponser.endPartial();
       return;
@@ -456,11 +463,12 @@ class ChatFlow implements ChatFlowContext {
       parts.push(remaining);
     }
     for (const part of parts) {
+      if (!isCurrent()) return;
       this.streamResponser.partial(part);
       this.updateAnswerDisplayText(`${this.answerDisplayText}${part}`);
       await new Promise((resolve) => setTimeout(resolve, 120));
     }
-    this.streamResponser.endPartial();
+    if (isCurrent()) this.streamResponser.endPartial();
   };
 
   startWakeSession = async (): Promise<void> => {
@@ -482,6 +490,8 @@ class ChatFlow implements ChatFlowContext {
     if (this.shutdownPromise) return this.shutdownPromise;
 
     this.shutdownPromise = (async () => {
+      this.manualRecognition?.cancel();
+      this.manualRecognition = undefined;
       this.endWakeSession();
       await this.wakeWordListener?.stop();
       this.whisplayIMBridge?.stop();

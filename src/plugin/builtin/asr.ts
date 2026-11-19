@@ -151,6 +151,19 @@ export function registerASRPlugins(): void {
   } as ASRPlugin);
 
   pluginRegistry.register({
+    name: "zipformer",
+    displayName: "Zipformer ASR",
+    version: "1.0.0",
+    type: "asr",
+    audioFormat: "wav",
+    description: "On-device streaming speech recognition with sherpa-onnx",
+    activate: (ctx) => {
+      const { createZipformerProvider } = require("../../cloud-api/local/zipformer-asr");
+      return createZipformerProvider(ctx.env);
+    },
+  } as ASRPlugin);
+
+  pluginRegistry.register({
     name: "hailowhisper",
     displayName: "Hailo Whisper ASR",
     version: "1.0.0",

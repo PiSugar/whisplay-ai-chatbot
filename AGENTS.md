@@ -329,6 +329,13 @@ The chat flow uses a finite state machine (`src/core/chat-flow/stateMachine.ts`)
 
 State transitions are triggered by button events, wake word detection, or completion of async operations.
 
+### Zipformer ASR
+
+`ASR_SERVER=zipformer` uses sherpa-onnx for offline speech recognition. Local
+ALSA push-to-talk streams PCM to a private Unix socket and shows interim
+subtitles. The same host reads complete recordings for browser audio, wake-word
+input and streaming fallback. Model and Python paths are configurable in `.env`.
+
 ## Testing Strategy
 
 ### Unit Testing

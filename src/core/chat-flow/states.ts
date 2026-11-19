@@ -1,5 +1,6 @@
 import moment from "moment";
 import { compact, noop } from "lodash";
+import { performance } from "node:perf_hooks";
 import {
   onButtonPressed,
   onButtonReleased,
@@ -18,8 +19,10 @@ import {
   recordAudioManually,
   recordFileFormat,
   getDynamicVoiceDetectLevel,
+  canStreamManualRecording,
+  waitForPlaybackToStop,
 } from "../../device/audio";
-import { chatWithLLMStream } from "../../cloud-api/server";
+import { chatWithLLMStream, startRecordingStream } from "../../cloud-api/server";
 import { isImMode, summaryTextWithLLM } from "../../cloud-api/llm";
 import { getSystemPromptWithKnowledge } from "../Knowledge";
 import { enableRAG } from "../../cloud-api/knowledge";
@@ -46,8 +49,12 @@ import { DEFAULT_EMOJI } from "../../utils";
 import { isMusicPlaying, getCurrentTrackTitle, stopMusicPlayback, startPendingMusicPlayback, onMusicTrackChange, onMusicPlaybackEnd } from "../../device/music-player";
 import { autoSaveExchange, prepareMemoryPrompt } from "../../config/local-memory";
 import { detectHatModel } from "../../utils/hat-detect";
+import { VOICE_PCM_SAMPLE_RATE } from "../../utils/pcm-wav";
 
 const isHatPlus = detectHatModel() === "hat-plus";
+const MIN_PUSH_TO_TALK_MS = 500;
+// The streaming capture is mono signed 16-bit PCM.
+const MIN_CAPTURE_BYTES = VOICE_PCM_SAMPLE_RATE * 2 * MIN_PUSH_TO_TALK_MS / 1000;
 
 export const flowStates: Record<FlowName, FlowStateHandler> = {
   sleep: (ctx: ChatFlowContext) => {
@@ -183,7 +190,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       rag_icon_visible: false,
     });
   },
-  listening: (ctx: ChatFlowContext) => {
+  listening: async (ctx: ChatFlowContext) => {
     ctx.enterMusicAfterAnswer = false;
     ctx.musicDisplayText = "";
     ctx.isFromWakeListening = false;
@@ -194,20 +201,55 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     ctx.currentRecordFilePath = `${ctx.recordingsDir
       }/user-${Date.now()}.${recordFileFormat}`;
     onButtonPressed(noop);
-    const listeningStartedAt = Date.now();
+    let releasedBeforeCapture = false;
+    onButtonReleased(() => { releasedBeforeCapture = true; });
+    const listeningStartedAt = performance.now();
+    const turn = ctx.answerId;
+    const playbackClosed = waitForPlaybackToStop();
+    if (playbackClosed) await playbackClosed;
+    if (ctx.answerId !== turn || ctx.currentFlowName !== "listening") return;
     // If button was already released before we entered this state, go back to sleep
-    if (!isButtonDown()) {
+    if (releasedBeforeCapture || !isButtonDown()) {
       console.log("[listening] Button already released, returning to sleep");
       ctx.transitionTo("sleep");
       return;
     }
-    const { result, stop } = recordAudioManually(ctx.currentRecordFilePath);
-    let shouldIgnoreRecordingResult = false;
+    let releasedAt: number | undefined;
+    const stream = canStreamManualRecording() ? startRecordingStream?.((text) => {
+      if (ctx.answerId !== turn || ctx.currentFlowName !== "listening" || releasedAt !== undefined) return;
+      display({ text: text || "Listening..." });
+    }) : undefined;
+    let capturedBytes = 0;
+    const { result, stop } = recordAudioManually(
+      ctx.currentRecordFilePath, stream ? (chunk) => {
+        capturedBytes += chunk.length;
+        stream.write(chunk);
+      } : undefined,
+    );
+    if (stream) {
+      const isCurrentTurn = () => ctx.answerId === turn && ctx.currentFlowName === "asr";
+      ctx.manualRecognition = {
+        async resolve() {
+          // Let the recorder deliver the last PCM frame before asking for the transcript.
+          const path = await result;
+          if (!isCurrentTurn() || capturedBytes < MIN_CAPTURE_BYTES) return "";
+          const remainingMs = 3000 - (performance.now() - (releasedAt ?? listeningStartedAt));
+          const text = await stream.finish(remainingMs);
+          if (!isCurrentTurn()) return "";
+          return text ?? ctx.recognizeAudio(path);
+        },
+        cancel: () => {
+          stream.cancel();
+          if (releasedAt === undefined) stop();
+        },
+      };
+    }
     const handleRelease = () => {
-      if (Date.now() - listeningStartedAt < 500) {
+      if (releasedAt !== undefined) return;
+      releasedAt = performance.now();
+      if (releasedAt - listeningStartedAt < MIN_PUSH_TO_TALK_MS) {
         // Too short to be meaningful — stop recording and return to sleep
         console.log("[listening] Button released too quickly, returning to sleep");
-        shouldIgnoreRecordingResult = true;
         stop();
         ctx.transitionTo("sleep");
         return;
@@ -217,16 +259,22 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         RGB: "#ff6800",
         image: "",
       });
+      if (stream) ctx.transitionTo("asr");
     };
     onButtonReleased(handleRelease);
     result
       .then(() => {
-        if (shouldIgnoreRecordingResult) return;
-        ctx.transitionTo("asr");
+        if (ctx.answerId === turn && ctx.currentFlowName === "listening") {
+          if (stream && releasedAt === undefined) {
+            ctx.transitionTo("sleep");
+          } else {
+            ctx.transitionTo("asr");
+          }
+        }
       })
       .catch((err) => {
         console.error("Error during recording:", err);
-        ctx.transitionTo("sleep");
+        if (ctx.answerId === turn && ctx.currentFlowName === "listening") ctx.transitionTo("sleep");
       });
     display({
       status: "listening",
@@ -274,21 +322,23 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
   },
   asr: (ctx: ChatFlowContext) => {
+    const turn = ctx.answerId;
+    const interrupted = Symbol("recording interrupted");
     display({
       status: "recognizing",
     });
     onButtonDoubleClick(null);
     Promise.race([
-      ctx.recognizeAudio(ctx.currentRecordFilePath, ctx.isFromWakeListening),
-      new Promise<string>((resolve) => {
+      ctx.manualRecognition?.resolve() ?? ctx.recognizeAudio(ctx.currentRecordFilePath, ctx.isFromWakeListening),
+      new Promise<typeof interrupted>((resolve) => {
         onButtonPressed(() => {
-          resolve("[UserPress]");
+          resolve(interrupted);
         });
         onButtonReleased(noop);
       }),
     ]).then((result) => {
-      if (ctx.currentFlowName !== "asr") return;
-      if (result === "[UserPress]") {
+      if (ctx.currentFlowName !== "asr" || ctx.answerId !== turn) return;
+      if (result === interrupted) {
         ctx.transitionTo("listening");
         return;
       }
@@ -313,6 +363,11 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         return;
       }
       ctx.transitionTo("sleep");
+    }).catch((error) => {
+      console.error("Error during recognition:", error);
+      if (ctx.currentFlowName === "asr" && ctx.answerId === turn) {
+        ctx.transitionTo("sleep");
+      }
     });
   },
   answer: (ctx: ChatFlowContext) => {
@@ -502,8 +557,8 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           ctx.transitionTo("sleep");
         }
       });
-    llmDonePromise.then(() => getPlayEndPromise()).then(() => {
-      if (ctx.currentFlowName === "answer") {
+    llmDonePromise.then(() => isCurrentAnswer() ? getPlayEndPromise() : undefined).then(() => {
+      if (isCurrentAnswer()) {
         autoSaveExchange(ctx.asrText, llmResponseText, summaryTextWithLLM);
         clearPendingCapturedImgForChat();
         display({ image_icon_visible: false });
@@ -614,6 +669,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
       ctx.transitionTo("sleep");
       return;
     }
+    const turn = ++ctx.answerId;
     ctx.resetToolCallDisplay();
     ctx.answerDisplayText = "";
     display({
@@ -643,7 +699,7 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     if (replyText) {
       void ctx.streamExternalReply(replyText, replyEmoji);
       ctx.streamResponser.getPlayEndPromise().then(() => {
-        if (ctx.currentFlowName !== "external_answer") return;
+        if (ctx.answerId !== turn || ctx.currentFlowName !== "external_answer") return;
         if (ctx.wakeSessionActive || ctx.endAfterAnswer) {
           if (ctx.endAfterAnswer) {
             ctx.endWakeSession();

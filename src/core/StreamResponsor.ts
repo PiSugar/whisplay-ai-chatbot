@@ -30,6 +30,7 @@ export class StreamResponser {
   private parsedSentences: string[] = [];
   private displaySentences: string[] = [];
   private isPlaying: boolean = false;
+  private playbackGeneration = 0;
   private ttsChain: Promise<void> = Promise.resolve();
   private hasStartedTTS: boolean = false;
   private firstTTSPromise: Promise<TTSResult> | null = null;
@@ -120,12 +121,15 @@ export class StreamResponser {
       return;
     }
     let currentIndex = 0;
+    const generation = this.playbackGeneration;
     const playNext = async () => {
+      if (generation !== this.playbackGeneration) return;
       if (currentIndex < this.speakQueue.length) {
         this.isPlaying = true;
         try {
           const item = this.speakQueue[currentIndex];
           const playParams = await item.ttsPromise;
+          if (generation !== this.playbackGeneration) return;
           console.log(
             `Playing audio ${currentIndex + 1}/${this.speakQueue.length}`
           );
@@ -162,9 +166,12 @@ export class StreamResponser {
   };
 
   private enqueueTTS = (text: string): Promise<TTSResult> => {
+    const generation = this.playbackGeneration;
+    const ifCurrent = (run: () => Promise<TTSResult>) =>
+      generation === this.playbackGeneration ? run() : { duration: 0 };
     if (!this.hasStartedTTS) {
       this.hasStartedTTS = true;
-      const task = this.ttsChain.then(() => this.ttsFunc(text));
+      const task = this.ttsChain.then(() => ifCurrent(() => this.ttsFunc(text)));
       this.ttsChain = task.then(
         () => undefined,
         () => undefined,
@@ -173,10 +180,8 @@ export class StreamResponser {
       return task;
     }
 
-    return (this.firstTTSPromise || Promise.resolve({ duration: 0 })).then(
-      () => this.enqueueLimitedTTS(text),
-      () => this.enqueueLimitedTTS(text),
-    );
+    const enqueue = () => ifCurrent(() => this.enqueueLimitedTTS(text));
+    return (this.firstTTSPromise || Promise.resolve({ duration: 0 })).then(enqueue, enqueue);
   };
 
   private enqueueLimitedTTS = (text: string): Promise<TTSResult> => {
@@ -187,6 +192,7 @@ export class StreamResponser {
   };
 
   private pumpTTSQueue = (): void => {
+    const generation = this.playbackGeneration;
     while (
       this.activeTTSCount < this.maxConcurrentTTS &&
       this.pendingTTSQueue.length > 0
@@ -199,6 +205,7 @@ export class StreamResponser {
       this.ttsFunc(item.text)
         .then(item.resolve, item.reject)
         .finally(() => {
+          if (generation !== this.playbackGeneration) return;
           this.activeTTSCount = Math.max(0, this.activeTTSCount - 1);
           this.pumpTTSQueue();
         });
@@ -278,6 +285,7 @@ export class StreamResponser {
   };
 
   stop = (): void => {
+    this.playbackGeneration++;
     this.speakQueue = [];
     this.speakQueue.length = 0;
     this.partialContent = "";
@@ -288,7 +296,7 @@ export class StreamResponser {
     this.hasStartedTTS = false;
     this.firstTTSPromise = null;
     this.activeTTSCount = 0;
-    this.pendingTTSQueue.length = 0;
+    for (const item of this.pendingTTSQueue.splice(0)) item.resolve({ duration: 0 });
     this.playEndResolve();
     stopPlaying();
   };

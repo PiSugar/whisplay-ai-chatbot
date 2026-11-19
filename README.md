@@ -30,6 +30,7 @@ Tutorial (offline version build on RPi 5):
 ## Pre-build Image
 
 - Please find the pre-build images in project wiki: https://github.com/PiSugar/whisplay-ai-chatbot/wiki
+- [Zipformer offline ASR setup](docs/zipformer-asr.md)
 
 ## Drivers
 

@@ -1,4 +1,7 @@
 import { spawn, ChildProcess } from "child_process";
+import { createWriteStream, promises as fs } from "node:fs";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { isEmpty, noop, set } from "lodash";
 import dotenv from "dotenv";
 import { ttsServer, asrServer } from "../cloud-api/server";
@@ -7,6 +10,7 @@ import type { ASRPlugin, TTSPlugin, AudioFormat } from "../plugin";
 import { ASRServer, TTSResult, TTSServer } from "../type";
 import { alsaInputDevice, alsaOutputDevice } from "./audio-device";
 import { webAudioBridge } from "./web-audio-bridge";
+import { pcm16WavHeader, VOICE_PCM_SAMPLE_RATE } from "../utils/pcm-wav";
 
 export { getDynamicVoiceDetectLevel } from "./voice-detect";
 
@@ -27,7 +31,6 @@ const ttsAudioFormat: AudioFormat = normalizeAudioFormat(
   defaultTtsAudioFormat,
 );
 
-const useWavPlayer = ttsAudioFormat === "wav";
 const MP3_SOX_GAIN_DB = "2";
 const voiceDetectEndSilenceSecRaw = parseFloat(
   process.env.VOICE_DETECT_END_SILENCE_SEC || "1.5",
@@ -49,6 +52,7 @@ const defaultAsrAudioFormat: AudioFormat = [
   ASRServer.whisper,
   ASRServer.whisperhttp,
   ASRServer.fasterwhisper,
+  ASRServer.zipformer,
   ASRServer.llm8850whisper,
 ].includes(asrServer)
   ? "wav"
@@ -60,10 +64,6 @@ export const recordFileFormat: AudioFormat = normalizeAudioFormat(
   selectedAsrPlugin?.audioFormat,
   defaultAsrAudioFormat,
 );
-
-function startPlayerProcess() {
-  return null;
-}
 
 let recordingProcessList: ChildProcess[] = [];
 let currentRecordingReject: (reason?: any) => void = noop;
@@ -219,14 +219,72 @@ const recordAudio = async (
   });
 };
 
+export const canStreamManualRecording = () =>
+  recordFileFormat === "wav" && !webAudioBridge.isAvailable();
+
+const recordPcmManually = (outputPath: string, onPcm: (audio: Buffer) => void) => {
+  const child = spawn("sox", [
+    "--buffer", "2048", "-t", "alsa", alsaInputDevice, "-t", "raw", "-c", "1", "-r",
+    String(VOICE_PCM_SAMPLE_RATE),
+    "-e", "signed-integer", "-b", "16", "-L", "-",
+  ]);
+  const destination = createWriteStream(outputPath);
+  destination.write(pcm16WavHeader(0, VOICE_PCM_SAMPLE_RATE, 1));
+  let byteLength = 0;
+  const tap = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      byteLength += chunk.length;
+      onPcm(chunk);
+      callback(null, chunk);
+    },
+  });
+  let stopRequested = false;
+  const stop = () => {
+    stopRequested = true;
+    killRecordingProcess(child);
+  };
+  const captureDone = new Promise<void>((resolve, reject) => {
+    currentRecordingReject = reject;
+    child.once("error", reject);
+    child.once("close", (code, signal) => {
+      removeRecordingProcess(child);
+      if (code === 0 || (stopRequested && (signal === "SIGINT" || code === 2 || code === 130))) {
+        resolve();
+      } else {
+        reject(new Error(`SoX recording exited with ${code ?? signal}`));
+      }
+    });
+  });
+  child.stderr.on("data", (data) => console.error(data.toString()));
+  recordingProcessList.push(child);
+  const result = Promise.all([captureDone, pipeline(child.stdout, tap, destination)])
+    .then(async () => {
+      const file = await fs.open(outputPath, "r+");
+      try {
+        const alignedLength = byteLength - byteLength % 2;
+        if (alignedLength !== byteLength) await file.truncate(44 + alignedLength);
+        await file.write(pcm16WavHeader(alignedLength, VOICE_PCM_SAMPLE_RATE, 1), 0, 44, 0);
+      } finally {
+        await file.close();
+      }
+      return outputPath;
+    })
+    .catch((error) => {
+      stop();
+      throw error;
+    });
+  return { result, stop };
+};
+
 const recordAudioManually = (
-  outputPath: string
+  outputPath: string, onPcm?: (audio: Buffer) => void,
 ): { result: Promise<string>; stop: () => void } => {
   // Delegate to browser microphone when web audio is enabled and a client is connected.
   if (webAudioBridge.isAvailable()) {
     console.log(`[WebAudio] Starting manual browser recording...`);
     return webAudioBridge.startManualRecording(outputPath);
   }
+  if (onPcm) return recordPcmManually(outputPath, onPcm);
 
   let stopFunc: () => void = noop;
   const result = new Promise<string>((resolve, reject) => {
@@ -282,253 +340,92 @@ const stopRecording = (): void => {
   }
 };
 
-interface Player {
-  isPlaying: boolean;
-  process: ChildProcess | null;
+interface ActivePlayback {
+  stop(): void;
+  closed: Promise<void>;
 }
 
-const player: Player = {
-  isPlaying: false,
-  process: null,
-};
-
-setTimeout(() => {
-  player.process = startPlayerProcess();
-}, 5000);
+const activePlaybacks = new Set<ActivePlayback>();
 
 const playAudioData = (params: TTSResult): Promise<void> => {
-  // Delegate to browser speaker when web audio is enabled and a client is connected.
   if (webAudioBridge.isAvailable()) {
-    console.log("[WebAudio] Sending audio to browser for playback.");
     return webAudioBridge.playAudioData(params, ttsAudioFormat);
   }
 
-  const { duration: audioDuration, filePath, base64, buffer } = params;
-  if (audioDuration <= 0 || (!filePath && !base64 && !buffer)) {
-    console.log("No audio data to play, skipping playback.");
-    return Promise.resolve();
-  }
-  // play wav file using aplay
-  if (filePath) {
-    return Promise.race([
-      new Promise<void>((resolve) => {
-        setTimeout(() => {
-          resolve();
-        }, audioDuration + 1000);
-      }),
-      new Promise<void>((resolve, reject) => {
-        console.log("Playback duration:", audioDuration);
-        player.isPlaying = true;
-        const process = spawn("sox", ["-q", filePath, "-t", "alsa", alsaOutputDevice]);
-        process.on("close", (code: number) => {
-          player.isPlaying = false;
-          if (code !== 0) {
-            console.error(`Audio playback error: ${code}`);
-            reject(code);
-          } else {
-            console.log("Audio playback completed");
-            resolve();
-          }
-        });
-      }),
-    ]).catch((error) => {
-      console.error("Audio playback error:", error);
-    });
-  }
+  const { duration, filePath, base64, buffer } = params;
+  if (duration <= 0 || (!filePath && !base64 && !buffer)) return Promise.resolve();
 
-  // play wav/mp3 buffer based on configured TTS format
-  return new Promise((resolve, reject) => {
-    const audioBuffer = base64 ? Buffer.from(base64, "base64") : buffer;
-    console.log("Playback duration:", audioDuration);
-    player.isPlaying = true;
+  const input = filePath ? [filePath] : ["-t", ttsAudioFormat, "-"];
+  const effects = !filePath && ttsAudioFormat === "mp3" ? ["gain", MP3_SOX_GAIN_DB] : [];
+  const child = spawn("sox", ["-q", ...input, "-t", "alsa", alsaOutputDevice, ...effects]);
+  let interrupted = false;
+  let markClosed: () => void = noop;
+  const playback: ActivePlayback = {
+    stop() {
+      if (interrupted || child.exitCode !== null || child.signalCode !== null) return;
+      interrupted = true;
+      // Closing ALSA abruptly discards queued playback instead of draining it into the mic.
+      child.kill("SIGKILL");
+    },
+    closed: new Promise<void>((resolve) => { markClosed = resolve; }),
+  };
+  activePlaybacks.add(playback);
 
-    if (ttsAudioFormat === "wav") {
-      const process = spawn("sox", [
-        "-q",
-        "-t",
-        "wav",
-        "-",
-        "-t",
-        "alsa",
-        alsaOutputDevice,
-      ]);
-      player.process = process;
-      process.stdin?.on("error", (err) => {
-        console.error("Sox stdin error:", err.message);
-      });
-      let stderr = "";
-      process.stderr?.on("data", (data) => {
-        stderr += data.toString();
-      });
-      let settled = false;
-      const watchdog = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        player.isPlaying = false;
-        if (player.process === process) {
-          player.process = null;
-        }
-        process.kill();
-        console.error("Audio playback timed out.");
-        resolve();
-      }, audioDuration + 2000);
-      process.on("exit", (code) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(watchdog);
-        player.isPlaying = false;
-        if (player.process === process) {
-          player.process = null;
-        }
-        if (code !== 0) {
-          console.error(`Audio playback error: ${code}`);
-          if (stderr.trim()) {
-            console.error(stderr.trim());
-          }
-          reject(code);
-        } else {
-          console.log("Audio playback completed");
-          resolve();
-        }
-      });
-      process.stdin?.end(audioBuffer);
-      return;
-    }
-
-    const process = spawn("sox", [
-      "-q",
-      "-t",
-      "mp3",
-      "-",
-      "-t",
-      "alsa",
-      alsaOutputDevice,
-      "gain",
-      MP3_SOX_GAIN_DB,
-    ]);
-    player.process = process;
-    process.stdin?.on("error", (err) => {
-      console.error("Sox stdin error:", err.message);
-    });
+  const completion = new Promise<void>((resolve, reject) => {
+    let failure: Error | undefined;
     let stderr = "";
-    process.stderr?.on("data", (data) => {
-      stderr += data.toString();
-    });
-    let settled = false;
     const watchdog = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      player.isPlaying = false;
-      if (player.process === process) {
-        player.process = null;
-      }
-      process.kill();
       console.error("Audio playback timed out.");
-      resolve();
-    }, audioDuration + 2000);
-    process.on("exit", (code) => {
-      if (settled) return;
-      settled = true;
+      playback.stop();
+    }, duration + (filePath ? 1000 : 2000));
+
+    child.on("error", (error) => { failure = error; });
+    child.stderr.on("data", (data) => { stderr += data.toString(); });
+    child.once("close", (code, signal) => {
       clearTimeout(watchdog);
-      player.isPlaying = false;
-      if (player.process === process) {
-        player.process = null;
-      }
-      if (code !== 0) {
-        console.error(`Audio playback error: ${code}`);
-        if (stderr.trim()) {
-          console.error(stderr.trim());
-        }
-        reject(code);
-      } else {
-        console.log("Audio playback completed");
+      activePlaybacks.delete(playback);
+      markClosed();
+      if (interrupted || code === 0) {
         resolve();
+      } else {
+        reject(failure ?? new Error(`SoX playback exited with ${code ?? signal}${stderr ? `: ${stderr.trim()}` : ""}`));
       }
     });
-    process.stdin?.end(audioBuffer);
+    child.stdin.on("error", (error) => {
+      if (!interrupted) failure = error;
+    });
+    child.stdin.end(filePath ? undefined : base64 ? Buffer.from(base64, "base64") : buffer);
   });
+
+  return completion;
 };
 
 const stopPlaying = (): void => {
-  // Also stop any in-progress web playback.
   webAudioBridge.stopPlayback();
-
-  if (player.isPlaying) {
-    try {
-      console.log("Stopping audio playback");
-      const process = player.process;
-      if (process) {
-        process.stdin?.end();
-        process.kill();
-      }
-    } catch { }
-    player.isPlaying = false;
-    // Recreate process
-    setTimeout(() => {
-      player.process = startPlayerProcess();
-    }, 500);
-  } else {
-    console.log("No audio currently playing");
-  }
+  for (const playback of activePlaybacks) playback.stop();
 };
 
-// Close audio player when exiting program
+export const waitForPlaybackToStop = (): Promise<void> | undefined => {
+  if (!activePlaybacks.size) return;
+  return Promise.all([...activePlaybacks].map((playback) => playback.closed)).then(() => {});
+};
+
 process.on("SIGINT", () => {
-  try {
-    if (player.process) {
-      player.process.stdin?.end();
-      player.process.kill();
-    }
-  } catch { }
+  stopPlaying();
   process.exit();
 });
 
-/**
- * Kill the persistent TTS player process to free the ALSA device.
- * Resolves once the process has fully exited AND a post-exit settling
- * delay has elapsed so that ALSA fully releases the hardware.
- * Must be paired with restoreAudioPlayer() when done.
- */
-const releaseAudioPlayer = (): Promise<void> => {
-  const proc = player.process;
-  player.process = null;
-  player.isPlaying = false;
-
-  if (!proc) {
-    return Promise.resolve();
-  }
-
-  const waitForExit = new Promise<void>((resolve) => {
-    if (proc.exitCode !== null || proc.signalCode !== null) {
-      resolve();
-      return;
-    }
-
-    const timeout = setTimeout(resolve, 3000);
-
-    proc.once("exit", () => {
-      clearTimeout(timeout);
-      resolve();
-    });
-
-    try {
-      proc.stdin?.end();
-      proc.kill();
-    } catch {}
-  });
-
-  // After process exit, wait for ALSA device to fully release
-  return waitForExit.then(() => new Promise((r) => setTimeout(r, 500)));
+// Music playback retains its ALSA settling period after interrupting TTS.
+const releaseAudioPlayer = async (): Promise<void> => {
+  const closed = waitForPlaybackToStop();
+  if (!closed) return;
+  stopPlaying();
+  await closed;
+  await new Promise((resolve) => setTimeout(resolve, 500));
 };
 
-/**
- * Recreate the persistent TTS player process after releaseAudioPlayer().
- */
-const restoreAudioPlayer = (): void => {
-  if (!player.process) {
-    player.process = startPlayerProcess();
-  }
-};
+// TTS opens ALSA on demand for each segment.
+const restoreAudioPlayer = noop;
 
 export {
   recordAudio,
