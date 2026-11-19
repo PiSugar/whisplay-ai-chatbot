@@ -13,7 +13,7 @@ class UsbCamera:
     def __init__(self, device: str, resolution: str):
         match = re.fullmatch(r"([1-9][0-9]*)x([1-9][0-9]*)", resolution)
         if not match:
-            raise ValueError("WHISPLAY_USB_CAMERA_SIZE must be WIDTHxHEIGHT")
+            raise ValueError("USB_CAMERA_SIZE must be WIDTHxHEIGHT")
         self.size = tuple(map(int, match.groups()))
         self.frame_bytes = self.size[0] * self.size[1] * 3
         self.device = device

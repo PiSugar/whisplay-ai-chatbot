@@ -34,6 +34,21 @@ def _default_web_frame_path() -> str:
 DAEMON_HOST = os.getenv("WHISPLAY_CAMERA_DAEMON_HOST", "127.0.0.1")
 DAEMON_PORT = int(os.getenv("WHISPLAY_CAMERA_DAEMON_PORT", "18765"))
 DAEMON_TIMEOUT_SEC = float(os.getenv("WHISPLAY_CAMERA_DAEMON_TIMEOUT_SEC", "2"))
+USB_ROTATIONS = {
+    "0": None,
+    "90": Image.Transpose.ROTATE_270,
+    "180": Image.Transpose.ROTATE_180,
+    "270": Image.Transpose.ROTATE_90,
+}
+
+
+def _usb_camera_rotation() -> str:
+    rotation = os.getenv("USB_CAMERA_ROTATION", "").strip() or "0"
+    if rotation in USB_ROTATIONS:
+        return rotation
+    print("[Camera] USB_CAMERA_ROTATION must be 0, 90, 180, or 270; using 0",
+          file=sys.stderr)
+    return "0"
 
 
 class SharedCameraService:
@@ -46,8 +61,9 @@ class SharedCameraService:
         interval_ms = int(os.getenv("WHISPLAY_CAMERA_DAEMON_INTERVAL_MS", "200"))
         self.stream_interval_sec = max(0.05, interval_ms / 1000)
 
-        self.usb_device = os.getenv("WHISPLAY_USB_CAMERA_DEVICE", "").strip()
-        self.usb_resolution = os.getenv("WHISPLAY_USB_CAMERA_SIZE", "640x480")
+        self.usb_device = os.getenv("USB_CAMERA_DEVICE", "").strip()
+        self.usb_resolution = os.getenv("USB_CAMERA_SIZE", "640x480")
+        self.usb_rotation = _usb_camera_rotation() if self.usb_device else "0"
         self.usb_camera = None
         if self.usb_device:
             self._remove_web_frame()
@@ -84,7 +100,8 @@ class SharedCameraService:
                     image = self.usb_camera.capture()
                     if not self._usb_device_connected():
                         raise RuntimeError(f"USB camera disconnected: {self.usb_device}")
-                    return image
+                    transform = USB_ROTATIONS[self.usb_rotation]
+                    return image if transform is None else image.transpose(transform)
                 except RuntimeError:
                     self._close_usb_camera()
                     self._remove_web_frame()
@@ -227,7 +244,20 @@ class SharedCameraService:
             ready = Picamera2 is not None
             if self.usb_device:
                 ready = self._usb_device_connected() and shutil.which("ffmpeg") is not None
-            return {"ok": True, "stream_ref_count": active, "ready": ready}
+            return {
+                "ok": True, "stream_ref_count": active, "ready": ready,
+                "usb_rotation": self.usb_rotation,
+            }
+
+        if cmd == "set_usb_rotation":
+            rotation = payload.get("rotation")
+            if not self.usb_device:
+                return {"ok": False, "error": "USB camera is not configured"}
+            if not isinstance(rotation, str) or rotation not in USB_ROTATIONS:
+                return {"ok": False, "error": "rotation must be 0, 90, 180, or 270"}
+            with self.camera_lock:
+                self.usb_rotation = rotation
+            return {"ok": True}
 
         if cmd == "start_stream":
             with self.state_lock:
@@ -321,10 +351,17 @@ def camera_daemon_request(
 def ensure_camera_daemon(timeout_sec: float = 3.0) -> bool:
     try:
         response = camera_daemon_request("status", timeout=0.4)
-        if response.get("ok"):
-            return True
     except Exception:
-        pass
+        response = {}
+    if response.get("ok"):
+        if os.getenv("USB_CAMERA_DEVICE", "").strip():
+            rotation = _usb_camera_rotation()
+            if response.get("usb_rotation", "0") != rotation:
+                result = camera_daemon_request("set_usb_rotation", {"rotation": rotation})
+                if not result.get("ok"):
+                    print(f"[Camera] Could not apply USB rotation: {result.get('error')}",
+                          file=sys.stderr)
+        return True
 
     subprocess.Popen(
         [sys.executable, os.path.abspath(__file__), "--daemon"],

@@ -116,12 +116,11 @@ const topLevelGroups: TopLevelGroup[] = [
   {
     key: "ai-features",
     title: "AI Features",
-    description: "Auto Listening, wake word, camera, RAG, web search, memory and local tools.",
+    description: "Auto Listening, wake word, RAG, web search, memory and local tools.",
     matches: (section) =>
       [
         "Wake word",
         "Auto Listening",
-        "Pi Camera",
         "RAG Settings",
         "RAG Providers & Storage",
         "Conversation & Runtime",
@@ -140,6 +139,12 @@ const topLevelGroups: TopLevelGroup[] = [
       ].includes(section.title),
   },
   {
+    key: "camera",
+    title: "Camera",
+    description: "Camera capture, USB rotation, browser camera and photo attachments.",
+    matches: (section) => section.title === "Camera",
+  },
+  {
     key: "device-ui",
     title: "Hardware & UI",
     description: "Whisplay hardware, display appearance, device audio and browser-based UI settings.",
@@ -151,7 +156,6 @@ const topLevelGroups: TopLevelGroup[] = [
         "Device Audio",
         "Web Display Settings",
         "Web Audio Settings (requires WHISPLAY_WEB_ENABLED=true)",
-        "Web Camera Settings (requires WHISPLAY_WEB_ENABLED=true)",
       ].includes(section.title),
   },
   {

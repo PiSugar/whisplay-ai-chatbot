@@ -120,7 +120,7 @@ export class WhisplayDisplay {
     this.cameraEnabled = parseBoolEnv("ENABLE_CAMERA", false);
     const webCameraEnabled = parseBoolEnv("WEB_CAMERA_ENABLED", false);
     this.usbCameraDevice = this.cameraEnabled && !webCameraEnabled
-      ? process.env.WHISPLAY_USB_CAMERA_DEVICE?.trim() || ""
+      ? process.env.USB_CAMERA_DEVICE?.trim() || ""
       : "";
     if (this.usbCameraDevice) {
       this.usbCameraConnected = this.isCameraAvailable();
