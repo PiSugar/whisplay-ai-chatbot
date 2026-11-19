@@ -1,14 +1,17 @@
 import argparse
 import json
 import os
+import shutil
 import socket
 import socketserver
+import stat
 import subprocess
 import sys
 import threading
 import time
 from PIL import Image
 
+from usb_camera import UsbCamera
 from utils import ImageUtils
 
 try:
@@ -43,6 +46,11 @@ class SharedCameraService:
         interval_ms = int(os.getenv("WHISPLAY_CAMERA_DAEMON_INTERVAL_MS", "200"))
         self.stream_interval_sec = max(0.05, interval_ms / 1000)
 
+        self.usb_device = os.getenv("WHISPLAY_USB_CAMERA_DEVICE", "").strip()
+        self.usb_resolution = os.getenv("WHISPLAY_USB_CAMERA_SIZE", "640x480")
+        self.usb_camera = None
+        if self.usb_device:
+            self._remove_web_frame()
         self.picam2 = None
         self.running = True
         self.stream_ref_count = 0
@@ -67,6 +75,20 @@ class SharedCameraService:
 
     def _capture_frame_image(self) -> Image.Image:
         with self.camera_lock:
+            if self.usb_device:
+                if not self._usb_device_connected():
+                    raise RuntimeError(f"USB camera disconnected: {self.usb_device}")
+                if self.usb_camera is None:
+                    self.usb_camera = UsbCamera(self.usb_device, self.usb_resolution)
+                try:
+                    image = self.usb_camera.capture()
+                    if not self._usb_device_connected():
+                        raise RuntimeError(f"USB camera disconnected: {self.usb_device}")
+                    return image
+                except RuntimeError:
+                    self._close_usb_camera()
+                    self._remove_web_frame()
+                    raise
             self._ensure_camera_ready()
             frame = self.picam2.capture_array()
         image = Image.fromarray(frame)
@@ -79,7 +101,26 @@ class SharedCameraService:
         image.save(temp_path, format="JPEG", quality=80)
         os.replace(temp_path, self.web_frame_path)
 
+    def _remove_web_frame(self) -> None:
+        try:
+            os.unlink(self.web_frame_path)
+        except FileNotFoundError:
+            pass
+
+    def _close_usb_camera(self) -> None:
+        if self.usb_camera is not None:
+            self.usb_camera.close()
+            self.usb_camera = None
+
+    def _usb_device_connected(self) -> bool:
+        try:
+            return stat.S_ISCHR(os.stat(self.usb_device).st_mode)
+        except OSError:
+            return False
+
     def _focus_at(self, normalized_x: float, normalized_y: float) -> dict:
+        if self.usb_device:
+            return {"ok": True, "supported": False}
         with self.camera_lock:
             self._ensure_camera_ready()
             available = self.picam2.camera_controls
@@ -146,13 +187,19 @@ class SharedCameraService:
             should_stream = False
             with self.state_lock:
                 should_stream = self.stream_ref_count > 0
-            if not should_stream:
+            if not should_stream or (self.usb_device and not self._usb_device_connected()):
+                if self.usb_camera is not None:
+                    with self.camera_lock:
+                        self._close_usb_camera()
+                        self._remove_web_frame()
                 time.sleep(0.05)
                 continue
             try:
                 image = self._capture_frame_image()
                 self._write_web_frame(image)
             except Exception:
+                if self.usb_device:
+                    self._remove_web_frame()
                 time.sleep(0.2)
                 continue
             time.sleep(self.stream_interval_sec)
@@ -161,6 +208,9 @@ class SharedCameraService:
         self.running = False
         self.worker.join(timeout=1)
         with self.camera_lock:
+            self._close_usb_camera()
+            if self.usb_device:
+                self._remove_web_frame()
             if self.picam2 is not None:
                 try:
                     self.picam2.stop()
@@ -174,7 +224,10 @@ class SharedCameraService:
         if cmd in ["status", "ping"]:
             with self.state_lock:
                 active = self.stream_ref_count
-            return {"ok": True, "stream_ref_count": active, "ready": Picamera2 is not None}
+            ready = Picamera2 is not None
+            if self.usb_device:
+                ready = self._usb_device_connected() and shutil.which("ffmpeg") is not None
+            return {"ok": True, "stream_ref_count": active, "ready": ready}
 
         if cmd == "start_stream":
             with self.state_lock:
@@ -347,14 +400,16 @@ class CameraThread(threading.Thread):
             self._draw_image_to_display(self.capture_image)
             time.sleep(2)
 
-    def capture(self):
+    def capture(self) -> bool:
         response = camera_daemon_request("capture", {"path": self.image_path})
         if not response.get("ok"):
             print(f"[Camera] Capture failed: {response.get('error', 'unknown error')}")
-            return
+            return False
         if os.path.exists(self.image_path):
             self.capture_image = Image.open(self.image_path).convert("RGB")
             print(f"[Camera] Captured image saved to {self.image_path}")
+            return True
+        return False
 
     def stop(self):
         self.running = False

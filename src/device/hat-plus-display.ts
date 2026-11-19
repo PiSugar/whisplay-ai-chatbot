@@ -24,7 +24,7 @@ type ButtonHandler = () => void;
 interface HatPlusDisplayOptions {
   host: string;
   port: number;
-  cameraEnabled: boolean;
+  cameraAvailable: boolean;
   onButtonPress: ButtonHandler;
   onButtonRelease: ButtonHandler;
   onAutoListeningChange: (enabled: boolean) => void;
@@ -42,7 +42,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
   private cameraFramePath: string | null = null;
   private host: string;
   private port: number;
-  private cameraEnabled: boolean;
+  private cameraAvailable: boolean;
   private onButtonPress: ButtonHandler;
   private onButtonRelease: ButtonHandler;
   private onAutoListeningChange: (enabled: boolean) => void;
@@ -58,7 +58,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
   constructor(options: HatPlusDisplayOptions) {
     this.host = options.host;
     this.port = options.port;
-    this.cameraEnabled = options.cameraEnabled;
+    this.cameraAvailable = options.cameraAvailable;
     this.onButtonPress = options.onButtonPress;
     this.onButtonRelease = options.onButtonRelease;
     this.onAutoListeningChange = options.onAutoListeningChange;
@@ -99,6 +99,12 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
         `[HatPlusDisplay] UI server running at http://${this.host}:${this.port}`,
       );
     });
+  }
+
+  setCameraAvailable(available: boolean): void {
+    if (this.cameraAvailable === available) return;
+    this.cameraAvailable = available;
+    this.broadcastState();
   }
 
   updateStatus(status: Status): void {
@@ -222,7 +228,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       emoji: this.currentStatus.emoji,
       text: this.currentStatus.text,
       tool_placeholders: this.currentStatus.tool_placeholders,
-      camera_available: this.cameraEnabled,
+      camera_available: this.cameraAvailable,
       scroll_speed: this.currentStatus.scroll_speed,
       scroll_sync: this.currentStatus.scroll_sync,
       brightness: this.currentStatus.brightness,
@@ -332,7 +338,7 @@ export class HatPlusDisplayServer implements WebAudioBridgeServer {
       this.sendVolumeToClient(socket);
       return;
     }
-    if (data?.type === "camera_open" && this.cameraEnabled) {
+    if (data?.type === "camera_open" && this.cameraAvailable) {
       this.onCameraModeRequest();
       return;
     }

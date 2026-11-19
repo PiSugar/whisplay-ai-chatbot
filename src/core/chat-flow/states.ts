@@ -13,6 +13,7 @@ import {
   onCameraBackRequest,
   onTextInput,
   isButtonDown,
+  isCameraAvailable,
 } from "../../device/display";
 import {
   recordAudio,
@@ -92,8 +93,13 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     });
     if (ctx.enableCamera) {
       const openCamera = async () => {
+        if (!isCameraAvailable()) return;
         await ctx.pauseWakeWordListener();
         if (ctx.currentFlowName !== "sleep") return;
+        if (!isCameraAvailable()) {
+          ctx.transitionTo("sleep");
+          return;
+        }
         const captureImgPath = `${cameraDir}/capture-${moment().format(
           "YYYYMMDD-HHmmss",
         )}.jpg`;

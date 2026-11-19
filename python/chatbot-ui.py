@@ -952,8 +952,7 @@ def handle_client(client_socket, addr, whisplay):
 
                     if trigger_camera_capture:
                         print("[Camera] Capturing image by command...")
-                        if camera_thread is not None:
-                            camera_thread.capture()
+                        if camera_thread is not None and camera_thread.capture():
                             notification = {"event": "camera_capture"}
                             send_to_all_clients(notification)
 

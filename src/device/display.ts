@@ -1,5 +1,5 @@
 import { exec, spawn } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { resolve } from "path";
 import { Socket } from "net";
 import { getCurrentTimeTag } from "../utils";
@@ -11,6 +11,7 @@ import dotEnv from "dotenv";
 
 dotEnv.config();
 
+const USB_CAMERA_CHECK_INTERVAL_MS = 500;
 const DOUBLE_CLICK_WINDOW_MS = 800;
 const DOUBLE_CLICK_MAX_PRESS_MS = 350;
 
@@ -91,6 +92,9 @@ export class WhisplayDisplay {
   private webDisplay: WebDisplayServer | null = null;
   private deviceEnabled: boolean;
   private cameraEnabled: boolean;
+  private readonly usbCameraDevice: string;
+  private usbCameraConnected = false;
+  private usbCameraTimer: NodeJS.Timeout | null = null;
   private receiveBuffer = "";
   private textCounterTimer: NodeJS.Timeout | null = null;
   private textCounterTemplate: string | null = null;
@@ -115,6 +119,14 @@ export class WhisplayDisplay {
     }
     this.cameraEnabled = parseBoolEnv("ENABLE_CAMERA", false);
     const webCameraEnabled = parseBoolEnv("WEB_CAMERA_ENABLED", false);
+    this.usbCameraDevice = this.cameraEnabled && !webCameraEnabled
+      ? process.env.WHISPLAY_USB_CAMERA_DEVICE?.trim() || ""
+      : "";
+    if (this.usbCameraDevice) {
+      this.usbCameraConnected = this.isCameraAvailable();
+      this.usbCameraTimer = setInterval(() => this.checkUsbCamera(), USB_CAMERA_CHECK_INTERVAL_MS);
+      this.usbCameraTimer.unref();
+    }
     if (this.cameraEnabled && !webCameraEnabled) {
       this.ensureCameraDaemon();
     }
@@ -140,7 +152,7 @@ export class WhisplayDisplay {
       this.hatPlusDisplay = new HatPlusDisplayServer({
         host,
         port,
-        cameraEnabled: this.cameraEnabled,
+        cameraAvailable: this.usbCameraDevice ? this.usbCameraConnected : this.cameraEnabled,
         onButtonPress: () => this.handleButtonPressedEvent(),
         onButtonRelease: () => this.handleButtonReleasedEvent(),
         onAutoListeningChange: enabled => this.autoListeningChangeCallback(enabled),
@@ -638,10 +650,35 @@ export class WhisplayDisplay {
   }
 
   stopWebDisplay(): void {
+    if (this.usbCameraTimer) {
+      clearInterval(this.usbCameraTimer);
+      this.usbCameraTimer = null;
+    }
     this.webDisplay?.close();
     this.webDisplay = null;
     this.hatPlusDisplay?.close();
     this.hatPlusDisplay = null;
+  }
+
+  isCameraAvailable(): boolean {
+    if (!this.usbCameraDevice) return this.cameraEnabled;
+    try {
+      return statSync(this.usbCameraDevice, { throwIfNoEntry: false })?.isCharacterDevice() ?? false;
+    } catch {
+      return false;
+    }
+  }
+
+  private checkUsbCamera(): void {
+    const connected = this.isCameraAvailable();
+    if (connected !== this.usbCameraConnected) {
+      this.usbCameraConnected = connected;
+      console.log(`[Camera] USB camera ${connected ? "connected" : "disconnected"}`);
+      this.hatPlusDisplay?.setCameraAvailable(connected);
+    }
+    if (!connected && this.currentStatus.camera_mode) {
+      this.cameraBackRequestCallback();
+    }
   }
 
   private ensureCameraDaemon(): void {
@@ -729,6 +766,8 @@ export const onTextInput =
   displayInstance.onTextInput.bind(displayInstance);
 export const isButtonDown =
   displayInstance.isButtonDown.bind(displayInstance);
+export const isCameraAvailable =
+  displayInstance.isCameraAvailable.bind(displayInstance);
 
 export function registerShutdownHandler(handler: ShutdownHandler): () => void {
   shutdownHandlers.add(handler);

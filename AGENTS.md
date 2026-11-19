@@ -283,6 +283,16 @@ whisplay.on_button_release(callback)
   plus shutter, back, and tap-to-focus controls in the camera preview.
 - `python/camera.py` accepts normalized `focus` coordinates and uses Picamera2 autofocus
   windows when the connected camera exposes autofocus controls.
+- With `ENABLE_CAMERA=true`, set `WHISPLAY_USB_CAMERA_DEVICE` to a V4L2 capture
+  node to use a USB webcam for both server-side preview and shutter. Prefer a
+  stable `/dev/v4l/by-id/` path. `WHISPLAY_USB_CAMERA_SIZE` defaults to `640x480`
+  and must be supported by the webcam. The camera daemon uses FFmpeg for USB
+  capture and releases the webcam when preview stops. Tap-to-focus is available
+  through Picamera2 on supported camera modules.
+- The app checks the configured USB capture node at startup and while running.
+  Hat Plus shows the camera entry when the node is present. Disconnecting the
+  webcam exits camera mode, and reconnecting restores the entry without an app
+  restart. Missing USB devices reject shutter requests.
 
 ### Optional Hardware Daemon
 - The optional local-only `whisplay-daemon` service now lives in the separate `Whisplay` driver repository, not in this repo.
