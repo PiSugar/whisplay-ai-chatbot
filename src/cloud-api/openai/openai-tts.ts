@@ -1,4 +1,4 @@
-import mp3Duration from "mp3-duration";
+import getAudioDurationInSeconds from "get-audio-duration";
 import { openai } from "./openai"; // Assuming openai is exported from openai.ts
 import dotenv from "dotenv";
 import { TTSResult } from "../../type";
@@ -27,7 +27,7 @@ const openaiTTS = async (
     return { duration: 0 };
   }
   const buffer = Buffer.from(await mp3.arrayBuffer());
-  const duration = await mp3Duration(buffer);
+  const duration = await getAudioDurationInSeconds(new Uint8Array(buffer));
   return { buffer, duration: duration * 1000 };
 };
 
