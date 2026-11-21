@@ -33,7 +33,7 @@ Whisplay AI Chatbot is a pocket-sized AI chatbot device built for Raspberry Pi Z
 - **AI SDKs**: @anthropic-ai/sdk, openai, @google/genai
 - **Vector DB**: @qdrant/js-client-rest
 - **Hardware**: spidev, onnxruntime-node
-- **Audio**: get-audio-duration, mp3-duration
+- **Audio**: get-audio-duration
 
 ### Hardware Requirements
 - Raspberry Pi Zero 2W or Pi 5 (8GB RAM recommended for offline)

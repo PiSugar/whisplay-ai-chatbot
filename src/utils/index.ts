@@ -2,7 +2,7 @@ import { get, isArray } from "lodash";
 import { FunctionCall } from "../type";
 import { exec } from "child_process";
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import mp3Duration from "mp3-duration";
+import getAudioDurationInSeconds from "get-audio-duration";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -302,7 +302,7 @@ export const getRecordFileDurationMs = async (
         // Use ffprobe for WebM files
         return await getMediaDurationWithFfprobe(filePath);
       }
-      return (await mp3Duration(data)) * 1000;
+      return (await getAudioDurationInSeconds(new Uint8Array(data))) * 1000;
     } else {
       // For unknown formats, use ffprobe
       return await getMediaDurationWithFfprobe(filePath);
