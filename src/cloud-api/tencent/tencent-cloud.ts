@@ -1,4 +1,4 @@
-import mp3Duration from "mp3-duration";
+import getAudioDurationInSeconds from "get-audio-duration";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -201,7 +201,7 @@ const synthesizeSpeech = async (
       : typeof audio === "string"
         ? Buffer.from(audio, "base64")
         : Buffer.from(audio);
-    const duration = await mp3Duration(buffer);
+    const duration = await getAudioDurationInSeconds(new Uint8Array(buffer));
     return { buffer, duration: duration * 1000 };
   } catch (err: any) {
     console.error(
