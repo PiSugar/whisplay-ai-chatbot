@@ -56,14 +56,10 @@ echo "Detected Home: $USER_HOME"
 echo "Detected UID:  $TARGET_UID"
 
 # Find Node bin
-NODE_BIN=$(which node)
-
-if [ -z "$NODE_BIN" ]; then
-    echo "Error: Could not find 'node'. Make sure you can run 'node -v' in this terminal."
-    exit 1
-fi
-
-NODE_FOLDER=$(dirname $NODE_BIN)
+source "$SCRIPT_DIR/scripts/with-node.sh"
+whisplay_require_node || exit 1
+NODE_BIN=$(command -v node)
+NODE_FOLDER=$(dirname "$NODE_BIN")
 echo "Found Node at: $NODE_FOLDER"
 echo "----------------------------------------"
 

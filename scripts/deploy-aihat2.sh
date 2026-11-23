@@ -40,16 +40,8 @@ log "Sync complete."
 
 # ─── Step 2: Build on device ────────────────────────────────
 log "Running npm install + build on device …"
-ssh_run bash -c "
-  set -e
-  cd '${REMOTE_DIR}'
-  if ! command -v node &>/dev/null; then
-    echo 'ERROR: Node.js not found on device. Install Node.js 20+ first.' >&2
-    exit 1
-  fi
-  npm install --prefer-offline
-  npm run build
-"
+printf -v remote_dir_arg '%q' "$REMOTE_DIR"
+ssh_run "cd $remote_dir_arg && bash scripts/with-node.sh bash -c 'npm install --prefer-offline && npm run build'"
 
 # ─── Step 3: Bootstrap .env if missing ──────────────────────
 log "Configuring .env for AI HAT+ 2 …"

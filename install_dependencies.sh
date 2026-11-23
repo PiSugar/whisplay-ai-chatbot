@@ -2,7 +2,7 @@
 NVM_VERSION="0.39.3"
 NVM_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/nvm/v$NVM_VERSION.tar.gz"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
-NODE_BINARY_INSTALL_URL="https://cdn.pisugar.com/PiSugar-wificonfig/script/node-binary/install-node-v20.19.5.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/scripts/with-node.sh"
 
 # read parameters --use-npm
 if [ -f "use_npm" ]; then
@@ -83,101 +83,46 @@ cd ..
 #     fi
 # fi
 
-# Function to install nvm and Node.js 20
 install_node_nvm() {
-    echo "Installing Node.js 20 using nvm..."
-    
-    # Install nvm if it's not already installed
-    if [ ! -d "$HOME/.nvm" ]; then
+    local archive_dir mirror
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    echo "Installing Node.js $WHISPLAY_NODE_MAJOR using nvm..."
+
+    if [ ! -s "$NVM_DIR/nvm.sh" ]; then
         echo "Installing nvm..."
-        TEMP_DIR=$(mktemp -d)
-        curl -o $TEMP_DIR/nvm-$NVM_VERSION.tar.gz -L $NVM_URL
-        tar -xzf $TEMP_DIR/nvm-$NVM_VERSION.tar.gz -C $TEMP_DIR
-        mv $TEMP_DIR/nvm-$NVM_VERSION $HOME/.nvm
-        rm -rf $TEMP_DIR
-
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-        # check if nvm is in the bash profile
-        if ! grep -q "nvm" $HOME/.bashrc; then
-            echo "export NVM_DIR=\"$HOME/.nvm\"" >> $HOME/.bashrc
-            echo "[ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"" >> $HOME/.bashrc
-            echo "[ -s \"\$NVM_DIR/bash_completion\" ] && \. \"\$NVM_DIR/bash_completion\"" >> $HOME/.bashrc
+        archive_dir=$(mktemp -d) || return 1
+        if ! curl -fsSL "$NVM_URL" -o "$archive_dir/nvm.tar.gz" ||
+           ! mkdir -p "$NVM_DIR" ||
+           ! tar -xzf "$archive_dir/nvm.tar.gz" --strip-components=1 -C "$NVM_DIR"; then
+            rm -rf "$archive_dir"
+            return 1
         fi
-    else
-        echo "nvm is already installed."
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-    fi
+        rm -rf "$archive_dir"
 
-    # Install and use Node.js 20
-    echo "Switch to Node.js 20"
-    nvm install 20
-    nvm use 20
-    nvm alias default 20
-
-    # Verify installation
-    if command_exists node && [[ "$(node -v)" =~ ^v20 ]]; then
-        echo "Node.js 20 installed successfully."
-    else
-        echo "Failed to install Node.js 20."
-        exit 1
-    fi
-}
-
-install_node_binary() {
-    echo "Installing Node.js 20 for pi zero..."
-    TEMP_DIR=$(mktemp -d)
-    curl -o $TEMP_DIR/install-node-v20.19.5.sh -L $NODE_BINARY_INSTALL_URL
-    chmod +x $TEMP_DIR/install-node-v20.19.5.sh
-    sudo bash $TEMP_DIR/install-node-v20.19.5.sh
-    rm -rf $TEMP_DIR
-
-    # Add /opt/nodejs/bin to PATH if not already present
-    if [ -d "/opt/nodejs/bin" ]; then
-        export PATH="/opt/nodejs/bin:$PATH"
-        if ! grep -q "/opt/nodejs/bin" "$HOME/.bashrc" 2>/dev/null; then
-            echo 'export PATH="/opt/nodejs/bin:$PATH"' >> "$HOME/.bashrc"
-            echo "Added /opt/nodejs/bin to PATH in ~/.bashrc"
-        fi
-        if ! grep -q "/opt/nodejs/bin" "$HOME/.profile" 2>/dev/null; then
-            echo 'export PATH="/opt/nodejs/bin:$PATH"' >> "$HOME/.profile"
+        if ! grep -qs 'NVM_DIR/nvm.sh' "$HOME/.bashrc"; then
+            printf '\nexport NVM_DIR=%q\n' "$NVM_DIR" >> "$HOME/.bashrc"
+            printf '%s\n' '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' \
+                '[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"' >> "$HOME/.bashrc"
         fi
     fi
 
-    # Verify installation
-    if command_exists node && [[ "$(node -v)" =~ ^v20 ]]; then
-        echo "Node.js 20 installed successfully."
-    else
-        echo "Failed to install Node.js 20."
-        exit 1
-    fi
-}
-
-install_node() {
+    whisplay_load_nvm || return 1
+    mirror="${NVM_NODEJS_ORG_MIRROR:-https://nodejs.org/dist}"
     if [[ "$(uname -m)" == "armv6l" ]]; then
-        install_node_binary
-    else
-        install_node_nvm
+        # The original Pi Zero needs the community ARMv6 binary.
+        mirror="${NVM_NODEJS_ORG_MIRROR:-https://unofficial-builds.nodejs.org/download/release}"
     fi
+    NVM_NODEJS_ORG_MIRROR="$mirror" nvm install -b "$WHISPLAY_NODE_MAJOR" &&
+        whisplay_select_node &&
+        whisplay_node_is_current &&
+        nvm alias default "$WHISPLAY_NODE_MAJOR"
 }
 
-# Check if Node.js is installed and is version 20
-if command_exists node; then
-    NODE_VERSION=$(node -v)
-    if [[ "$NODE_VERSION" =~ ^v20 ]]; then
-        echo "Node.js 20 is already installed."
-    else
-        echo "Different version of Node.js detected: $NODE_VERSION"
-        install_node
-    fi
-else
-    echo "Node.js is not installed."
-    install_node
+if ! whisplay_select_node && ! install_node_nvm; then
+    echo "Failed to install Node.js $WHISPLAY_NODE_MAJOR. Update stopped." >&2
+    exit 1
 fi
+echo "Using Node.js $(node --version)."
 
 # Check if npm is installed
 if ! command_exists npm; then
@@ -214,15 +159,24 @@ fi
 #sudo ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npx" "/usr/local/bin/npx"
 
 echo "Installing Node.js dependencies..."
-if [ "$use_npm" = true ]; then
-    echo "Using npm to install dependencies."
-    npm i --registry=$NPM_REGISTRY
-else
+if [ "$use_npm" = false ]; then
     echo "Using yarn to install dependencies."
-    if ! yarn --registry=$NPM_REGISTRY; then
+    if ! yarn --registry="$NPM_REGISTRY"; then
         echo "WARNING: yarn failed. Falling back to npm."
         use_npm=true
-        npm i --registry=$NPM_REGISTRY
+    fi
+fi
+if [ "$use_npm" = true ]; then
+    echo "Using npm to install dependencies."
+    npm install --registry="$NPM_REGISTRY" || exit 1
+fi
+
+if [ "${1:-}" = "--build" ]; then
+    echo "Building with Node.js $(node --version)..."
+    if [ "$use_npm" = true ]; then
+        npm run build || exit 1
+    else
+        yarn run build || exit 1
     fi
 fi
 

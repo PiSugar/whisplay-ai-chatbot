@@ -61,7 +61,10 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    bash install_dependencies.sh
    source ~/.bashrc
    ```
-   Running `source ~/.bashrc` is necessary to load the new environment variables.
+   The installer uses Node.js 22 or later and installs Node.js 22 if needed.
+   On an existing installation, `whisplay update` also upgrades Node.js before
+   installing dependencies and building. Reload the shell configuration with
+   `source ~/.bashrc`.
 
    **Custom npm registry:** All scripts respect the `NPM_REGISTRY` environment variable. If not set, the official npm registry (`https://registry.npmjs.org`) is used. To use a mirror (e.g. in China), export it before running any script:
    ```bash

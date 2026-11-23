@@ -1,19 +1,22 @@
 {
   "name": "whisplay-ai-chatbot",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=22"
+  },
   "main": "index.js",
   "bin": {
     "whisplay": "./bin/whisplay"
   },
   "scripts": {
-    "dev": "yarn build && yarn start",
-    "prebuild": "patch-package --error-on-fail",
-    "build": "rm -rf dist && tsc && node scripts/register-whisplay-daemon-app.js",
-    "start": "node dist/index.js",
-    "index-knowledge": "node -r ts-node/register -r tsconfig-paths/register dist/index-knowledge.js",
-    "configure-env": "node -r ts-node/register -r tsconfig-paths/register dist/configure-env.js",
-    "upgrade-env": "node -r ts-node/register -r tsconfig-paths/register dist/upgrade-env.js",
-    "postinstall": "patch-package",
+    "dev": "bash scripts/with-node.sh bash -c 'yarn build && yarn start'",
+    "prebuild": "bash scripts/with-node.sh ./node_modules/.bin/patch-package --error-on-fail",
+    "build": "bash scripts/with-node.sh bash -c 'rm -rf dist && ./node_modules/.bin/tsc && node scripts/register-whisplay-daemon-app.js'",
+    "start": "bash scripts/with-node.sh node dist/index.js",
+    "index-knowledge": "bash scripts/with-node.sh node -r ts-node/register -r tsconfig-paths/register dist/index-knowledge.js",
+    "configure-env": "bash scripts/with-node.sh node -r ts-node/register -r tsconfig-paths/register dist/configure-env.js",
+    "upgrade-env": "bash scripts/with-node.sh node -r ts-node/register -r tsconfig-paths/register dist/upgrade-env.js",
+    "postinstall": "bash scripts/with-node.sh ./node_modules/.bin/patch-package",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

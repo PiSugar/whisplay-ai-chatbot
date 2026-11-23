@@ -12,15 +12,11 @@ cmd_update() {
   _bold "Updating whisplay-ai-chatbot..."
   cd "$PROJECT_ROOT"
 
-  _bold "[1/3] Pulling latest code..."
+  _bold "[1/2] Pulling latest code..."
   git pull --ff-only
 
-  _bold "[2/3] Installing dependencies..."
-  source ~/.bashrc 2>/dev/null || true
-  bash "$PROJECT_ROOT/install_dependencies.sh"
-
-  _bold "[3/3] Building project..."
-  pkg_run build
+  _bold "[2/2] Updating Node.js, installing dependencies and building..."
+  bash "$PROJECT_ROOT/install_dependencies.sh" --build
 
   _green "✅ Project updated successfully!"
   echo ""
@@ -81,7 +77,7 @@ cmd_help() {
   echo "  service enable|disable     Enable or disable auto-start on boot"
   echo "  service start|stop|restart Control the running service"
   echo "  service status             Show service status"
-  echo "  update                     Pull latest code, install deps & build"
+  echo "  update                     Pull code, update Node.js, install deps & build"
   echo "  configure                  Interactively manage .env by category"
   echo "  index-knowledge            Index the knowledge base"
   echo "  upgrade-env                Upgrade .env to latest template"

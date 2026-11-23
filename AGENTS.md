@@ -21,7 +21,7 @@ Whisplay AI Chatbot is a pocket-sized AI chatbot device built for Raspberry Pi Z
 ### Core Technologies
 | Component | Technology |
 |-----------|------------|
-| Main Runtime | Node.js 20 + TypeScript |
+| Main Runtime | Node.js 22 or later + TypeScript. The basic image provisions Node.js 22. |
 | Hardware Interface | Python 3 + RPi.GPIO / gpiod |
 | UI Rendering | Python Pillow (PIL) + socket communication |
 | Package Manager | yarn (preferred) or npm |
@@ -170,7 +170,7 @@ whisplay service start|stop|restart       # Control service
 whisplay service status                   # Check service status
 
 # Utilities
-whisplay update                           # Pull latest code, install deps, build
+whisplay update                           # Pull latest code, select or install Node.js 22, install deps, build
 whisplay configure                        # Interactively manage .env by category
 whisplay index-knowledge                  # Index knowledge base
 whisplay upgrade-env                      # Upgrade .env to latest template
@@ -412,6 +412,12 @@ tail -f chatbot.log
 sudo journalctl -u chatbot.service -f
 ```
 
+`whisplay update` uses the same Node.js runtime for dependency installation and
+the build. It installs Node.js 22 with nvm when the active runtime is older and
+no local Node.js 22 is available. ARMv6 installations use the Node.js community
+binary mirror. The service launcher selects the installed runtime on its next
+start, including when an older service unit still includes Node.js 20 on PATH.
+
 ### Docker Services (Optional)
 For local AI services without cloud dependencies:
 ```bash
@@ -499,7 +505,7 @@ reading are opt-in through `DEEPSEEK_ENABLE_WEB_SEARCH` and
 - **Audio issues**: Check `amixer` output, verify WM8960 driver loaded
 - **Display not updating**: Check socket connection on port 12345
 - **GPIO errors**: Verify user in `gpio` group, check platform detection
-- **Build errors**: Ensure Node.js 20, run `bash build.sh` to reset
+- **Build errors**: Run `whisplay update` to install or select Node.js 22 and rebuild
 
 ## Data Directories
 

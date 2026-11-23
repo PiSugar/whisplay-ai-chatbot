@@ -21,9 +21,9 @@ if [ "$is_linux" = true ] &&
   done
 fi
 
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+# Older service units can still have the previous NVM version on PATH.
+source "$(dirname "${BASH_SOURCE[0]}")/scripts/with-node.sh"
+whisplay_require_node || exit 1
 
 # Find the unified Whisplay sound card first; keep legacy names as fallback.
 card_index=""

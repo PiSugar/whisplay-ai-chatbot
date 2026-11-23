@@ -83,9 +83,13 @@ fi
 mkdir -p /etc/systemd/system/multi-user.target.wants
 ln -sf /etc/systemd/system/whisplay-expand-rootfs.service /etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service
 
-if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q '^v20\.'; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+if ! /usr/bin/node --version 2>/dev/null | grep -q '^v22\.'; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
+fi
+if ! /usr/bin/node --version | grep -q '^v22\.'; then
+  echo "Expected Node.js 22 at /usr/bin/node." >&2
+  exit 1
 fi
 
 /usr/local/lib/whisplay-image/install-whisplay-driver.sh
