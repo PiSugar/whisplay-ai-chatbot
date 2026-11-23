@@ -77,4 +77,18 @@ export function registerImageGenerationPlugins(): void {
       };
     },
   } as ImageGenerationPlugin);
+
+  pluginRegistry.register({
+    name: "minimax",
+    displayName: "MiniMax H3 Image Generation",
+    version: "1.0.0",
+    type: "image-generation",
+    description: "Generate images from text prompts with MiniMax H3",
+    activate: (ctx) => {
+      const { createMiniMaxImageTool } = require("../../cloud-api/minimax/minimax-image-generation");
+      return {
+        addImageGenerationTools: (tools: LLMTool[]) => tools.push(createMiniMaxImageTool(ctx)),
+      };
+    },
+  } as ImageGenerationPlugin);
 }
