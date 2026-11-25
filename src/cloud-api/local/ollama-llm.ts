@@ -100,7 +100,14 @@ const messages: OllamaMessage[] = [
   },
 ];
 
-const keepAliveOllama = () => {
+// The warm-up load is retried a few times: at boot the chatbot can start before Ollama
+// accepts connections, or Ollama can fail its first model load. Without a retry the model
+// stays unloaded until the first question, which then waits for the whole load.
+// Attempts never overlap, and a pending retry does not keep the process alive.
+const warmupAttempts = 4;
+const warmupRetryDelayMs = 10_000;
+
+const keepAliveOllama = (attempt = 1): void => {
   axios
     .post(`${ollamaEndpoint}/api/chat`, {
       model: ollamaModel,
@@ -123,7 +130,13 @@ const keepAliveOllama = () => {
       console.log("Ollama keep-alive response:", response.data);
     })
     .catch((err) => {
-      console.error("Error initializing Ollama model:", err.message);
+      if (attempt >= warmupAttempts) {
+        console.error(`Error initializing Ollama model: ${err.message} (gave up after ${attempt} attempts; the model will load on the first question)`);
+        return;
+      }
+      console.error(`Ollama warm-up attempt ${attempt}/${warmupAttempts} failed: ${err.message}; retrying in ${warmupRetryDelayMs / 1000} s`);
+      const timer = setTimeout(() => keepAliveOllama(attempt + 1), warmupRetryDelayMs);
+      timer.unref?.();
     });
 };
 
