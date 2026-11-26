@@ -143,6 +143,8 @@ const resetChatHistory = (): void => {
 type ToolLoopState = {
   round: number;
   signatures: Set<string>;
+  // Aborted when a newer question supersedes this answer (see chatWithLLMStream).
+  signal?: AbortSignal;
 };
 
 const stableStringify = (value: unknown): string => {
@@ -178,12 +180,14 @@ const answerFromAvailableToolResults = async ({
   endResolve,
   endCallback,
   partialThinkingCallback,
+  signal,
 }: {
   instruction: string;
   partialCallback: (partialAnswer: string) => void;
   endResolve: () => void;
   endCallback: () => void;
   partialThinkingCallback?: (partialThinking: string) => void;
+  signal?: AbortSignal;
 }): Promise<void> => {
   let finalAnswer = "";
   let finalThinking = "";
@@ -212,6 +216,7 @@ const answerFromAvailableToolResults = async ({
           "Content-Type": "application/json",
         },
         responseType: "stream",
+        signal,
       },
     );
 
@@ -231,6 +236,7 @@ const answerFromAvailableToolResults = async ({
     if (finalThinking.trim()) {
       console.log(`[Ollama] Final no-tools thinking length: ${finalThinking.length}`);
     }
+    if (signal?.aborted) return;
     messages.push({
       role: "assistant",
       content: finalAnswer,
@@ -251,6 +257,10 @@ const chatWithLLMStreamInternal = async (
   invokeFunctionCallback?: (functionName: string, result?: string) => void,
   toolLoopState: ToolLoopState = { round: 0, signatures: new Set<string>() },
 ): Promise<void> => {
+  if (toolLoopState.signal?.aborted) {
+    endCallback();
+    return;
+  }
   if (shouldResetChatHistory()) {
     resetChatHistory();
   }
@@ -265,6 +275,11 @@ const chatWithLLMStreamInternal = async (
     contextWindowResolver: resolveOllamaContextWindow,
     invokeFunctionCallback,
   });
+  // A cancelled answer must not send a request for the history the newer question uses.
+  if (toolLoopState.signal?.aborted) {
+    endCallback();
+    return;
+  }
   let endResolve: () => void = () => {};
   const promise = new Promise<void>((resolve) => {
     endResolve = resolve;
@@ -322,6 +337,7 @@ const chatWithLLMStreamInternal = async (
           "Content-Type": "application/json",
         },
         responseType: "stream",
+        signal: toolLoopState.signal,
       },
     );
 
@@ -357,6 +373,7 @@ const chatWithLLMStreamInternal = async (
           endResolve,
           endCallback,
           partialThinkingCallback,
+          signal: toolLoopState.signal,
         });
         return;
       }
@@ -396,6 +413,7 @@ const chatWithLLMStreamInternal = async (
           endResolve,
           endCallback,
           partialThinkingCallback,
+          signal: toolLoopState.signal,
         });
         return;
       }
@@ -437,6 +455,13 @@ const chatWithLLMStreamInternal = async (
           }
         }),
       );
+
+      // A newer question has taken over: its history must not receive these results.
+      if (toolLoopState.signal?.aborted) {
+        endResolve();
+        endCallback();
+        return;
+      }
 
       const newMessages: OllamaMessage[] = results.map(
         ([name, id, result]) => ({
@@ -481,6 +506,7 @@ const chatWithLLMStreamInternal = async (
         {
           round: toolLoopState.round + 1,
           signatures: toolLoopState.signatures,
+          signal: toolLoopState.signal,
         },
       );
       return;
@@ -498,20 +524,42 @@ const chatWithLLMStreamInternal = async (
   return promise;
 };
 
+// The answer in progress. A new question asked before it finished cancels it: Ollama
+// usually serves one request at a time, so the new question would otherwise wait for the
+// old answer and all its tool rounds, and the shared history would contain both questions.
+let activeAnswer: { controller: AbortController; inputMessages: Message[] } | null = null;
+
 const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
   endCallback: () => void,
   partialThinkingCallback?: (partialThinking: string) => void,
   invokeFunctionCallback?: (functionName: string, result?: string) => void,
-): Promise<void> =>
-  chatWithLLMStreamInternal(
-    inputMessages,
-    partialCallback,
-    endCallback,
-    partialThinkingCallback,
-    invokeFunctionCallback,
-  );
+): Promise<void> => {
+  if (activeAnswer) {
+    console.warn("[Ollama] New question before the previous answer finished; cancelling the previous answer.");
+    activeAnswer.controller.abort();
+    // Drop the unanswered question and everything after it (tool calls and results).
+    // Its messages are found by identity, since compaction may have shortened the history.
+    const abandoned = activeAnswer.inputMessages as unknown[];
+    const start = messages.findIndex((message) => abandoned.includes(message));
+    if (start > 0) messages.length = start;
+  }
+  const answer = { controller: new AbortController(), inputMessages };
+  activeAnswer = answer;
+  try {
+    await chatWithLLMStreamInternal(
+      inputMessages,
+      partialCallback,
+      endCallback,
+      partialThinkingCallback,
+      invokeFunctionCallback,
+      { round: 0, signatures: new Set<string>(), signal: answer.controller.signal },
+    );
+  } finally {
+    if (activeAnswer === answer) activeAnswer = null;
+  }
+};
 
 const summaryTextWithLLM: SummaryTextWithLLMFunction = async (
   text: string, promptPrefix: string

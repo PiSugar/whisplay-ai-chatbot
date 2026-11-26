@@ -31,7 +31,7 @@ test("Ollama preserves split UTF-8 and tool history and dispatches only complete
   ];
   const exports = {};
   vm.runInNewContext(source, {
-    exports, Buffer, console, process: { env: { OLLAMA_ENABLE_TOOLS: "true" } },
+    exports, Buffer, AbortController, console, process: { env: { OLLAMA_ENABLE_TOOLS: "true" } },
     require(id) {
       switch (id) {
         case "axios": return { async post(url, body) {
@@ -92,7 +92,7 @@ function duplicateHarness(responses) {
   const exports = {};
   const handler = name => async args => { runs.push(name); return `result-${name}-${runs.length}`; };
   vm.runInNewContext(source, {
-    exports, Buffer, console: { ...console, warn() {}, log() {} }, process: { env: { OLLAMA_ENABLE_TOOLS: "true" } },
+    exports, Buffer, AbortController, console: { ...console, warn() {}, log() {} }, process: { env: { OLLAMA_ENABLE_TOOLS: "true" } },
     require(id) {
       switch (id) {
         case "axios": return { async post(url, body) {
