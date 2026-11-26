@@ -79,6 +79,7 @@ export enum EmbeddingServer {
 }
 
 export enum ImageGenerationServer {
+  minimax = "minimax",
   openai = "openai",
   gemini = "gemini",
   volcengine = "volcengine",
