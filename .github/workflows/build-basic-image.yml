@@ -447,23 +447,39 @@ jobs:
           RELEASE_NAME: ${{ needs.build-image.outputs.release_name }}
           RELEASE_TAG: ${{ needs.build-image.outputs.release_tag }}
         run: |
-          release_flags=(--title "$RELEASE_NAME" --generate-notes --verify-tag)
+          set -euo pipefail
+          notes_dir="$(mktemp -d)"
+          trap 'rm -rf "$notes_dir"' EXIT
+          cat > "$notes_dir/basic-image.md" <<EOF
+          ## Basic image startup
+
+          The basic image includes drivers for Whisplay HAT and Whisplay HAT+ and selects the connected HAT at boot. It automatically reboots once on first boot or after switching HATs to apply the selected driver configuration. Subsequent boots with the same HAT continue normally.
+
+          [Basic image startup guide](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/basic-image.md)
+          EOF
+
+          release_flags=(--title "$RELEASE_NAME" --verify-tag)
           if [ "$PRERELEASE" = "true" ]; then
             release_flags+=(--prerelease)
           fi
 
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" --json assets,body > "$notes_dir/release.json"; then
             while IFS= read -r asset_name; do
               [ -n "$asset_name" ] || continue
               gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes
-            done < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
+            done < <(jq -r '.assets[].name' "$notes_dir/release.json")
             gh release upload "$RELEASE_TAG" release-assets/* --clobber
-            gh release edit "$RELEASE_TAG" --title "$RELEASE_NAME"
-            if [ "$PRERELEASE" = "true" ]; then
-              gh release edit "$RELEASE_TAG" --prerelease
+
+            jq -r '.body // ""' "$notes_dir/release.json" > "$notes_dir/existing.md"
+            if ! grep -qxF '## Basic image startup' "$notes_dir/existing.md"; then
+              printf '\n' >> "$notes_dir/existing.md"
+              cat "$notes_dir/basic-image.md" >> "$notes_dir/existing.md"
+              release_flags+=(--notes-file "$notes_dir/existing.md")
             fi
+            gh release edit "$RELEASE_TAG" "${release_flags[@]}"
           else
-            gh release create "$RELEASE_TAG" release-assets/* "${release_flags[@]}"
+            gh release create "$RELEASE_TAG" release-assets/* "${release_flags[@]}" \
+              --generate-notes --notes-file "$notes_dir/basic-image.md"
           fi
 
   notify-discord:

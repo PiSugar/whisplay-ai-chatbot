@@ -45,7 +45,7 @@ Tutorial (offline version build on RPi 5):
 - Please find the pre-build images in project wiki: https://github.com/PiSugar/whisplay-ai-chatbot/wiki
 - [Zipformer offline ASR setup](docs/zipformer-asr.md)
 
-The basic image includes drivers for Whisplay HAT and Whisplay HAT+ and detects the board at boot. It reboots automatically once on first boot or after switching boards to apply the selected driver configuration.
+The basic image detects Whisplay HAT and Whisplay HAT+ at boot. It reboots automatically once on first boot or after switching HATs to apply the selected driver configuration. See the [basic image startup guide](docs/basic-image.md).
 
 ## Drivers
 
