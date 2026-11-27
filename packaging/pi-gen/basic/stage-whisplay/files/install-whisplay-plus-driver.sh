@@ -6,7 +6,7 @@ source_dir="$(mktemp -d)"
 trap 'rm -rf "$source_dir"' EXIT
 
 # Match the upstream HAT+ release image's panel driver and aggregate overlay.
-revision=b29d38cd7538d33a783c9b33618010c57a407
+revision=b29d38cd7538d33a783c9b33618010c57a53a407
 git -C "$source_dir" init -q
 git -C "$source_dir" fetch --depth 1 https://github.com/PiSugar/whisplay-plus.git "$revision"
 git -C "$source_dir" checkout --detach FETCH_HEAD
