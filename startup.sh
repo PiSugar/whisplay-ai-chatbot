@@ -63,7 +63,8 @@ NODE_FOLDER=$(dirname "$NODE_BIN")
 echo "Found Node at: $NODE_FOLDER"
 echo "----------------------------------------"
 
-if command -v systemctl >/dev/null 2>&1; then
+# The basic image keeps the SPI daemon installed when it selects HAT+.
+if [ ! -e /run/whisplay-image/hat-plus ] && command -v systemctl >/dev/null 2>&1; then
     if systemctl is-active --quiet whisplay-daemon.service 2>/dev/null && [ -S /tmp/whisplay-daemon.sock ]; then
         echo "Detected whisplay-daemon.service on this system."
         echo "Registering whisplay-ai-chatbot and enabling daemon-managed boot autostart..."

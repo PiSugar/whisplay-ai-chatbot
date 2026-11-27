@@ -1,0 +1,13 @@
+[Unit]
+Description=Select the Whisplay HAT driver for this Raspberry Pi
+RequiresMountsFor=/boot/firmware
+After=whisplay-expand-rootfs.service systemd-udevd.service
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/whisplay-image/select-whisplay-hat.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

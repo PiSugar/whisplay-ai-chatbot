@@ -36,12 +36,15 @@ jobs:
             packaging/pi-gen/basic/stage-whisplay/01-whisplay/00-run-chroot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-sugar-wifi-conf.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-driver.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-plus-driver.sh \
+            packaging/pi-gen/basic/stage-whisplay/files/select-whisplay-hat.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-u-boot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/expand-rootfs-firstboot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/provision-basic.sh
           do
             bash -n "$script"
           done
+          bash packaging/pi-gen/basic/test-select-whisplay-hat.sh
 
       - name: Set release metadata
         id: meta
@@ -247,6 +250,8 @@ jobs:
           check_file /etc/systemd/system/whisplay-daemon.service || exit 1
           check_file /etc/systemd/system/whisplay-chatbot-register.service || exit 1
           check_file /etc/systemd/system/whisplay-expand-rootfs.service || exit 1
+          check_file /etc/systemd/system/whisplay-select-hat.service || exit 1
+          check_file /usr/local/lib/whisplay-image/select-whisplay-hat.sh || exit 1
           check_file /usr/local/sbin/whisplay-expand-rootfs || exit 1
           check_file /etc/whisplay-image/basic-release || exit 1
           check_file /etc/whisplay-image/u-boot-release || exit 1
@@ -266,32 +271,31 @@ jobs:
           check_boot_file /u-boot-whisplay-rpi-arm64.bin || exit 1
           check_boot_file /logo_lcd_240_280_rgb565.bmp || exit 1
           check_boot_file /config.txt || exit 1
+          check_boot_file /overlays/whisplay-soundcard.dtbo || exit 1
+          check_boot_file /overlays/whisplay-plus.dtbo || exit 1
+          check_boot_file /whisplay-hat.txt || exit 1
 
           if ! sudo grep -qxF 'enable_uart=1' /mnt/whisplay-boot/config.txt; then
             echo "config.txt is missing enable_uart=1" >&2
             sudo cat /mnt/whisplay-boot/config.txt >&2
             exit 1
           fi
-          if ! sudo grep -qxF 'uart_2ndstage=1' /mnt/whisplay-boot/config.txt; then
-            echo "config.txt is missing uart_2ndstage=1" >&2
-            sudo cat /mnt/whisplay-boot/config.txt >&2
+          profiles=/mnt/whisplay-root/usr/local/lib/whisplay-image/boot-profiles
+          sudo grep -qxF 'uart_2ndstage=1' /mnt/whisplay-boot/config.txt
+          sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' "$profiles/hat.txt"
+          sudo grep -qxF 'dtoverlay=whisplay-soundcard' "$profiles/hat.txt"
+          sudo grep -qxF 'dtoverlay=whisplay-plus' "$profiles/hat-plus.txt"
+          sudo grep -qxF 'include whisplay-hat.txt' /mnt/whisplay-boot/config.txt
+          sudo grep -qxF 'force_eeprom_read=0' /mnt/whisplay-boot/config.txt
+          if sudo grep -Eq '^[[:space:]]*(kernel=|dtoverlay=(whisplay-soundcard|whisplay-plus|wm8960-soundcard|es8389-soundcard)([,[:space:]]|$))' /mnt/whisplay-boot/{config,whisplay-hat}.txt; then
+            echo "The unconfigured image enables a Whisplay kernel or overlay before detection" >&2
             exit 1
           fi
-          if ! sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' /mnt/whisplay-boot/config.txt; then
-            echo "config.txt is missing Whisplay U-Boot kernel setting" >&2
-            sudo cat /mnt/whisplay-boot/config.txt >&2
-            exit 1
-          fi
-          if ! sudo grep -qxF 'dtoverlay=whisplay-soundcard' /mnt/whisplay-boot/config.txt; then
-            echo "config.txt is missing unified Whisplay sound card overlay" >&2
-            sudo cat /mnt/whisplay-boot/config.txt >&2
-            exit 1
-          fi
-          if sudo grep -qxF 'dtoverlay=wm8960-soundcard' /mnt/whisplay-boot/config.txt; then
-            echo "config.txt still enables the legacy WM8960 sound card overlay" >&2
-            sudo cat /mnt/whisplay-boot/config.txt >&2
-            exit 1
-          fi
+          sudo test -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-select-hat.service
+          for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
+            sudo grep -qxF 'After=whisplay-select-hat.service' "/mnt/whisplay-root/etc/systemd/system/${unit}.service.d/10-whisplay-hat.conf"
+            sudo grep -qxF 'ConditionPathExists=/run/whisplay-image/hat' "/mnt/whisplay-root/etc/systemd/system/${unit}.service.d/10-whisplay-hat.conf"
+          done
           if ! sudo grep -q 'whisplaysound' /mnt/whisplay-root/etc/asound.conf; then
             echo "/etc/asound.conf does not route audio through whisplaysound" >&2
             sudo cat /mnt/whisplay-root/etc/asound.conf >&2
@@ -316,6 +320,8 @@ jobs:
               sudo grep -n 'whisplay' "/mnt/whisplay-root/lib/modules/${kernel_release}/modules.dep" >&2 || true
               exit 1
             fi
+            sudo test -f "/mnt/whisplay-root/lib/modules/${kernel_release}/extra/st7701p_pisugar.ko"
+            sudo grep -q '^extra/st7701p_pisugar\.ko:' "/mnt/whisplay-root/lib/modules/${kernel_release}/modules.dep"
           done <<< "$whisplay_kernel_releases"
           if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ]; then
             true

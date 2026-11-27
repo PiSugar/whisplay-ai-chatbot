@@ -141,6 +141,16 @@ bash build.sh
 # See packaging/pi-gen/basic/ for the basic Raspberry Pi OS release image customization
 ```
 
+The basic image preinstalls the unified sound-card module and the HAT+ DSI panel
+module for every packaged kernel ABI. At boot, `whisplay-select-hat.service`
+checks the HAT+ sensor IDs on I2C1 on supported Pi models. It changes
+`/boot/firmware/whisplay-hat.txt` and reboots once when the board profile changes.
+The image selects the overlay through this include and disables HAT EEPROM
+autoloading to keep the two overlays from conflicting. Only the SPI HAT
+profile enables the custom U-Boot splash, SPI daemon, app registration, and
+audio warm-up. The HAT+ profile uses the Raspberry Pi firmware's normal
+kernel boot path and Desktop.
+
 ### Run Commands
 ```bash
 # Start the chatbot service

@@ -45,9 +45,14 @@ Tutorial (offline version build on RPi 5):
 - Please find the pre-build images in project wiki: https://github.com/PiSugar/whisplay-ai-chatbot/wiki
 - [Zipformer offline ASR setup](docs/zipformer-asr.md)
 
+The basic image includes drivers for Whisplay HAT and Whisplay HAT+ and detects the board at boot. It reboots automatically once on first boot or after switching boards to apply the selected driver configuration.
+
 ## Drivers
 
-You need to firstly install the audio drivers for the Whisplay HAT. Follow the instructions in the [Whisplay HAT repository](https://github.com/PiSugar/whisplay).
+If you are setting up the chatbot on your own Raspberry Pi OS installation, install the driver for your board first.
+
+- **Whisplay HAT (SPI LCD)** requires the [Whisplay HAT driver](https://github.com/PiSugar/Whisplay).
+- **Whisplay HAT+ (MIPI DSI touchscreen)** requires 64-bit Raspberry Pi OS Desktop and the [Whisplay Plus driver](https://github.com/PiSugar/whisplay-plus#install).
 
 ## Installation Steps
 
@@ -98,7 +103,7 @@ You need to firstly install the audio drivers for the Whisplay HAT. Follow the i
    If `whisplay-daemon` is running, this registers the chatbot with the daemon,
    configures it as the daemon's boot autostart app, and launches it immediately.
    Otherwise, the script installs the legacy standalone `chatbot.service`.
-   Please note that this will disable the graphical interface and set the system to multi-user mode, which is suitable for headless operation.
+   Keep the graphical desktop enabled for the Whisplay HAT+ touchscreen UI. For a headless setup, the script may offer to switch to multi-user mode.
    You can find the output logs at `chatbot.log`. Running `tail -f chatbot.log` will also display the logs in real-time.
 
 ## Whisplay Plus Quick Start

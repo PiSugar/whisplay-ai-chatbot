@@ -31,7 +31,10 @@ apt-get update
 apt-get install -y \
   alsa-utils \
   bluez \
+  build-essential \
+  chromium \
   curl \
+  device-tree-compiler \
   dkms \
   git \
   i2c-tools \
@@ -93,6 +96,23 @@ if ! /usr/bin/node --version | grep -q '^v22\.'; then
 fi
 
 /usr/local/lib/whisplay-image/install-whisplay-driver.sh
+/usr/local/lib/whisplay-image/install-whisplay-plus-driver.sh "$(dirname "$boot_config")"
+
+# Keep the boot overlay in one include so the selector can replace it without
+# rewriting config.txt. On the first boot, neither HAT claims GPIO.
+boot_profiles=/usr/local/lib/whisplay-image/boot-profiles
+sed -i -E '/^[[:space:]]*(dtoverlay=(whisplay-soundcard|whisplay-plus|wm8960-soundcard|es8389-soundcard)([,[:space:]]|$)|include[[:space:]]+whisplay-hat\.txt[[:space:]]*$)/d' "$boot_config"
+printf '%s\n' 'dtoverlay=whisplay-soundcard' > "$boot_profiles/hat.txt"
+printf '%s\n' '# Selected on first boot.' > "$(dirname "$boot_config")/whisplay-hat.txt"
+cat >> "$boot_config" <<'EOF'
+
+[all]
+# Select the board overlay from the image profile, including on HATs with EEPROM.
+force_eeprom_read=0
+dtparam=i2c_arm=on
+include whisplay-hat.txt
+EOF
+ln -sf /etc/systemd/system/whisplay-select-hat.service /etc/systemd/system/multi-user.target.wants/whisplay-select-hat.service
 
 whisplay_dir="/home/pi/Whisplay"
 install_whisplay_daemon() {
@@ -163,7 +183,7 @@ ln -sf "$repo_dir/bin/whisplay" /usr/local/bin/whisplay
 cd "$repo_dir/python"
 pip3 install -r requirements.txt --break-system-packages
 
-/usr/local/lib/whisplay-image/install-whisplay-u-boot.sh
+/usr/local/lib/whisplay-image/install-whisplay-u-boot.sh "$boot_profiles/hat.txt"
 
 if [ ! -f NotoSansSC-Bold.ttf ]; then
   curl -fL -o NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
@@ -270,6 +290,19 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 ln -sf /etc/systemd/system/whisplay-chatbot-register.service /etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service
+
+# The SPI daemon owns GPIO also used by the Plus board. On Plus, the app
+# accesses the button and RGB LED directly and uses the desktop DSI session.
+for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
+  drop_in="/etc/systemd/system/${unit}.service.d"
+  install -d -m 0755 "$drop_in"
+  cat > "$drop_in/10-whisplay-hat.conf" <<'EOF'
+[Unit]
+Wants=whisplay-select-hat.service
+After=whisplay-select-hat.service
+ConditionPathExists=/run/whisplay-image/hat
+EOF
+done
 
 install_networkmanager_polkit_rule
 
