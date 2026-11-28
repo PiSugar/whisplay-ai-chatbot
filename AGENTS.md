@@ -293,6 +293,10 @@ whisplay.on_button_release(callback)
   while camera mode is active. Hat Plus does not use the double-click camera shortcut.
 - The Hat Plus browser UI exposes a camera entry button when `ENABLE_CAMERA=true`,
   plus shutter, back, and tap-to-focus controls in the camera preview.
+- Hat Plus Settings offers clockwise app UI rotation at 0°, 90°, 180°, or 270°.
+  The kiosk browser persists the angle in local storage and reapplies it on
+  launch. CSS rotates the app surface and its settings overlay, and camera
+  focus taps are mapped back to the preview's coordinates.
 - `python/camera.py` accepts normalized `focus` coordinates and uses Picamera2 autofocus
   windows when the connected camera exposes autofocus controls.
 - With `ENABLE_CAMERA=true`, set `USB_CAMERA_DEVICE` to a V4L2 capture

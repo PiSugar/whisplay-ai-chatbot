@@ -26,6 +26,9 @@ const volumeSlider = document.getElementById("volumeSlider");
 const volumeValue = document.getElementById("volumeValue");
 const autoListeningToggle = document.getElementById("autoListeningToggle");
 const autoListeningError = document.getElementById("autoListeningError");
+const rotationSetting = document.getElementById("rotationSetting");
+const rotationOptions = [...rotationSetting.querySelectorAll("input")];
+const rotationError = document.getElementById("rotationError");
 const exitAppBtn = document.getElementById("exitAppBtn");
 const exitConfirm = document.getElementById("exitConfirm");
 const exitCancelBtn = document.getElementById("exitCancelBtn");
@@ -456,7 +459,7 @@ function connectWebSocket() {
       volumeSlider.value = pct;
       volumeValue.textContent = `${pct}%`;
     } else if (message.type === "auto_listening") {
-      autoListeningToggle.checked = message.enabled === true;
+      autoListeningToggle.setAttribute("aria-checked", String(message.enabled === true));
       autoListeningToggle.disabled = false;
       autoListeningError.textContent = message.error || "";
       autoListeningError.hidden = !message.error;
@@ -518,25 +521,46 @@ cameraShutterBtn.addEventListener("click", () => {
 
 function cameraFocusCoordinates(event) {
   const rect = imageDisplay.getBoundingClientRect();
-  const naturalWidth = imageDisplay.naturalWidth || rect.width;
-  const naturalHeight = imageDisplay.naturalHeight || rect.height;
-  if (!rect.width || !rect.height || !naturalWidth || !naturalHeight) return null;
+  if (!rect.width || !rect.height) return null;
 
-  const scale = Math.max(rect.width / naturalWidth, rect.height / naturalHeight);
+  // Convert the tap back to the unrotated preview before applying its cover crop.
+  const left = event.clientX - rect.left;
+  const top = event.clientY - rect.top;
+  let x = left;
+  let y = top;
+  let { width, height } = rect;
+  switch (document.body.dataset.rotation) {
+    case "90":
+      [x, y] = [top, width - left];
+      [width, height] = [height, width];
+      break;
+    case "180":
+      [x, y] = [width - left, height - top];
+      break;
+    case "270":
+      [x, y] = [height - top, left];
+      [width, height] = [height, width];
+      break;
+  }
+
+  const naturalWidth = imageDisplay.naturalWidth || width;
+  const naturalHeight = imageDisplay.naturalHeight || height;
+  const scale = Math.max(width / naturalWidth, height / naturalHeight);
   const renderedWidth = naturalWidth * scale;
   const renderedHeight = naturalHeight * scale;
-  const cropX = (renderedWidth - rect.width) / 2;
-  const cropY = (renderedHeight - rect.height) / 2;
+  const cropX = (renderedWidth - width) / 2;
+  const cropY = (renderedHeight - height) / 2;
   return {
-    x: Math.max(0, Math.min(1, (event.clientX - rect.left + cropX) / renderedWidth)),
-    y: Math.max(0, Math.min(1, (event.clientY - rect.top + cropY) / renderedHeight)),
+    x: Math.max(0, Math.min(1, (x + cropX) / renderedWidth)),
+    y: Math.max(0, Math.min(1, (y + cropY) / renderedHeight)),
+    ringX: x,
+    ringY: y,
   };
 }
 
-function showFocusRing(clientX, clientY) {
-  const layerRect = imageLayer.getBoundingClientRect();
-  focusRing.style.left = `${clientX - layerRect.left}px`;
-  focusRing.style.top = `${clientY - layerRect.top}px`;
+function showFocusRing(x, y) {
+  focusRing.style.left = `${x}px`;
+  focusRing.style.top = `${y}px`;
   focusRing.classList.remove("visible");
   // Restart the focus animation even when tapping the same point twice.
   void focusRing.offsetWidth;
@@ -558,7 +582,7 @@ imageDisplay.addEventListener("pointerup", (event) => {
   if (movement > 16) return;
   const focus = cameraFocusCoordinates(event);
   if (!focus) return;
-  showFocusRing(event.clientX, event.clientY);
+  showFocusRing(focus.ringX, focus.ringY);
   sendJson({ type: "camera_focus", x: focus.x, y: focus.y });
 });
 
@@ -623,11 +647,73 @@ menuBtn.addEventListener("click", openMenu);
 
 menuClose.addEventListener("click", closeMenu);
 
-autoListeningToggle.addEventListener("change", () => {
+autoListeningToggle.addEventListener("click", () => {
+  const enabled = autoListeningToggle.getAttribute("aria-checked") !== "true";
   autoListeningToggle.disabled = true;
   autoListeningError.hidden = true;
-  sendJson({ type: "set_auto_listening", enabled: autoListeningToggle.checked });
+  sendJson({ type: "set_auto_listening", enabled });
 });
+
+const rotationStorageKey = "whisplay-hat-plus.screen-rotation";
+
+function applyScreenRotation(value) {
+  const option = rotationOptions.find((input) => input.value === value) || rotationOptions[0];
+  option.checked = true;
+  document.body.dataset.rotation = option.value;
+}
+
+try {
+  applyScreenRotation(localStorage.getItem(rotationStorageKey));
+} catch (error) {
+  console.warn("[HatPlusDisplay] Failed to load screen rotation:", error);
+  applyScreenRotation("0");
+}
+
+rotationSetting.addEventListener("change", (event) => {
+  const value = event.target.value;
+  try {
+    localStorage.setItem(rotationStorageKey, value);
+    applyScreenRotation(value);
+    rotationError.hidden = true;
+  } catch (error) {
+    console.warn("[HatPlusDisplay] Failed to save screen rotation:", error);
+    applyScreenRotation(document.body.dataset.rotation);
+    rotationError.textContent = "Unable to save screen rotation.";
+    rotationError.hidden = false;
+  }
+});
+
+// Scroll along the rotated UI's vertical axis on the touchscreen.
+for (const viewport of document.querySelectorAll(".text-viewport, .menu-panel")) {
+  let scrollToTouch = null;
+  viewport.addEventListener("touchstart", (event) => {
+    scrollToTouch = null;
+    const angle = document.body.dataset.rotation;
+    if (angle === "0" || event.touches.length !== 1 ||
+        event.target === volumeSlider || viewport.scrollHeight <= viewport.clientHeight) return;
+
+    const axis = angle === "180" ? "clientY" : "clientX";
+    const direction = angle === "270" ? -1 : 1;
+    let last = event.touches[0][axis];
+    let dragging = false;
+    scrollToTouch = (touch) => {
+      const next = touch[axis];
+      const delta = next - last;
+      if (!dragging && Math.abs(delta) < 8) return false;
+      dragging = true;
+      viewport.scrollTop += delta * direction;
+      last = next;
+      return true;
+    };
+  }, { passive: true });
+  viewport.addEventListener("touchmove", (event) => {
+    if (event.touches.length === 1 && scrollToTouch?.(event.touches[0])) {
+      event.preventDefault();
+    }
+  }, { passive: false });
+  viewport.addEventListener("touchend", () => { scrollToTouch = null; });
+  viewport.addEventListener("touchcancel", () => { scrollToTouch = null; });
+}
 
 exitAppBtn.addEventListener("click", showExitConfirmation);
 exitCancelBtn.addEventListener("click", hideExitConfirmation);
@@ -660,6 +746,28 @@ volumeSlider.addEventListener("input", () => {
     sendJson({ type: "set_volume", percent: pct });
   }, 100);
 });
+
+function setVolumeFromRotatedTouch(event) {
+  const { rotation } = document.body.dataset;
+  if (rotation === "0" || event.touches.length !== 1) return;
+
+  event.preventDefault();
+  const { clientX, clientY } = event.touches[0];
+  const rect = volumeSlider.getBoundingClientRect();
+  let progress;
+  if (rotation === "180") {
+    progress = (rect.right - clientX) / rect.width;
+  } else if (rotation === "270") {
+    progress = (rect.bottom - clientY) / rect.height;
+  } else {
+    progress = (clientY - rect.top) / rect.height;
+  }
+  volumeSlider.valueAsNumber = Math.round(progress * 100);
+  volumeSlider.dispatchEvent(new Event("input"));
+}
+
+volumeSlider.addEventListener("touchstart", setVolumeFromRotatedTouch, { passive: false });
+volumeSlider.addEventListener("touchmove", setVolumeFromRotatedTouch, { passive: false });
 
 // ── Start ───────────────────────────────────────────────────────────────────
 connectWebSocket();

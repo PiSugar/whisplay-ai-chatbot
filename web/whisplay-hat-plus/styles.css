@@ -4,8 +4,8 @@
   --text: #e4ecf4;
   --muted: #7f8a99;
   --danger: #f55;
-  --edge-x: clamp(10px, 3vw, 24px);
-  --edge-y: clamp(6px, 2vh, 18px);
+  --edge-x: clamp(10px, 3cqw, 24px);
+  --edge-y: clamp(6px, 2cqh, 18px);
   --status-font: clamp(15px, 3.8vmin, 22px);
   --body-font: clamp(16px, 4.2vmin, 28px);
   --emoji-size: clamp(56px, 18vmin, 112px);
@@ -32,11 +32,29 @@ body {
 }
 
 /* ── Full-screen layout ─────────────────────────────────────────────────── */
+body {
+  --panel-width: 100dvw;
+  --panel-height: 100dvh;
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: var(--panel-width);
+  height: var(--panel-height);
+  container: app-viewport / size;
+  transform-origin: top left;
+}
+
+body:is([data-rotation="90"], [data-rotation="270"]) {
+  width: var(--panel-height);
+  height: var(--panel-width);
+}
+
+body[data-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+body[data-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+body[data-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
+
 .screen {
-  width: 100vw;
-  height: 100vh;
-  width: 100dvw;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -51,7 +69,7 @@ body {
 
 /* ── Status bar ─────────────────────────────────────────────────────────── */
 .header {
-  padding: var(--edge-y) var(--edge-x) clamp(4px, 1vh, 8px);
+  padding: var(--edge-y) var(--edge-x) clamp(4px, 1cqh, 8px);
   background: var(--bg);
   z-index: 2;
 }
@@ -81,7 +99,7 @@ body {
 .status-icons {
   display: flex;
   justify-content: flex-end;
-  gap: clamp(6px, 2vw, 12px);
+  gap: clamp(6px, 2cqw, 12px);
   align-items: center;
 }
 
@@ -128,7 +146,7 @@ body {
 /* ── Emoji ──────────────────────────────────────────────────────────────── */
 .emoji-area {
   text-align: center;
-  padding: clamp(4px, 1.5vh, 12px) var(--edge-x);
+  padding: clamp(4px, 1.5cqh, 12px) var(--edge-x);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -156,7 +174,7 @@ body {
 
 /* ── Text body ──────────────────────────────────────────────────────────── */
 .body {
-  padding: clamp(4px, 1.5vh, 10px) var(--edge-x) clamp(6px, 2vh, 14px);
+  padding: clamp(4px, 1.5cqh, 10px) var(--edge-x) clamp(6px, 2cqh, 14px);
   overflow: hidden;
   position: relative;
   z-index: 1;
@@ -233,7 +251,7 @@ body {
   display: none;
   align-items: center;
   gap: 8px;
-  padding: 0 var(--edge-x) clamp(4px, 1vh, 8px);
+  padding: 0 var(--edge-x) clamp(4px, 1cqh, 8px);
   z-index: 2;
 }
 
@@ -270,7 +288,7 @@ body {
 
 /* ── Record button area ─────────────────────────────────────────────────── */
 .button-area {
-  padding: clamp(6px, 1.5vh, 12px) var(--edge-x) clamp(10px, 3vh, 22px);
+  padding: clamp(6px, 1.5cqh, 12px) var(--edge-x) clamp(10px, 3cqh, 22px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -506,7 +524,7 @@ body {
 
 /* ── Menu overlay ───────────────────────────────────────────────────────── */
 .menu-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(0,0,0,0);
   z-index: 50;
@@ -532,9 +550,11 @@ body {
 
 .menu-panel {
   width: 100%;
-  max-width: min(720px, 100vw);
-  max-height: 100vh;
+  max-width: 720px;
+  max-height: 100%;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   background: #131c2a;
   padding: clamp(14px, 3vmin, 24px) var(--edge-x) max(20px, env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -10px 40px rgba(0,0,0,.6);
@@ -544,6 +564,11 @@ body {
   transition:
     transform .3s cubic-bezier(.22, 1, .36, 1),
     opacity .22s ease;
+}
+
+body:is([data-rotation="90"], [data-rotation="180"], [data-rotation="270"])
+  :is(.text-viewport, .menu-panel, .volume-slider) {
+  touch-action: none;
 }
 
 .menu-overlay.open .menu-panel {
@@ -590,20 +615,106 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  width: 100%;
   min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-.setting-switch input {
+.setting-switch:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.setting-switch:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 4px;
+}
+
+.setting-switch-track {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: #4a5565;
+  transition: background-color .18s ease;
+}
+
+.setting-switch-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
   width: 24px;
   height: 24px;
-  accent-color: #44f28a;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35);
+  transition: transform .18s ease;
+}
+
+.setting-switch[aria-checked="true"] .setting-switch-track {
+  background: var(--accent);
+}
+
+.setting-switch[aria-checked="true"] .setting-switch-track::before {
+  transform: translateX(22px);
 }
 
 .setting-error {
   margin: 4px 0 0;
   color: #ffb4ab;
   font-size: 13px;
+}
+
+.rotation-setting {
+  min-width: 0;
+  border: 0;
+}
+
+.rotation-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rotation-options label {
+  position: relative;
+}
+
+.rotation-options input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rotation-options span {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+}
+
+.rotation-options input:checked + span {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rotation-options input:focus-visible + span {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 .menu-label {
@@ -743,22 +854,18 @@ body {
  * Cap the portrait surface to the actual panel width so the rightmost 20px
  * are not clipped. Landscape continues to use its full logical width. */
 @media (orientation: portrait) and (max-width: 520px) {
-  .screen,
-  .menu-overlay {
-    width: min(480px, 100vw);
+  body {
+    --panel-width: min(480px, 100dvw);
   }
 }
 
 /* Landscape DSI panels: place the Python-style emoji beside the response. */
-@media (orientation: landscape) and (max-height: 600px) {
-  :root {
-    --emoji-size: clamp(72px, 24vh, 128px);
-    --record-size: clamp(58px, 15vh, 76px);
-    --menu-size: clamp(44px, 12vh, 58px);
-  }
-
+@container app-viewport (orientation: landscape) and (max-height: 600px) {
   .screen {
-    grid-template-columns: minmax(120px, 30vw) minmax(0, 1fr);
+    --emoji-size: clamp(72px, 24cqh, 128px);
+    --record-size: clamp(58px, 15cqh, 76px);
+    --menu-size: clamp(44px, 12cqh, 58px);
+    grid-template-columns: minmax(120px, 30cqw) minmax(0, 1fr);
     /* Corner controls are absolute, so reserve their height in the grid even
        when the music bar is hidden. Keep the scroll viewport above them. */
     grid-template-rows: auto minmax(0, 1fr) minmax(
@@ -806,7 +913,9 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .menu-overlay,
-  .menu-panel {
+  .menu-panel,
+  .setting-switch-track,
+  .setting-switch-track::before {
     transition-duration: .01ms;
   }
 }

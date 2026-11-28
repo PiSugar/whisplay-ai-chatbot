@@ -124,12 +124,22 @@
         </div>
       </div>
       <div class="menu-section">
-        <label class="setting-switch" for="autoListeningToggle">
+        <button class="setting-switch" id="autoListeningToggle" type="button" role="switch" aria-checked="false" disabled>
           <span>Auto Listening</span>
-          <input id="autoListeningToggle" type="checkbox" role="switch" disabled />
-        </label>
+          <span class="setting-switch-track" aria-hidden="true"></span>
+        </button>
         <p class="setting-error" id="autoListeningError" role="status" hidden></p>
       </div>
+      <fieldset class="menu-section rotation-setting" id="rotationSetting">
+        <legend class="menu-label">Screen Rotation</legend>
+        <div class="rotation-options">
+          <label><input type="radio" name="screenRotation" value="0" checked /><span>0°</span></label>
+          <label><input type="radio" name="screenRotation" value="90" /><span>90°</span></label>
+          <label><input type="radio" name="screenRotation" value="180" /><span>180°</span></label>
+          <label><input type="radio" name="screenRotation" value="270" /><span>270°</span></label>
+        </div>
+        <p class="setting-error" id="rotationError" role="status" hidden></p>
+      </fieldset>
       <div class="menu-section app-actions">
         <div class="menu-label">Application</div>
         <button class="exit-app-btn" id="exitAppBtn" type="button">
