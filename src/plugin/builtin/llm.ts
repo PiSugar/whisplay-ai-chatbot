@@ -250,6 +250,22 @@ export function registerLLMPlugins(): void {
   } as LLMPlugin);
 
   pluginRegistry.register({
+    name: "atlascloud",
+    displayName: "Atlas Cloud LLM",
+    version: "1.0.0",
+    type: "llm",
+    description: "Atlas Cloud AI model gateway (OpenAI-compatible)",
+    activate: () => {
+      const mod = require("../../cloud-api/atlascloud/atlascloud-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+        summaryTextWithLLM: mod.summaryTextWithLLM,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
     name: "image-tool-direct",
     displayName: "Image Tool Direct LLM",
     version: "1.0.0",

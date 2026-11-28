@@ -50,6 +50,7 @@ export enum LLMServer {
   imagetooldirect = "image-tool-direct",
   perplexity = "perplexity",
   openrouter = "openrouter",
+  atlascloud = "atlascloud",
   deepseek = "deepseek",
 }
 
