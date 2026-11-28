@@ -38,14 +38,14 @@ pkill -f "chromium.*${HAT_PLUS_PORT}" 2>/dev/null || true
 pkill -f "firefox.*${HAT_PLUS_PORT}" 2>/dev/null || true
 sleep 1
 
-# Prefer Firefox, fall back to Chromium
+# Prefer Chromium for the HAT+ kiosk.
 BROWSER_BIN=""
-if command -v firefox &>/dev/null; then
-  BROWSER_BIN="firefox"
-elif command -v chromium &>/dev/null; then
+if command -v chromium &>/dev/null; then
   BROWSER_BIN="chromium"
 elif command -v chromium-browser &>/dev/null; then
   BROWSER_BIN="chromium-browser"
+elif command -v firefox &>/dev/null; then
+  BROWSER_BIN="firefox"
 else
   echo "[hat-plus-ui] Error: no browser found. Install firefox or chromium"
   exit 1
@@ -56,7 +56,14 @@ echo "[hat-plus-ui] Using browser: ${BROWSER_BIN}"
 if [ "$BROWSER_BIN" = "firefox" ]; then
   exec firefox --kiosk "$HAT_PLUS_URL"
 else
+  # Keep the local kiosk separate from normal browser sessions and avoid a
+  # desktop keyring setup prompt on a fresh image.
+  kiosk_profile="${XDG_CONFIG_HOME:-$HOME/.config}/whisplay/chromium-kiosk"
+  mkdir -p -m 0700 "$kiosk_profile" || exit 1
+
   CHROMIUM_ARGS=(
+    "--user-data-dir=$kiosk_profile"
+    --password-store=basic
     --kiosk
     --noerrdialogs
     --disable-infobars
