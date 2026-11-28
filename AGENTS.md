@@ -21,7 +21,7 @@ Whisplay AI Chatbot is a pocket-sized AI chatbot device built for Raspberry Pi Z
 ### Core Technologies
 | Component | Technology |
 |-----------|------------|
-| Main Runtime | Node.js 22 or later + TypeScript. The basic image provisions Node.js 22. |
+| Main Runtime | Node.js 22 or later + TypeScript. Both basic images provision Node.js 22. |
 | Hardware Interface | Python 3 + RPi.GPIO / gpiod |
 | UI Rendering | Python Pillow (PIL) + socket communication |
 | Package Manager | yarn (preferred) or npm |
@@ -141,15 +141,14 @@ bash build.sh
 # See packaging/pi-gen/basic/ for the basic Raspberry Pi OS release image customization
 ```
 
-The basic image preinstalls the unified sound-card module and the HAT+ DSI panel
-module for every packaged kernel ABI. At boot, `whisplay-select-hat.service`
-checks the HAT+ sensor IDs on I2C1 on supported Pi models. It changes
-`/boot/firmware/whisplay-hat.txt` and reboots once when the board profile changes.
-The image selects the overlay through this include and disables HAT EEPROM
-autoloading to keep the two overlays from conflicting. Only the SPI HAT
-profile enables the custom U-Boot splash, SPI daemon, app registration, and
-audio warm-up. The HAT+ profile uses the Raspberry Pi firmware's normal
-kernel boot path and Desktop.
+GitHub Actions builds separate Whisplay HAT and HAT+ images in a matrix using
+the same pi-gen stage and the `WHISPLAY_IMAGE_MODEL` build setting. The HAT
+image uses the classic Whisplay driver, U-Boot splash, hardware daemon, and
+app registration service. The HAT+ image builds the display and audio modules
+from the `whisplay-plus` repository for every packaged kernel ABI. It uses
+the Raspberry Pi firmware and a desktop launcher. Each image configures its
+own device-tree overlay and `WHISPLAY_HAT_MODEL` before flashing. The release
+job publishes both image assets together after both builds pass inspection.
 
 ### Run Commands
 ```bash

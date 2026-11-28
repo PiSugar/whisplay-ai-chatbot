@@ -15,12 +15,18 @@ permissions:
 jobs:
   build-image:
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - model: hat
+            name: whisplay-basic
+          - model: hat-plus
+            name: whisplay-plus-basic
     outputs:
-      asset_name: ${{ steps.meta.outputs.asset_name }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_name: ${{ steps.meta.outputs.release_name }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
-      source_ref: ${{ steps.meta.outputs.source_ref }}
       source_branch: ${{ steps.meta.outputs.source_branch }}
     steps:
       - name: Checkout repository
@@ -37,14 +43,12 @@ jobs:
             packaging/pi-gen/basic/stage-whisplay/files/install-sugar-wifi-conf.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-driver.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-plus-driver.sh \
-            packaging/pi-gen/basic/stage-whisplay/files/select-whisplay-hat.sh \
             packaging/pi-gen/basic/stage-whisplay/files/install-whisplay-u-boot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/expand-rootfs-firstboot.sh \
             packaging/pi-gen/basic/stage-whisplay/files/provision-basic.sh
           do
             bash -n "$script"
           done
-          bash packaging/pi-gen/basic/test-select-whisplay-hat.sh
 
       - name: Set release metadata
         id: meta
@@ -52,7 +56,6 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             release_tag="${GITHUB_REF_NAME}"
             release_name="${GITHUB_REF_NAME}"
-            asset_name="whisplay-basic.img.xz"
             prerelease="false"
             source_ref="${GITHUB_REF_NAME}"
             source_branch=""
@@ -60,7 +63,6 @@ jobs:
             branch_slug="$(printf '%s' "${GITHUB_REF_NAME}" | tr '/[:space:]' '-' | tr -cd '[:alnum:]._-')"
             release_tag="${branch_slug}-latest"
             release_name="${branch_slug}-latest"
-            asset_name="whisplay-basic.img.xz"
             prerelease="true"
             source_ref="${GITHUB_REF_NAME}"
             source_branch="${GITHUB_REF_NAME}"
@@ -69,7 +71,6 @@ jobs:
           {
             echo "release_tag=$release_tag"
             echo "release_name=$release_name"
-            echo "asset_name=$asset_name"
             echo "prerelease=$prerelease"
             echo "source_ref=$source_ref"
             echo "source_branch=$source_branch"
@@ -132,6 +133,8 @@ jobs:
         env:
           WHISPLAY_RELEASE_VERSION: ${{ steps.meta.outputs.release_name }}
           WHISPLAY_SOURCE_REF: ${{ steps.meta.outputs.source_ref }}
+          IMAGE_NAME: ${{ matrix.image.name }}
+          IMAGE_MODEL: ${{ matrix.image.model }}
         run: |
           cp -R packaging/pi-gen/basic/stage-whisplay pi-gen/stage-whisplay
           chmod +x \
@@ -147,9 +150,12 @@ jobs:
           touch pi-gen/stage3/SKIP_IMAGES
           cat packaging/pi-gen/basic/pi-gen.env > pi-gen/config
           {
-            echo "WHISPLAY_CHATBOT_REPO=https://github.com/${GITHUB_REPOSITORY}.git"
-            echo "WHISPLAY_CHATBOT_REF=${WHISPLAY_SOURCE_REF}"
-            echo "WHISPLAY_RELEASE_VERSION=${WHISPLAY_RELEASE_VERSION}"
+            printf 'IMG_NAME=%q\nTARGET_HOSTNAME=%q\n' "$IMAGE_NAME" "$IMAGE_NAME"
+            printf 'export WHISPLAY_IMAGE_MODEL=%q\n' "$IMAGE_MODEL"
+            printf 'export WHISPLAY_CHATBOT_REPO=%q\n' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+            printf 'export WHISPLAY_CHATBOT_REF=%q\n' "$WHISPLAY_SOURCE_REF"
+            printf 'export WHISPLAY_CHATBOT_REVISION=%q\n' "$(git rev-parse HEAD)"
+            printf 'export WHISPLAY_RELEASE_VERSION=%q\n' "$WHISPLAY_RELEASE_VERSION"
           } >> pi-gen/config
           grep -n "install_networkmanager_polkit_rule\\|49-whisplay-networkmanager" pi-gen/stage-whisplay/files/provision-basic.sh
 
@@ -159,7 +165,7 @@ jobs:
 
       - name: Prepare release assets
         env:
-          ASSET_NAME: ${{ steps.meta.outputs.asset_name }}
+          ASSET_NAME: ${{ matrix.image.name }}.img.xz
         run: |
           set -euo pipefail
           deploy_dir="pi-gen/deploy"
@@ -203,7 +209,8 @@ jobs:
 
       - name: Inspect image contents
         env:
-          ASSET_NAME: ${{ steps.meta.outputs.asset_name }}
+          ASSET_NAME: ${{ matrix.image.name }}.img.xz
+          IMAGE_MODEL: ${{ matrix.image.model }}
         run: |
           set -euo pipefail
           asset="release-assets/${ASSET_NAME}"
@@ -246,61 +253,78 @@ jobs:
             fi
           }
 
-          check_file /etc/systemd/system/chatbot.service || exit 1
-          check_file /etc/systemd/system/whisplay-daemon.service || exit 1
-          check_file /etc/systemd/system/whisplay-chatbot-register.service || exit 1
-          check_file /etc/systemd/system/whisplay-expand-rootfs.service || exit 1
-          check_file /etc/systemd/system/whisplay-select-hat.service || exit 1
-          check_file /usr/local/lib/whisplay-image/select-whisplay-hat.sh || exit 1
-          check_file /usr/local/sbin/whisplay-expand-rootfs || exit 1
-          check_file /etc/whisplay-image/basic-release || exit 1
-          check_file /etc/whisplay-image/u-boot-release || exit 1
-          check_file /etc/cloud/cloud.cfg || exit 1
-          check_file /usr/bin/nmcli || exit 1
-          check_file /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules || exit 1
-          check_file /etc/asound.conf || exit 1
-          check_file /etc/systemd/system/whisplay-soundcard-warmup.service || exit 1
+          root=/mnt/whisplay-root
+          boot=/mnt/whisplay-boot
+          config="$boot/config.txt"
+          services="$root/etc/systemd/system"
+          wants="$services/multi-user.target.wants"
 
-          check_boot_file() {
-            local path="$1"
-            if [ ! -e "/mnt/whisplay-boot${path}" ]; then
-              echo "Missing expected boot path: ${path}" >&2
-              return 1
-            fi
+          check_file /etc/systemd/system/chatbot.service
+          check_file /etc/systemd/system/whisplay-expand-rootfs.service
+          check_file /usr/local/sbin/whisplay-expand-rootfs
+          check_file /etc/whisplay-image/basic-release
+          check_file /etc/cloud/cloud.cfg
+          check_file /usr/bin/nmcli
+          check_file /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
+          check_file /etc/asound.conf
+          sudo grep -qxF "WHISPLAY_IMAGE_MODEL=$IMAGE_MODEL" "$root/etc/whisplay-image/basic-release"
+          sudo grep -qxF "WHISPLAY_CHATBOT_REVISION=$GITHUB_SHA" "$root/etc/whisplay-image/basic-release"
+          sudo grep -qxF "WHISPLAY_HAT_MODEL=$IMAGE_MODEL" "$root/home/pi/whisplay-ai-chatbot/.env"
+          sudo grep -q 'whisplaysound' "$root/etc/asound.conf"
+          sudo test -L "$wants/whisplay-expand-rootfs.service"
+
+          expect_absent() {
+            local path
+            for path in "$@"; do
+              if sudo test -e "$path" || sudo test -L "$path"; then
+                echo "Unexpected path in ${IMAGE_MODEL} image: $path" >&2
+                return 1
+              fi
+            done
           }
-          check_boot_file /u-boot-whisplay-rpi-arm64.bin || exit 1
-          check_boot_file /logo_lcd_240_280_rgb565.bmp || exit 1
-          check_boot_file /config.txt || exit 1
-          check_boot_file /overlays/whisplay-soundcard.dtbo || exit 1
-          check_boot_file /overlays/whisplay-plus.dtbo || exit 1
-          check_boot_file /whisplay-hat.txt || exit 1
 
-          if ! sudo grep -qxF 'enable_uart=1' /mnt/whisplay-boot/config.txt; then
-            echo "config.txt is missing enable_uart=1" >&2
-            sudo cat /mnt/whisplay-boot/config.txt >&2
+          expect_absent "$services/whisplay-select-hat.service" "$boot/whisplay-hat.txt" "$wants/wm8960-soundcard.service"
+          if sudo grep -Eq '^dtoverlay=(wm8960-soundcard|es8389-soundcard)([,[:space:]]|$)' "$config"; then
+            echo "Found a deprecated audio overlay in $config" >&2
             exit 1
           fi
-          profiles=/mnt/whisplay-root/usr/local/lib/whisplay-image/boot-profiles
-          sudo grep -qxF 'uart_2ndstage=1' /mnt/whisplay-boot/config.txt
-          sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' "$profiles/hat.txt"
-          sudo grep -qxF 'dtoverlay=whisplay-soundcard' "$profiles/hat.txt"
-          sudo grep -qxF 'dtoverlay=whisplay-plus' "$profiles/hat-plus.txt"
-          sudo grep -qxF 'include whisplay-hat.txt' /mnt/whisplay-boot/config.txt
-          sudo grep -qxF 'force_eeprom_read=0' /mnt/whisplay-boot/config.txt
-          if sudo grep -Eq '^[[:space:]]*(kernel=|dtoverlay=(whisplay-soundcard|whisplay-plus|wm8960-soundcard|es8389-soundcard)([,[:space:]]|$))' /mnt/whisplay-boot/{config,whisplay-hat}.txt; then
-            echo "The unconfigured image enables a Whisplay kernel or overlay before detection" >&2
-            exit 1
+
+          if [ "$IMAGE_MODEL" = hat ]; then
+            check_file /etc/whisplay-image/u-boot-release
+            sudo test -f "$boot/u-boot-whisplay-rpi-arm64.bin"
+            sudo test -f "$boot/logo_lcd_240_280_rgb565.bmp"
+            sudo test -f "$boot/overlays/whisplay-soundcard.dtbo"
+            sudo grep -qxF 'dtoverlay=whisplay-soundcard' "$config"
+            sudo grep -qxF 'enable_uart=1' "$config"
+            sudo grep -qxF 'uart_2ndstage=1' "$config"
+            sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' "$config"
+            for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
+              check_file "/etc/systemd/system/${unit}.service"
+              sudo test -L "$wants/${unit}.service"
+            done
+            sudo grep -Eq '^SupplementaryGroups=([[:alnum:]_-]+[[:space:]]+)*netdev([[:space:]]|$)' "$services/whisplay-daemon.service"
+            expect_absent "$boot/overlays/whisplay-plus.dtbo"
+            sound_module=kernel/sound/soc/codecs/snd-soc-whisplay-soundcard.ko
+          else
+            check_file /usr/bin/chromium
+            check_file /usr/share/applications/whisplay-ai-chatbot.desktop
+            check_file /etc/modules-load.d/whisplay-hat-plus.conf
+            sudo test -f "$boot/overlays/whisplay-plus.dtbo"
+            sudo grep -qxF 'dtoverlay=whisplay-plus' "$config"
+            test "$(sudo grep -xcF 'dtoverlay=whisplay-plus,display_dsi=1' "$config")" -eq 2
+            sudo grep -qxF 'st7701p_pisugar' "$root/etc/modules-load.d/whisplay-hat-plus.conf"
+            sudo grep -qxF 'snd-soc-whisplay-soundcard' "$root/etc/modules-load.d/whisplay-hat-plus.conf"
+            expect_absent "$boot/overlays/whisplay-soundcard.dtbo" "$boot/u-boot-whisplay-rpi-arm64.bin" "$root/home/pi/Whisplay"
+            for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
+              expect_absent "$services/${unit}.service" "$root/usr/lib/systemd/system/${unit}.service" "$wants/${unit}.service"
+            done
+            if sudo grep -Eq '^(kernel=|dtoverlay=whisplay-soundcard([,[:space:]]|$))' "$config"; then
+              echo "Found a Whisplay HAT boot setting in the HAT+ image" >&2
+              exit 1
+            fi
+            sound_module=extra/snd-soc-whisplay-soundcard.ko
           fi
-          sudo test -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-select-hat.service
-          for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
-            sudo grep -qxF 'After=whisplay-select-hat.service' "/mnt/whisplay-root/etc/systemd/system/${unit}.service.d/10-whisplay-hat.conf"
-            sudo grep -qxF 'ConditionPathExists=/run/whisplay-image/hat' "/mnt/whisplay-root/etc/systemd/system/${unit}.service.d/10-whisplay-hat.conf"
-          done
-          if ! sudo grep -q 'whisplaysound' /mnt/whisplay-root/etc/asound.conf; then
-            echo "/etc/asound.conf does not route audio through whisplaysound" >&2
-            sudo cat /mnt/whisplay-root/etc/asound.conf >&2
-            exit 1
-          fi
+
           whisplay_kernel_releases="$(sudo find /mnt/whisplay-root/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V)"
           if [ -z "$whisplay_kernel_releases" ]; then
             echo "No kernel module directories found in image" >&2
@@ -309,32 +333,17 @@ jobs:
           fi
           while IFS= read -r kernel_release; do
             [ -n "$kernel_release" ] || continue
-            module_path="/mnt/whisplay-root/lib/modules/${kernel_release}/kernel/sound/soc/codecs/snd-soc-whisplay-soundcard.ko"
-            if ! sudo test -f "$module_path"; then
-              echo "Unified Whisplay sound card kernel module is missing for ${kernel_release}" >&2
-              sudo find "/mnt/whisplay-root/lib/modules/${kernel_release}" -maxdepth 6 -type f -name '*whisplay*' -print >&2 || true
-              exit 1
+            module_dir="$root/lib/modules/$kernel_release"
+            sudo test -f "$module_dir/$sound_module"
+            sudo grep -Fq "$sound_module:" "$module_dir/modules.dep"
+            if [ "$IMAGE_MODEL" = hat-plus ]; then
+              sudo test -f "$module_dir/extra/st7701p_pisugar.ko"
+              sudo grep -Fq 'extra/st7701p_pisugar.ko:' "$module_dir/modules.dep"
+              expect_absent "$module_dir/kernel/sound/soc/codecs/snd-soc-whisplay-soundcard.ko"
+            else
+              expect_absent "$module_dir/extra/st7701p_pisugar.ko"
             fi
-            if ! sudo grep -q 'snd-soc-whisplay-soundcard.ko' "/mnt/whisplay-root/lib/modules/${kernel_release}/modules.dep"; then
-              echo "modules.dep does not include the Whisplay sound card module for ${kernel_release}" >&2
-              sudo grep -n 'whisplay' "/mnt/whisplay-root/lib/modules/${kernel_release}/modules.dep" >&2 || true
-              exit 1
-            fi
-            sudo test -f "/mnt/whisplay-root/lib/modules/${kernel_release}/extra/st7701p_pisugar.ko"
-            sudo grep -q '^extra/st7701p_pisugar\.ko:' "/mnt/whisplay-root/lib/modules/${kernel_release}/modules.dep"
           done <<< "$whisplay_kernel_releases"
-          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-soundcard-warmup.service ]; then
-            true
-          else
-            echo "whisplay-soundcard-warmup.service is not enabled in the image" >&2
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
-            exit 1
-          fi
-          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/wm8960-soundcard.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/wm8960-soundcard.service ]; then
-            echo "Legacy wm8960-soundcard.service is still enabled in the image" >&2
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants >&2 || true
-            exit 1
-          fi
 
           chatbot_exec_path_raw="$(sudo awk -F= '
             $1 == "ExecStart" {
@@ -368,39 +377,6 @@ jobs:
             exit 1
           fi
 
-          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service ]; then
-            true
-          else
-            echo "whisplay-chatbot-register.service is not enabled in the image" >&2
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
-            exit 1
-          fi
-
-          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-daemon.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-daemon.service ]; then
-            true
-          else
-            echo "whisplay-daemon.service is not enabled in the image" >&2
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
-            exit 1
-          fi
-
-          if [ -L /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service ] || [ -e /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants/whisplay-expand-rootfs.service ]; then
-            true
-          else
-            echo "whisplay-expand-rootfs.service is not enabled in the image" >&2
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system
-            sudo ls -la /mnt/whisplay-root/etc/systemd/system/multi-user.target.wants || true
-            exit 1
-          fi
-
-          if ! sudo grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service; then
-            echo "whisplay-daemon.service is missing netdev in SupplementaryGroups" >&2
-            sudo cat /mnt/whisplay-root/etc/systemd/system/whisplay-daemon.service >&2
-            exit 1
-          fi
-
           if ! sudo grep -q 'org.freedesktop.NetworkManager.' /mnt/whisplay-root/etc/polkit-1/rules.d/49-whisplay-networkmanager.rules; then
             echo "NetworkManager polkit rule is missing expected action prefix" >&2
             sudo cat /mnt/whisplay-root/etc/polkit-1/rules.d/49-whisplay-networkmanager.rules >&2
@@ -413,8 +389,9 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: basic-image-release-assets
+          name: basic-image-release-assets-${{ matrix.image.model }}
           path: release-assets/*
+          if-no-files-found: error
 
   publish-release:
     needs: build-image
@@ -437,7 +414,8 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: basic-image-release-assets
+          pattern: basic-image-release-assets-*
+          merge-multiple: true
           path: release-assets
 
       - name: Publish release
@@ -448,12 +426,25 @@ jobs:
           RELEASE_TAG: ${{ needs.build-image.outputs.release_tag }}
         run: |
           set -euo pipefail
+          (
+            cd release-assets
+            for image in whisplay-basic.img.xz whisplay-plus-basic.img.xz; do
+              test -s "$image"
+              sha256sum --check --status "$image.sha256"
+            done
+          )
+
           notes_dir="$(mktemp -d)"
           trap 'rm -rf "$notes_dir"' EXIT
           cat > "$notes_dir/basic-image.md" <<EOF
-          ## Basic image startup
+          ## Basic images
 
-          The basic image includes drivers for Whisplay HAT and Whisplay HAT+ and selects the connected HAT at boot. It automatically reboots once on first boot or after switching HATs to apply the selected driver configuration. Subsequent boots with the same HAT continue normally.
+          Choose the image for your hardware before flashing the SD card.
+
+          - \`whisplay-basic.img.xz\` — Whisplay HAT with the SPI LCD and Whisplay launcher.
+          - \`whisplay-plus-basic.img.xz\` — Whisplay HAT+ with its native display, touch, and audio drivers. Open **Whisplay AI Chatbot** from the Raspberry Pi desktop.
+
+          To switch HAT models, flash the matching image.
 
           [Basic image startup guide](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/basic-image.md)
           EOF
@@ -463,15 +454,17 @@ jobs:
             release_flags+=(--prerelease)
           fi
 
-          if gh release view "$RELEASE_TAG" --json assets,body > "$notes_dir/release.json"; then
-            while IFS= read -r asset_name; do
-              [ -n "$asset_name" ] || continue
-              gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes
-            done < <(jq -r '.assets[].name' "$notes_dir/release.json")
+          if gh release view "$RELEASE_TAG" --json body > "$notes_dir/release.json"; then
             gh release upload "$RELEASE_TAG" release-assets/* --clobber
 
-            jq -r '.body // ""' "$notes_dir/release.json" > "$notes_dir/existing.md"
-            if ! grep -qxF '## Basic image startup' "$notes_dir/existing.md"; then
+            jq -r '.body // ""' "$notes_dir/release.json" |
+              awk '
+                /^## Basic image startup\r?$/ { skip=1; next }
+                skip && /^\[Basic image startup guide\]\(/ { skip=0; next }
+                /^## / { skip=0 }
+                !skip
+              ' > "$notes_dir/existing.md"
+            if ! grep -qxF '## Basic images' "$notes_dir/existing.md"; then
               printf '\n' >> "$notes_dir/existing.md"
               cat "$notes_dir/basic-image.md" >> "$notes_dir/existing.md"
               release_flags+=(--notes-file "$notes_dir/existing.md")
@@ -524,7 +517,7 @@ jobs:
             fi
           fi
           if [ -z "$BODY" ]; then
-            BODY="Basic image release is available."
+            BODY="Whisplay HAT and Whisplay HAT+ images are available."
           fi
 
           BODY="${BODY:0:1800}"

@@ -22,7 +22,6 @@ if [ -z "$boot_dir" ]; then
 fi
 
 config_txt="${boot_dir}/config.txt"
-kernel_config="${1:-$config_txt}"
 if [ ! -f "$config_txt" ]; then
   echo "${config_txt} not found" >&2
   exit 1
@@ -97,21 +96,19 @@ install -m 0644 "$logo_tmp" "${boot_dir}/${logo_asset}"
 set_config() {
   local key="$1"
   local value="$2"
-  local config_file="${3:-$config_txt}"
   local escaped
 
   escaped="$(printf '%s' "$value" | sed 's/[\/&]/\\&/g')"
-  if grep -qE "^[[:space:]]*#?[[:space:]]*${key}=" "$config_file"; then
-    sed -i "s/^[[:space:]]*#\\?[[:space:]]*${key}=.*/${key}=${escaped}/" "$config_file"
+  if grep -qE "^[[:space:]]*#?[[:space:]]*${key}=" "$config_txt"; then
+    sed -i "s/^[[:space:]]*#\\?[[:space:]]*${key}=.*/${key}=${escaped}/" "$config_txt"
   else
-    printf '%s=%s\n' "$key" "$value" >> "$config_file"
+    printf '%s=%s\n' "$key" "$value" >> "$config_txt"
   fi
 }
 
 set_config "enable_uart" "1"
-# The EEPROM bootloader reads this setting only from config.txt.
 set_config "uart_2ndstage" "1"
-set_config "kernel" "$asset" "$kernel_config"
+set_config "kernel" "$asset"
 
 mkdir -p "$meta_dir"
 cat > "${meta_dir}/u-boot-release" <<EOF

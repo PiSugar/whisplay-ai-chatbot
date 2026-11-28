@@ -37,15 +37,19 @@ Tutorial (offline version build on RPi 5):
 ## Hardware
 
 - Raspberry Pi zero 2w (Recommand RRi 5, 8G RAM for offline build)
-- PiSugar Whisplay HAT (including LCD screen, on-board speaker and microphone)
+- PiSugar Whisplay HAT (SPI LCD) or Whisplay HAT+ (MIPI DSI touchscreen), with on-board speaker and microphone
 - PiSugar 3 1200mAh (Plus version 5000mAh for RPi 5)
 
 ## Pre-build Image
 
-- Please find the pre-build images in project wiki: https://github.com/PiSugar/whisplay-ai-chatbot/wiki
-- [Zipformer offline ASR setup](docs/zipformer-asr.md)
+Choose the image for your HAT from the [release assets](https://github.com/PiSugar/whisplay-ai-chatbot/releases/latest).
 
-The basic image detects Whisplay HAT and Whisplay HAT+ at boot. It reboots automatically once on first boot or after switching HATs to apply the selected driver configuration. See the [basic image startup guide](docs/basic-image.md).
+- **Whisplay HAT (SPI LCD)** — `whisplay-basic.img.xz`
+- **Whisplay HAT+ (MIPI DSI touchscreen)** — `whisplay-plus-basic.img.xz`
+
+See the [basic image startup guide](docs/basic-image.md) for flashing and setup, or the [project wiki](https://github.com/PiSugar/whisplay-ai-chatbot/wiki) for other images.
+
+- [Zipformer offline ASR setup](docs/zipformer-asr.md)
 
 ## Drivers
 
@@ -108,7 +112,7 @@ If you are setting up the chatbot on your own Raspberry Pi OS installation, inst
 
 ## Whisplay Plus Quick Start
 
-Whisplay Plus is detected automatically from its DSI display. If automatic detection is unavailable, set the model explicitly in `.env`:
+The Whisplay HAT+ image sets the model in `.env` and includes a **Whisplay AI Chatbot** desktop launcher. On a manual installation, the chatbot detects HAT+ from its DSI display. You can also set the model explicitly in `.env`:
 
 ```bash
 WHISPLAY_HAT_MODEL=hat-plus

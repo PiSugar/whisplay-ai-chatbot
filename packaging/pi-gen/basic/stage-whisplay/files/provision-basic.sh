@@ -10,9 +10,11 @@ export NVM_DIR="/home/pi/.nvm"
 repo_dir="/home/pi/whisplay-ai-chatbot"
 repo_url="${WHISPLAY_CHATBOT_REPO:-https://github.com/PiSugar/whisplay-ai-chatbot.git}"
 repo_ref="${WHISPLAY_CHATBOT_REF:-master}"
+repo_revision="${WHISPLAY_CHATBOT_REVISION:-$repo_ref}"
 repo_version="${WHISPLAY_RELEASE_VERSION:-$repo_ref}"
 npm_registry="${NPM_REGISTRY:-https://registry.npmjs.org}"
 wifi_country="${WIFI_COUNTRY:-GB}"
+image_model="${WHISPLAY_IMAGE_MODEL:-hat}"
 
 install_networkmanager_polkit_rule() {
   install -d -m 0755 /etc/polkit-1/rules.d
@@ -32,7 +34,6 @@ apt-get install -y \
   alsa-utils \
   bluez \
   build-essential \
-  chromium \
   curl \
   device-tree-compiler \
   dkms \
@@ -59,7 +60,9 @@ apt-get install -y \
   libcairo2-dev
 
 if command -v raspi-config >/dev/null 2>&1; then
-  raspi-config nonint do_spi 0
+  if [ "$image_model" = hat ]; then
+    raspi-config nonint do_spi 0
+  fi
   raspi-config nonint do_wifi_country "$wifi_country" || true
 fi
 
@@ -71,6 +74,8 @@ fi
 if [ -f "$boot_config" ]; then
   sed -i'' '/^[[:space:]]*dtoverlay=disable-wifi[[:space:]]*$/d' "$boot_config"
 fi
+# Both images configure their board's overlay explicitly.
+printf '\n[all]\nforce_eeprom_read=0\n' >> "$boot_config"
 rfkill unblock wifi || true
 
 # Keep a baseline wpa_supplicant config present for non-NetworkManager flows.
@@ -95,28 +100,13 @@ if ! /usr/bin/node --version | grep -q '^v22\.'; then
   exit 1
 fi
 
-/usr/local/lib/whisplay-image/install-whisplay-driver.sh
-/usr/local/lib/whisplay-image/install-whisplay-plus-driver.sh "$(dirname "$boot_config")"
+getent group netdev >/dev/null 2>&1 || groupadd -r netdev
+usermod -aG netdev pi
+install_networkmanager_polkit_rule
 
-# Keep the boot overlay in one include so the selector can replace it without
-# rewriting config.txt. On the first boot, neither HAT claims GPIO.
-boot_profiles=/usr/local/lib/whisplay-image/boot-profiles
-sed -i -E '/^[[:space:]]*(dtoverlay=(whisplay-soundcard|whisplay-plus|wm8960-soundcard|es8389-soundcard)([,[:space:]]|$)|include[[:space:]]+whisplay-hat\.txt[[:space:]]*$)/d' "$boot_config"
-printf '%s\n' 'dtoverlay=whisplay-soundcard' > "$boot_profiles/hat.txt"
-printf '%s\n' '# Selected on first boot.' > "$(dirname "$boot_config")/whisplay-hat.txt"
-cat >> "$boot_config" <<'EOF'
-
-[all]
-# Select the board overlay from the image profile, including on HATs with EEPROM.
-force_eeprom_read=0
-dtparam=i2c_arm=on
-include whisplay-hat.txt
-EOF
-ln -sf /etc/systemd/system/whisplay-select-hat.service /etc/systemd/system/multi-user.target.wants/whisplay-select-hat.service
-
-whisplay_dir="/home/pi/Whisplay"
 install_whisplay_daemon() {
-  local script
+  local whisplay_dir="/home/pi/Whisplay"
+  local script daemon_unit
   for script in \
     "$whisplay_dir/daemon/install_whisplay_daemon_service.sh" \
     "$whisplay_dir/daemon/install.sh" \
@@ -126,38 +116,45 @@ install_whisplay_daemon() {
   do
     if [ -f "$script" ]; then
       SUDO_USER=pi HOME=/home/pi bash "$script" || true
-      return 0
+      break
     fi
   done
-  return 0
+
+  for daemon_unit in /etc/systemd/system/whisplay-daemon.service /usr/lib/systemd/system/whisplay-daemon.service /lib/systemd/system/whisplay-daemon.service; do
+    if [ -f "$daemon_unit" ]; then
+      break
+    fi
+  done
+  if [ ! -f "$daemon_unit" ]; then
+    echo "whisplay-daemon.service was not installed" >&2
+    return 1
+  fi
+  if ! grep -Eq '^SupplementaryGroups=([[:alnum:]_-]+[[:space:]]+)*netdev([[:space:]]|$)' "$daemon_unit"; then
+    sed -i -E 's/^(SupplementaryGroups=.*)$/\1 netdev/' "$daemon_unit"
+  fi
+  ln -sf "$daemon_unit" /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
+
+  if [ -f "$whisplay_dir/example/requirements.txt" ]; then
+    pip3 install -r "$whisplay_dir/example/requirements.txt" --break-system-packages
+  fi
 }
-install_whisplay_daemon
 
-getent group netdev >/dev/null 2>&1 || groupadd -r netdev
-usermod -aG netdev pi
-
-# Ensure daemon service is enabled if unit is present.
-daemon_unit=""
-if [ -f /etc/systemd/system/whisplay-daemon.service ]; then
-  daemon_unit="/etc/systemd/system/whisplay-daemon.service"
-elif [ -f /usr/lib/systemd/system/whisplay-daemon.service ]; then
-  daemon_unit="/usr/lib/systemd/system/whisplay-daemon.service"
-elif [ -f /lib/systemd/system/whisplay-daemon.service ]; then
-  daemon_unit="/lib/systemd/system/whisplay-daemon.service"
-else
-  echo "whisplay-daemon.service was not installed" >&2
-  exit 1
-fi
-if ! grep -Eq '^SupplementaryGroups=.*(^|[[:space:]])netdev($|[[:space:]])' "$daemon_unit"; then
-  sed -i -E 's/^(SupplementaryGroups=.*)$/\1 netdev/' "$daemon_unit"
-fi
-ln -sf "$daemon_unit" /etc/systemd/system/multi-user.target.wants/whisplay-daemon.service
-
-install_networkmanager_polkit_rule
-
-if [ -f "$whisplay_dir/example/requirements.txt" ]; then
-  pip3 install -r "$whisplay_dir/example/requirements.txt" --break-system-packages
-fi
+case "$image_model" in
+  hat)
+    /usr/local/lib/whisplay-image/install-whisplay-driver.sh
+    install_whisplay_daemon
+    /usr/local/lib/whisplay-image/install-whisplay-u-boot.sh
+    ;;
+  hat-plus)
+    apt-get install -y chromium
+    /usr/local/lib/whisplay-image/install-whisplay-plus-driver.sh "$(dirname "$boot_config")"
+    systemctl set-default graphical.target
+    ;;
+  *)
+    echo "Unsupported Whisplay image model: $image_model" >&2
+    exit 1
+    ;;
+esac
 
 if [ ! -d "$repo_dir/.git" ]; then
   git clone "$repo_url" "$repo_dir"
@@ -165,12 +162,20 @@ fi
 
 cd "$repo_dir"
 git fetch --tags --force origin
-git checkout --force "$repo_ref"
+git checkout --force "$repo_revision"
+repo_revision="$(git rev-parse HEAD)"
 chown -R pi:pi "$repo_dir"
 
 if [ ! -f .env ]; then
   cp .env.template .env
-  chown pi:pi .env
+fi
+sed -i -E '/^[[:space:]]*#?[[:space:]]*WHISPLAY_HAT_MODEL=/d' .env
+printf '\nWHISPLAY_HAT_MODEL=%s\n' "$image_model" >> .env
+chown pi:pi .env
+
+if [ "$image_model" = hat-plus ]; then
+  sudo -u pi env HOME=/home/pi XDG_DESKTOP_DIR=/home/pi/Desktop bash scripts/install-hat-plus-desktop-shortcut.sh
+  install -Dm 0644 /home/pi/Desktop/whisplay-ai-chatbot.desktop /usr/share/applications/whisplay-ai-chatbot.desktop
 fi
 
 sudo -u pi touch use_npm
@@ -182,8 +187,6 @@ ln -sf "$repo_dir/bin/whisplay" /usr/local/bin/whisplay
 
 cd "$repo_dir/python"
 pip3 install -r requirements.txt --break-system-packages
-
-/usr/local/lib/whisplay-image/install-whisplay-u-boot.sh "$boot_profiles/hat.txt"
 
 if [ ! -f NotoSansSC-Bold.ttf ]; then
   curl -fL -o NotoSansSC-Bold.ttf https://storage.whisplay.ai/whisplay-ai-chatbot/NotoSansSC-Bold.ttf
@@ -270,10 +273,11 @@ EOF
 touch /home/pi/whisplay-ai-chatbot/chatbot.log
 chown pi:pi /home/pi/whisplay-ai-chatbot/chatbot.log
 mkdir -p /etc/systemd/system/multi-user.target.wants
-# Do not auto-start chatbot.service. It is launched via whisplay-daemon app registry.
+# Start the app through the SPI launcher or the HAT+ desktop shortcut.
 rm -f /etc/systemd/system/multi-user.target.wants/chatbot.service
 
-cat > /etc/systemd/system/whisplay-chatbot-register.service <<'EOF'
+if [ "$image_model" = hat ]; then
+  cat > /etc/systemd/system/whisplay-chatbot-register.service <<'EOF'
 [Unit]
 Description=Register whisplay-ai-chatbot app to whisplay-daemon
 After=whisplay-daemon.service network.target
@@ -289,26 +293,14 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
-ln -sf /etc/systemd/system/whisplay-chatbot-register.service /etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service
-
-# The SPI daemon owns GPIO also used by the Plus board. On Plus, the app
-# accesses the button and RGB LED directly and uses the desktop DSI session.
-for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
-  drop_in="/etc/systemd/system/${unit}.service.d"
-  install -d -m 0755 "$drop_in"
-  cat > "$drop_in/10-whisplay-hat.conf" <<'EOF'
-[Unit]
-Wants=whisplay-select-hat.service
-After=whisplay-select-hat.service
-ConditionPathExists=/run/whisplay-image/hat
-EOF
-done
-
-install_networkmanager_polkit_rule
+  ln -sf /etc/systemd/system/whisplay-chatbot-register.service /etc/systemd/system/multi-user.target.wants/whisplay-chatbot-register.service
+fi
 
 mkdir -p /etc/whisplay-image
 cat > /etc/whisplay-image/basic-release <<EOF
 WHISPLAY_RELEASE_VERSION=$repo_version
+WHISPLAY_IMAGE_MODEL=$image_model
 WHISPLAY_CHATBOT_REF=$repo_ref
+WHISPLAY_CHATBOT_REVISION=$repo_revision
 WHISPLAY_CHATBOT_REPO=$repo_url
 EOF
