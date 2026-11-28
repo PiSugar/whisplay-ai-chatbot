@@ -90,6 +90,7 @@ const topLevelGroups: TopLevelGroup[] = [
         "Kimi (Moonshot AI)",
         "Alibaba Cloud Qwen",
         "OpenRouter",
+        "Atlas Cloud",
         "Perplexity",
       ].includes(section.title),
   },
