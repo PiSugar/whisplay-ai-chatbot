@@ -17,9 +17,13 @@ const piperHttpModel =
 const piperHttpLengthScale =
   process.env.PIPER_HTTP_LENGTH_SCALE || "1";
 
-const endpoint = (process.env.PIPER_HTTP_PATH || "").trim();
+const configuredPath = (process.env.PIPER_HTTP_PATH || "").trim();
 const baseUrl = /^https?:\/\//i.test(piperHttpHost) ? piperHttpHost : `http://${piperHttpHost}`;
-const url = `${baseUrl}:${piperHttpPort}${endpoint && !endpoint.startsWith("/") ? "/" : ""}${endpoint}`;
+const serverUrl = `${baseUrl}:${piperHttpPort}`;
+const explicitPath = configuredPath && !configuredPath.startsWith("/")
+  ? `/${configuredPath}`
+  : configuredPath;
+let detectedPath = "";
 const voice = (process.env.PIPER_HTTP_VOICE || "").trim();
 const timeout = Number(process.env.PIPER_HTTP_TIMEOUT_SEC || "60");
 const requestTimeout = Number.isFinite(timeout) && timeout > 0 ? timeout : 60;
@@ -63,13 +67,24 @@ const piperHttpTTS = async (text: string): Promise<TTSResult> => {
   let ready = false;
   let stage = "HTTP request";
   try {
-    const { stdout } = await run("curl", [
-      "-sS", "--connect-timeout", "5", "--max-time", String(requestTimeout),
-      "--write-out", "%{http_code}", "-H", "Content-Type: application/json",
-      "--data-binary", JSON.stringify({ text, length_scale: Number(piperHttpLengthScale), ...(voice ? { voice } : {}) }),
-      "-o", raw, url,
-    ]);
-    const status = stdout.trim();
+    const payload = JSON.stringify({ text, length_scale: Number(piperHttpLengthScale), ...(voice ? { voice } : {}) });
+    const requestSynthesis = async (route: string) => {
+      const { stdout } = await run("curl", [
+        "-sS", "--connect-timeout", "5", "--max-time", String(requestTimeout),
+        "--write-out", "%{http_code}", "-H", "Content-Type: application/json",
+        "--data-binary", payload,
+        "-o", raw, serverUrl + route,
+      ]);
+      return stdout.trim();
+    };
+
+    let route = explicitPath || detectedPath;
+    let status = await requestSynthesis(route);
+    // Older Piper releases synthesize at POST /; newer ones use POST /synthesize.
+    if (!explicitPath && (status === "404" || status === "405")) {
+      route = route === "" ? "/synthesize" : "";
+      status = await requestSynthesis(route);
+    }
     stage = /^\d{3}$/.test(status) ? `HTTP status ${status}` : "invalid HTTP status";
     if (status !== "200") throw new Error();
     stage = "WAV validation";
@@ -84,6 +99,7 @@ const piperHttpTTS = async (text: string): Promise<TTSResult> => {
     } finally {
       await handle.close();
     }
+    if (!explicitPath) detectedPath = route;
 
     // Preserve the format required by the unified Whisplay ALSA device.
     stage = "SoX conversion";

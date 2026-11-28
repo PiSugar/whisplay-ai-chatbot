@@ -31,7 +31,8 @@ test("Piper preserves defaults, sends valid JSON, validates responses and cleans
         calls.push([command, args]);
         if (command === "curl") {
           fs.writeFileSync(args[args.indexOf("-o") + 1], audio);
-          cb(failRequest ? Error(marker) : null, status, marker);
+          const httpStatus = typeof status === "function" ? status(args.at(-1)) : status;
+          cb(failRequest ? Error(marker) : null, httpStatus, marker);
         } else {
           fs.writeFileSync(args.at(-1), audio);
           cb(failConversion ? Error(marker) : null, "", marker);
@@ -53,8 +54,31 @@ test("Piper preserves defaults, sends valid JSON, validates responses and cleans
   assert.equal(curl[curl.indexOf("--max-time") + 1], "60");
   assert.deepEqual(JSON.parse(curl[curl.indexOf("--data-binary") + 1]), { text: input, length_scale: 1 });
 
+  const root = "http://localhost:8805";
+  const synthesize = root + "/synthesize";
+  const automatic = load({});
+  async function assertRoutes(expected, duration) {
+    const offset = calls.length;
+    const result = await automatic(input);
+    assert.equal(result.duration, duration);
+    assert.deepEqual(calls.slice(offset).filter(([command]) => command === "curl")
+      .map(([, args]) => args.at(-1)), expected);
+    if (result.filePath) fs.unlinkSync(result.filePath);
+    assert.deepEqual(fs.readdirSync(dir), []);
+  }
+  status = url => url === synthesize ? "200" : "405";
+  await assertRoutes([root, synthesize], 500);
+  await assertRoutes([synthesize], 500);
+  status = url => url === synthesize ? "500" : "200";
+  await assertRoutes([synthesize], 0);
+  status = url => url === root ? "200" : "404";
+  await assertRoutes([synthesize, root], 500);
+  await assertRoutes([root], 500);
+  status = "404";
+  await assertRoutes([root, synthesize], 0);
+
   const custom = load({ PIPER_HTTP_PATH: "synthesize", PIPER_HTTP_VOICE: "example", PIPER_HTTP_TIMEOUT_SEC: "2" });
-  for (const [code, body, badSoX] of [["500", audio, false], ["200", "<html>", false], ["200", audio, true]]) {
+  for (const [code, body, badSoX] of [["500", audio, false], ["404", audio, false], ["200", "<html>", false], ["200", audio, true]]) {
     status = code;
     audio = body;
     failConversion = badSoX;
