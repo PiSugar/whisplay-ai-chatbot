@@ -107,8 +107,10 @@ jobs:
           sudo apt-get install -y \
             binfmt-support \
             bmap-tools \
+            initramfs-tools-core \
             qemu-user-static \
-            xz-utils
+            xz-utils \
+            zstd
 
       - name: Register qemu-aarch64 for binfmt_misc
         run: |
@@ -263,6 +265,7 @@ jobs:
           check_file /etc/systemd/system/whisplay-expand-rootfs.service
           check_file /usr/local/sbin/whisplay-expand-rootfs
           check_file /etc/whisplay-image/basic-release
+          check_file /etc/whisplay-image/u-boot-release
           check_file /etc/cloud/cloud.cfg
           check_file /usr/bin/nmcli
           check_file /etc/polkit-1/rules.d/49-whisplay-networkmanager.rules
@@ -272,6 +275,11 @@ jobs:
           sudo grep -qxF "WHISPLAY_HAT_MODEL=$IMAGE_MODEL" "$root/home/pi/whisplay-ai-chatbot/.env"
           sudo grep -q 'whisplaysound' "$root/etc/asound.conf"
           sudo test -L "$wants/whisplay-expand-rootfs.service"
+          sudo grep -qxF 'WHISPLAY_UBOOT_VERSION=v0.6.0' "$root/etc/whisplay-image/u-boot-release"
+          sudo test -s "$boot/u-boot-whisplay-rpi-arm64.bin"
+          sudo grep -qxF 'enable_uart=1' "$config"
+          sudo grep -qxF 'uart_2ndstage=1' "$config"
+          sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' "$config"
 
           expect_absent() {
             local path
@@ -290,38 +298,44 @@ jobs:
           fi
 
           if [ "$IMAGE_MODEL" = hat ]; then
-            check_file /etc/whisplay-image/u-boot-release
-            sudo test -f "$boot/u-boot-whisplay-rpi-arm64.bin"
             sudo test -f "$boot/logo_lcd_240_280_rgb565.bmp"
             sudo test -f "$boot/overlays/whisplay-soundcard.dtbo"
             sudo grep -qxF 'dtoverlay=whisplay-soundcard' "$config"
-            sudo grep -qxF 'enable_uart=1' "$config"
-            sudo grep -qxF 'uart_2ndstage=1' "$config"
-            sudo grep -qxF 'kernel=u-boot-whisplay-rpi-arm64.bin' "$config"
             for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
               check_file "/etc/systemd/system/${unit}.service"
               sudo test -L "$wants/${unit}.service"
             done
             sudo grep -Eq '^SupplementaryGroups=([[:alnum:]_-]+[[:space:]]+)*netdev([[:space:]]|$)' "$services/whisplay-daemon.service"
-            expect_absent "$boot/overlays/whisplay-plus.dtbo"
+            expect_absent "$boot/overlays/whisplay-plus.dtbo" "$root/etc/initramfs-tools/hooks/whisplay-plus"
             sound_module=kernel/sound/soc/codecs/snd-soc-whisplay-soundcard.ko
           else
             check_file /usr/bin/chromium
             check_file /usr/share/applications/whisplay-ai-chatbot.desktop
             check_file /etc/modules-load.d/whisplay-hat-plus.conf
+            check_file /etc/initramfs-tools/hooks/whisplay-plus
             sudo test -f "$boot/overlays/whisplay-plus.dtbo"
             sudo grep -qxF 'dtoverlay=whisplay-plus' "$config"
             test "$(sudo grep -xcF 'dtoverlay=whisplay-plus,display_dsi=1' "$config")" -eq 2
             sudo grep -qxF 'st7701p_pisugar' "$root/etc/modules-load.d/whisplay-hat-plus.conf"
             sudo grep -qxF 'snd-soc-whisplay-soundcard' "$root/etc/modules-load.d/whisplay-hat-plus.conf"
-            expect_absent "$boot/overlays/whisplay-soundcard.dtbo" "$boot/u-boot-whisplay-rpi-arm64.bin" "$root/home/pi/Whisplay"
+            expect_absent "$boot/overlays/whisplay-soundcard.dtbo" "$boot/logo_lcd_240_280_rgb565.bmp" "$root/home/pi/Whisplay"
             for unit in whisplay-daemon whisplay-chatbot-register whisplay-soundcard-warmup; do
               expect_absent "$services/${unit}.service" "$root/usr/lib/systemd/system/${unit}.service" "$wants/${unit}.service"
             done
-            if sudo grep -Eq '^(kernel=|dtoverlay=whisplay-soundcard([,[:space:]]|$))' "$config"; then
+            if sudo grep -Eq '^dtoverlay=whisplay-soundcard([,[:space:]]|$)' "$config"; then
               echo "Found a Whisplay HAT boot setting in the HAT+ image" >&2
               exit 1
             fi
+            for option in quiet splash plymouth.ignore-serial-consoles; do
+              sudo tr '[:blank:]' '\n' < "$boot/cmdline.txt" | grep -xF "$option" >/dev/null
+            done
+            for initramfs in initramfs8 initramfs_2712; do
+              contents="$(sudo lsinitramfs "$boot/$initramfs")"
+              grep -Eq '(^|/)st7701p_pisugar\.ko(\.[[:alnum:]]+)?$' <<< "$contents"
+              for file in whisplay-plus.plymouth whisplay-plus.script logo.png; do
+                grep -Fq "usr/share/plymouth/themes/whisplay-plus/$file" <<< "$contents"
+              done
+            done
             sound_module=extra/snd-soc-whisplay-soundcard.ko
           fi
 
@@ -443,6 +457,8 @@ jobs:
 
           - \`whisplay-basic.img.xz\` — Whisplay HAT with the SPI LCD and Whisplay launcher.
           - \`whisplay-plus-basic.img.xz\` — Whisplay HAT+ with its native display, touch, and audio drivers. Open **Whisplay AI Chatbot** from the Raspberry Pi desktop.
+
+          Both images use Whisplay U-Boot v0.6.0. The SPI image displays its logo in U-Boot. The HAT+ image displays a centered Whisplay logo on the DSI touchscreen during early Linux startup through Plymouth.
 
           To switch HAT models, flash the matching image.
 

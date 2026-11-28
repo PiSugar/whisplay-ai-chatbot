@@ -145,10 +145,13 @@ GitHub Actions builds separate Whisplay HAT and HAT+ images in a matrix using
 the same pi-gen stage and the `WHISPLAY_IMAGE_MODEL` build setting. The HAT
 image uses the classic Whisplay driver, U-Boot splash, hardware daemon, and
 app registration service. The HAT+ image builds the display and audio modules
-from the `whisplay-plus` repository for every packaged kernel ABI. It uses
-the Raspberry Pi firmware and a desktop launcher. Each image configures its
-own device-tree overlay and `WHISPLAY_HAT_MODEL` before flashing. The release
-job publishes both image assets together after both builds pass inspection.
+from the `whisplay-plus` repository for every packaged kernel ABI and starts
+the chatbot from a desktop launcher. Both images pin Whisplay U-Boot v0.6.0.
+For HAT+, pi-gen installs the matching Plymouth theme and rebuilds both
+firmware initramfs files with the panel and DSI drivers. Each image configures
+its own device-tree overlay and `WHISPLAY_HAT_MODEL` before flashing. The
+release job publishes both image assets together after both builds pass
+inspection.
 
 ### Run Commands
 ```bash

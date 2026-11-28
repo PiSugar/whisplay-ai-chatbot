@@ -7,7 +7,9 @@ Choose the asset that matches your display and HAT. Both images are built from 6
 | Whisplay HAT with the SPI LCD | `whisplay-basic.img.xz` | Select **AI Chatbot** in the Whisplay launcher. |
 | Whisplay HAT+ with the MIPI DSI touchscreen | `whisplay-plus-basic.img.xz` | Open **Whisplay AI Chatbot** from the Raspberry Pi desktop or applications menu. |
 
-The Whisplay HAT image includes the Whisplay SPI boot splash and hardware daemon. The HAT+ image uses the standard Raspberry Pi boot path, the native HAT+ display, touch, and audio drivers, and Chromium for the fullscreen interface. Supported HAT+ boards and ribbon connections are listed in the [Whisplay Plus driver guide](https://github.com/PiSugar/whisplay-plus#install).
+From v2.5.2, both images use Whisplay U-Boot v0.6.0. Whisplay HAT shows the SPI logo in U-Boot and uses the Whisplay hardware daemon. Whisplay HAT+ shows a centered Whisplay logo on the DSI touchscreen during early Linux startup through Plymouth. It uses native HAT+ display, touch, and audio drivers and Chromium for the fullscreen interface. [U-Boot release notes](https://github.com/PiSugar/whisplay-u-boot/releases/tag/v0.6.0)
+
+Check the supported HAT+ boards and ribbon connections before powering on. [Whisplay Plus driver guide](https://github.com/PiSugar/whisplay-plus#install)
 
 ## Flash and start
 

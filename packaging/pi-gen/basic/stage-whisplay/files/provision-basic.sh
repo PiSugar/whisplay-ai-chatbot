@@ -143,7 +143,6 @@ case "$image_model" in
   hat)
     /usr/local/lib/whisplay-image/install-whisplay-driver.sh
     install_whisplay_daemon
-    /usr/local/lib/whisplay-image/install-whisplay-u-boot.sh
     ;;
   hat-plus)
     apt-get install -y chromium
@@ -242,6 +241,7 @@ if [ -f /etc/pisugar/config.json ]; then
 fi
 
 /usr/local/lib/whisplay-image/install-sugar-wifi-conf.sh
+/usr/local/lib/whisplay-image/install-whisplay-u-boot.sh "$image_model"
 
 cat > /etc/systemd/system/chatbot.service <<'EOF'
 [Unit]
